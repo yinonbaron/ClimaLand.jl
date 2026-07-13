@@ -1,0 +1,18 @@
+--- corpse_variable.f90
++++ corpse_variable.f90
+@@ -145,5 +145,0 @@
+-    !Parameters for this test model run, in namelist file
+-    namelist /CORPSE_casa_nml/ initial_C, &
+-                               exudate_npp_frac, &
+-                               rhizosphere_frac, &
+-                               litter_option
+@@ -155,2 +150,9 @@
+     integer:: litter_option
++
++    !Parameters for this test model run, in namelist file
++    namelist /CORPSE_casa_nml/ initial_C, &
++                               exudate_npp_frac, &
++                               rhizosphere_frac, &
++                               litter_option
++
+     real::T           !soil temperature (K)

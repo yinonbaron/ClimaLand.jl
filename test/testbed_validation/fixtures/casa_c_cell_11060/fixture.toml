@@ -1,0 +1,50 @@
+license = "CC-BY-4.0"
+schema_version = 1
+
+[cell]
+fixture_lat_index = 1
+fixture_lon_index = 1
+id = 11060
+pft = 7
+reason = "small productive-cell runtime and trajectory fixture"
+reference_maximum_gpp = 4.435247898101807
+source_lat_index = 20
+source_lon_index = 116
+
+[comparison]
+candidate_time_offset = 1900
+expected_alignment_warnings = 1
+reference_time_start = 1
+reference_time_stop = 365
+
+[fixture.driver]
+bytes = 75614
+filename = "met_1901_cell_11060.nc"
+sha256 = "b8247b3423cd977973ea1ce000b550be097c2f1871e7e9ef7cc1a80f41288b56"
+
+[fixture.grid]
+bytes = 244
+filename = "grid_cell_11060.csv"
+sha256 = "c41e282e2e77946a991e0fdb79c268c1db76a40f2ce2657aacb1699d106d7f8a"
+
+[fixture.output]
+bytes = 328584
+filename = "casa_1901_1905_cell_11060.nc"
+sha256 = "0e1039ecc9294d28d4ddc210c8988c5660f7e49b1cfd78a027154ed9d43e105c"
+
+[fixture.soil]
+bytes = 125
+filename = "soil_cell_11060.csv"
+sha256 = "e18b086a6aeb05e0ee8f3fe8225d6622bd15f75db427ce2e6dc75e4311017797"
+
+[generation]
+roundtrip_exact = true
+script = "extract_fixture.jl"
+
+[source]
+driver_archive = "INPUT_GSWP3_CLM5dev110_hist.tar.gz"
+driver_archive_md5 = "7b2a438bf095e1133fdf966327167171"
+driver_member = "INPUT_GSWP3_CLM5dev110_hist/met_1901_1901.nc"
+output_archive = "CASACNP_mod5_GSWP3_Conly.tar.gz"
+output_archive_md5 = "6a6dc040f338772bc38116a29d865788"
+output_member = "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc"

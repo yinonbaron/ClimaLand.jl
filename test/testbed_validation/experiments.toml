@@ -1,0 +1,206 @@
+schema_version = 1
+
+[dataset]
+title = "Global MIMICS-CN from biogeochemical testbed"
+doi = "10.5065/jqts-cg20"
+record_url = "https://zenodo.org/records/15504780"
+license = "CC-BY-4.0"
+
+[source]
+repository = "https://github.com/wwieder/biogeochem_testbed.git"
+local_checkout_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+archive_generating_commit_status = "unverified"
+
+[fortran]
+makefile = "SOURCE_CODE/Makefile.txt"
+executable = "casaclm_mimics-cn_corpse"
+compiler = "gfortran"
+netcdf_config = "nf-config"
+flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall -std=legacy"
+compatibility_patch = "fortran_compat.patch"
+
+[smoke.casa_c_1901]
+status = "passed on 2026-07-10"
+purpose = "runtime smoke only; default initial pools are not the archived spinup restart"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+soil_model = 1
+cycle = 1
+initialization = 0
+loops = 1
+meteorology_member = "INPUT_GSWP3_CLM5dev110_hist/met_1901_1901.nc"
+
+[smoke.casa_c_1901.input_md5]
+meteorology = "d425c87b43e21539c01b589ed90d660b"
+grid_info = "488a4ffb40aa3f47df6892adc202d702"
+casa_parameters = "9919e045af0226a2198b5988190de398"
+phenology = "4fe9fa658ead31026882c60540428a5c"
+soil_properties = "5e9367287627d16d324a47ed6ca1386e"
+perturbation = "616f3ef6153196979e79fb73b1a8f8ff"
+
+[comparison]
+c_only_undefined_fortran_variables = ["nLitInptStruc"]
+notes = "observed nondeterministic in repeated current-source CASA-C smoke runs; the assignment is reached although the C-only path never defines this N flux"
+
+[archive_check.casa_c_cell_51]
+status = "exact boundary case on 2026-07-11"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+archive_member = "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc"
+days = 365
+variables = 49
+comparison = "exact after adding the documented 1900-year offset to the raw Fortran time coordinate"
+fixture_manifest = "fixtures/casa_c_cell_51/fixture.toml"
+scope = "IGBP 17 ice/water; all carbon pools and fluxes are zero, so this does not establish active-pool parity"
+
+[archive_check.casa_c_cell_11060]
+status = "blocked by missing archived initialization on 2026-07-11"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+archive_member = "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc"
+days = 365
+variables = 49
+exact_variables = 28
+differing_variables = 21
+fixture_manifest = "fixtures/casa_c_cell_11060/fixture.toml"
+evidence = "drivers, environmental scalars, coordinates, and metadata match; plant/litter/soil pools and dependent fluxes differ with default initialization"
+
+[kernel_validation.casa_c_cell_11060]
+status = "passed on 2026-07-11"
+environmental_days = 365
+environmental_comparison = "exact after Float32 NetCDF conversion for root-weighted temperature, thetaLiq, fT, and fW"
+active_pool_transitions = 364
+maximum_soil_relative_error = 1.8427264500534383e-7
+maximum_respiration_relative_error = 1.6610488376999702e-4
+maximum_passive_input_relative_error = 3.38292176969971e-4
+notes = "errors reflect calculations from Float32 archived state/diagnostic values rather than the Fortran internal Float64 state"
+
+[[artifact]]
+id = "drivers"
+filename = "INPUT_GSWP3_CLM5dev110_hist.tar.gz"
+bytes = 13399060965
+md5 = "7b2a438bf095e1133fdf966327167171"
+url = "https://zenodo.org/api/records/15504780/files/INPUT_GSWP3_CLM5dev110_hist.tar.gz/content"
+source = "zenodo"
+
+[[artifact]]
+id = "casa_c_output"
+filename = "CASACNP_mod5_GSWP3_Conly.tar.gz"
+bytes = 1475682110
+md5 = "6a6dc040f338772bc38116a29d865788"
+url = "https://zenodo.org/api/records/15504780/files/CASACNP_mod5_GSWP3_Conly.tar.gz/content"
+source = "zenodo"
+
+[[artifact]]
+id = "mimics_c_output"
+filename = "MIMICS_mod5_Conly_KO4.tar.gz"
+bytes = 1617153062
+md5 = "1be7b02d77da6f85134b85086c918331"
+url = "https://zenodo.org/api/records/15504780/files/MIMICS_mod5_Conly_KO4.tar.gz/content"
+source = "zenodo"
+
+[[artifact]]
+id = "casa_cn_output"
+filename = "CASACNP_mod5_GSWP3_exudate0_cwdN.tar.gz"
+bytes = 1922634553
+md5 = "ffbf1ec50070d9d497d0521fb17e85e3"
+url = "https://zenodo.org/api/records/15504780/files/CASACNP_mod5_GSWP3_exudate0_cwdN.tar.gz/content"
+source = "zenodo"
+
+[[artifact]]
+id = "mimics_cn_output"
+filename = "MIMICS_mod5_GSWP3_KO4_exudate0_cwdN.tar.gz"
+bytes = 2583060797
+md5 = "255b6f31ee01e0269f803144c83122e5"
+url = "https://zenodo.org/api/records/15504780/files/MIMICS_mod5_GSWP3_KO4_exudate0_cwdN.tar.gz/content"
+source = "zenodo"
+
+[[artifact]]
+id = "legacy_casa_mean"
+filename = "casaclm_pool_flux_2000-2010_mean.nc"
+bytes = 1779588
+md5 = "4a13e991de06d209c7c53c1244afd404"
+url = ""
+source = "local_legacy_summary"
+
+[[artifact]]
+id = "legacy_mimics_mean"
+filename = "mimics_pool_flux_2000-2010_mean.nc"
+bytes = 946876
+md5 = "66dd59aa31daec44d067346e7017ced8"
+url = ""
+source = "local_legacy_summary"
+
+[[artifact]]
+id = "legacy_corpse_mean"
+filename = "corpse_pool_flux_2000-2010_mean.nc"
+bytes = 2331684
+md5 = "3a07763d84e734c987168407c8c22d77"
+url = ""
+source = "local_legacy_summary"
+
+[[experiment]]
+id = "casa_c"
+model = "CASA"
+cycle = "C"
+input_artifact = "drivers"
+output_artifact = "casa_c_output"
+archive_outputs = [
+    "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/ann_casaclm_pool_flux_1901_2014.nc",
+    "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc",
+    "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/casaclm_pool_flux_2010_2014_daily.nc",
+]
+parameter_file = "pftlookup_igbp_updated4_exud0.csv"
+candidate_source_commit = "630389decceaac88d7ab8e09339daa75f960ba32"
+candidate_reason = "latest repository commit before archived file creation on 2022-03-12"
+control_status = "original control directory named in NetCDF history is not committed or archived"
+
+[[experiment]]
+id = "mimics_c"
+model = "MIMICS"
+cycle = "C"
+input_artifact = "drivers"
+output_artifact = "mimics_c_output"
+archive_outputs = [
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/ann_casaclm_pool_flux_1901_2014.nc",
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/ann_mimics_pool_flux_1901_2014.nc",
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc",
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/casaclm_pool_flux_2010_2014_daily.nc",
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/mimics_pool_flux_1901_1905_daily.nc",
+    "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/mimics_pool_flux_2010_2014_daily.nc",
+]
+parameter_file = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+candidate_source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+candidate_reason = "latest repository commit before archived file creation on 2021-02-02"
+control_status = "original control directory named in NetCDF history is not committed or archived"
+
+[[experiment]]
+id = "casa_cn"
+model = "CASA"
+cycle = "CN"
+input_artifact = "drivers"
+output_artifact = "casa_cn_output"
+control_directory = "GRID_CN/CASACNP_mod5_GSWP3_JAMES"
+control_file = "fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+control_md5 = "6ffad3aff680ecbe45e2c9558caf4363"
+control_status = "candidate; archive missing locally and spinup restart is absent from Git history"
+
+[[experiment]]
+id = "mimics_cn"
+model = "MIMICS"
+cycle = "CN"
+input_artifact = "drivers"
+output_artifact = "mimics_cn_output"
+control_directory = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push"
+control_file = "fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+control_md5 = "29e746c0b19aa19373f6215737016897"
+control_status = "candidate; archive missing locally and plant/MIMICS spinup restarts are absent from Git history"
+
+[[experiment]]
+id = "corpse_c"
+model = "CORPSE"
+cycle = "C"
+input_artifact = ""
+output_artifact = "legacy_corpse_mean"
+control_directory = "EXAMPLE_GRID"
+parameter_file = "corpse_params_12.18d.2017.nml"
+control_status = "historical CRU-NCEP inputs unavailable; fresh pinned Fortran fallback selected"
+validation_fixture = "fixtures/corpse_c_fresh_cell_11060/fixture.toml"

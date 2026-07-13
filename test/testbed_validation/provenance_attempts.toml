@@ -1,0 +1,195 @@
+schema_version = 1
+updated = "2026-07-11"
+
+[[attempt]]
+id = "artifact_checksums"
+target = "published and local reference artifacts"
+status = "partial_pass"
+evidence = "drivers, CASA-C, MIMICS-C, and three legacy means match manifest byte counts and MD5; CASA-CN and MIMICS-CN are absent locally"
+command = "julia reference_harness.jl verify <data-root> <artifact ids>"
+
+[[attempt]]
+id = "current_source_build"
+target = "testbed source compilation"
+status = "pass"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+evidence = "modern gfortran build links after the declaration-order compatibility patch"
+command = "julia reference_harness.jl build-fortran <source-root> <build-parent>"
+notes = "legacy compiler warnings remain in build.log; a successful build is not an archive integrity pass"
+
+[[attempt]]
+id = "casa_c_archive_metadata"
+target = "CASA carbon-only archive provenance"
+status = "candidate_only"
+archive = "CASACNP_mod5_GSWP3_Conly.tar.gz"
+archive_output = "ann_casaclm_pool_flux_1901_2014.nc"
+created = "2022-03-12T17:01:30"
+parameter_file = "pftlookup_igbp_updated4_exud0.csv"
+recorded_control_directory = "GRID_CN/CASACNP_mod5_GSWP3_Conly"
+candidate_source_commit = "630389decceaac88d7ab8e09339daa75f960ba32"
+evidence = "NetCDF attributes and NCO history; candidate is the latest repository commit before creation"
+blocker = "control directory and spinup restart files were not archived or committed"
+
+[[attempt]]
+id = "mimics_c_archive_metadata"
+target = "MIMICS carbon-only archive provenance"
+status = "candidate_only"
+archive = "MIMICS_mod5_Conly_KO4.tar.gz"
+archive_output = "ann_mimics_pool_flux_1901_2014.nc"
+created = "2021-02-02"
+parameter_file = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+recorded_control_directory = "GRID_CN/MIMICS_mod5_Conly_KO4"
+candidate_source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+evidence = "NetCDF attributes; candidate is the latest repository commit before creation"
+blocker = "control directory and spinup restart files were not archived or committed"
+
+[[attempt]]
+id = "git_object_search_for_missing_controls"
+target = "carbon-only controls and CN restart states"
+status = "not_found"
+evidence = "exact path/filename searches over every local Git object and commit name list returned no matches"
+searched = [
+    "CASACNP_mod5_GSWP3_Conly",
+    "MIMICS_mod5_Conly_KO4",
+    "cnppool_end_spin_1901-1920_x500b.csv",
+    "mimicspool_end_spin_1901-1920_x500b.csv",
+]
+notes = "analysis notebooks mention the carbon-only experiment names but contain no authoritative controls or restarts"
+
+[[attempt]]
+id = "casa_cn_control_audit"
+target = "GRID_CN/CASACNP_mod5_GSWP3_JAMES historical control"
+status = "blocked_missing_inputs"
+control_md5 = "6ffad3aff680ecbe45e2c9558caf4363"
+present = [
+    "grid_info",
+    "casa_parameters",
+    "phenology",
+    "soil_properties",
+    "perturbation",
+]
+missing = ["extracted_1901_meteorology", "casa_spinup_restart"]
+notes = "meteorology is available inside the verified driver archive; the restart is absent from Git history"
+
+[[attempt]]
+id = "mimics_cn_control_audit"
+target = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push historical control"
+status = "blocked_missing_inputs"
+control_md5 = "29e746c0b19aa19373f6215737016897"
+present = [
+    "grid_info",
+    "casa_parameters",
+    "phenology",
+    "soil_properties",
+    "perturbation",
+    "mimics_parameters",
+]
+missing = [
+    "extracted_1901_meteorology",
+    "casa_spinup_restart",
+    "mimics_spinup_restart",
+]
+notes = "meteorology is available inside the verified driver archive; both restarts are absent from Git history"
+
+[[attempt]]
+id = "current_source_casa_c_smoke"
+target = "Fortran runtime with verified GSWP3 input"
+status = "pass_not_parity"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, 4263 cells"
+meteorology_md5 = "d425c87b43e21539c01b589ed90d660b"
+evidence = "created CASA pool/flux restart CSVs and an annual NetCDF file; errors.txt was empty"
+command = "julia reference_harness.jl smoke-fortran <source-root> <met_1901_1901.nc> <run-parent>"
+repeatability = "two independent builds/runs produced byte-identical restart CSVs and exact payloads for 47 of 48 NetCDF variables"
+known_difference = "nLitInptStruc differs because the carbon-only execution path does not assign that nitrogen flux before output"
+notes = "default initial pools make this a compiler/runtime smoke test only; its output is not a parity golden"
+
+[[attempt]]
+id = "current_source_casa_c_cell_51_archive_parity"
+target = "CASA carbon-only archived ice/water boundary, cell 51, 1901"
+status = "pass_exact_boundary_only"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, IGBP 17 ice/water"
+fixture = "fixtures/casa_c_cell_51/fixture.toml"
+command = "julia --project=.buildkite test/testbed_validation/casa_fixture_parity.jl <source-root> test/testbed_validation/fixtures/casa_c_cell_51 <run-parent>"
+evidence = "all 49 NetCDF variables and critical attributes match exactly for all 365 daily records"
+normalization = "the raw run time coordinate receives the archive's documented +1900 year-label offset; no scientific value tolerance is applied"
+legacy_warning = "one expected ReadMetNcFile alignment warning occurs because the sliced 1x1 grid preserves global cell ID 51"
+notes = "all carbon pools and fluxes are zero; this validates the boundary path and workflow but does not establish active-pool parity"
+
+[[attempt]]
+id = "current_source_casa_c_cell_11060_archive_parity"
+target = "CASA carbon-only archived productive trajectory, cell 11060, 1901"
+status = "failed_missing_initial_state"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, IGBP 7"
+fixture = "fixtures/casa_c_cell_11060/fixture.toml"
+command = "julia --project=.buildkite test/testbed_validation/casa_fixture_parity.jl <source-root> test/testbed_validation/fixtures/casa_c_cell_11060 <run-parent>"
+evidence = "28 of 49 variables match exactly, including drivers, fT, fW, thetaLiq, coordinates, masks, and critical metadata; 21 active pools and dependent fluxes differ"
+blocker = "the archive-generating spinup restart was not published or committed; default PFT initial pools are not the archived historical initial state"
+notes = "the productive fixture is valid for environmental-kernel tests and will become the active trajectory gate when the initialization is reconstructed"
+
+[[attempt]]
+id = "corpse_current_source_control_compatibility"
+target = "EXAMPLE_GRID CORPSE historical control with current source"
+status = "control_update_required"
+evidence = "the historical control has 28 values; current source requires line 29 for NetCDF output interval"
+source_change = "ff31ec5 introduced line 29 on 2020-10-12"
+notes = "adding an output interval may restore control parsing but does not establish which historical source generated the legacy mean"
+
+[[attempt]]
+id = "corpse_current_source_one_day_probe"
+target = "ordered CORPSE cohort update in current pinned Fortran source"
+status = "pass_exact_float32"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source_md5 = "8462f575650535d06692d0d8ee6ef17a"
+parameter_md5 = "575cf154cbb1e293117b57a150f565a1"
+configuration = "one soil pool, two fixed cohorts, dt=1/365 year, gfortran default REAL"
+command = "julia reference_harness.jl corpse-one-day <source-root> <run-parent>"
+evidence = "all nine rhizosphere cohort states match Julia exactly; daily CO2 differs by two Float32 ULP because of reduction rounding"
+scope = "equation-order fixture only; this does not reproduce the legacy 2000-2010 mean"
+
+[[attempt]]
+id = "corpse_legacy_mean_forcing_audit"
+target = "corpse_pool_flux_2000-2010_mean.nc"
+status = "blocked_missing_historical_forcing"
+evidence = "NetCDF history identifies 2000-2010 daily ncrcat followed by cdo -yearmean; the committed control requires 4299-cell CLM4.5/CRU-NCEP meteorology"
+missing = ["INPUT_MET_GRID_CRU_NCEP_SOILLIQ/met_1901_1901.nc through met_2010_2010.nc"]
+incompatible_available_input = "published CLM5/GSWP3 archive contains 4263 active cells and cannot be substituted"
+notes = "the 2024 JAMES methods explicitly distinguish the older CLM4.5/CRU-NCEP experiment from the newer CLM5/GSWP3 dataset"
+
+[[attempt]]
+id = "corpse_legacy_mean_restart_audit"
+target = "historical CORPSE 1901 initialization"
+status = "blocked_missing_exact_casa_restart"
+present = ["corpsepool_end_1901_1920_spin_x499b_minFW.csv"]
+missing = ["cnppool_end_1901_1920_spin_x499b_minFW_corpse.csv"]
+candidate_rejected = "cnppool_end_1901_1920_postADspin_x499c.csv belongs to a differently named CASA post-accelerated-spin experiment"
+notes = "renaming the nearby candidate would be an unsupported scientific substitution"
+
+[[attempt]]
+id = "corpse_legacy_mean_historical_source_audit"
+target = "source/configuration around the 2018-03-15 NetCDF creation date"
+status = "no_complete_runnable_configuration"
+evidence = "the last public source commit before file creation is 26b4630 (2017-11-17); the named corpse_params_12.18d.2017.nml was first committed on 2018-04-26 and its restart on 2018-08-24"
+binary = "committed historical executable is Linux x86-64 ELF and cannot run on the current macOS ARM environment"
+notes = "later current-source controls additionally need line 29; none of these source choices restore the missing CRU-NCEP files and exact CASA restart"
+
+[[attempt]]
+id = "corpse_fresh_gswp3_cell_11060_reference"
+target = "authoritative CORPSE fallback reference"
+status = "pass_fresh_fortran"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CORPSE carbon, initcasa=0, one 1901 year, productive GSWP3 cell 11060, daily output"
+fixture = "fixtures/corpse_c_fresh_cell_11060/fixture.toml"
+command = "julia reference_harness.jl corpse-fortran-fixture <source-root> test/testbed_validation/fixtures/casa_c_cell_11060 <run-parent>"
+evidence = "two independent fresh runs produced exact scientific payloads for all 28 CORPSE and 49 CASA NetCDF variables plus byte-identical cohort restarts; Julia reproduces the trajectory within committed measured tolerances"
+raw_netcdf_note = "file checksums differ only because the global creation-time attribute changes"
+legacy_mean_role = "informational only unless the missing historical inputs are later recovered"
+
+[[attempt]]
+id = "public_exact_filename_search"
+target = "missing control directories and restart files"
+status = "not_found"
+evidence = "exact searches of the public GitHub repository and indexed web results returned no control/restart copies"
+notes = "the published paper documents the 1901-1920 repeated spinup concept but not the missing restart byte content"
