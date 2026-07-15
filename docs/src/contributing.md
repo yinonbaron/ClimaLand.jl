@@ -74,6 +74,21 @@ using JuliaFormatter; format(".")
 The `Documentation` test rebuilds the documentation for the PR and checks if the docs
 are consistent and generate valid output.
 
+To reproduce the complete documentation build locally, run these commands from the
+repository root:
+
+```sh
+julia -O0 --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+julia -O0 --color=yes --project=docs --procs=4 docs/make.jl
+```
+
+The first command also installs the Python environment used by the CES tutorial.
+The build executes every Literate tutorial and keeps doctests and missing-doc checks
+enabled. On Julia 1.12, `LowRankApprox` may emit a non-fatal deprecation warning
+about extending `Base.Array` during precompilation. Local builds may also warn that
+the search index exceeds Documenter's size threshold and that deployment is skipped
+because no CI deployment environment was detected.
+
 To add internal references, for example to another documentation page or API, see the relevant
 `Documenter.jl` `@ref` [documentation page](@extref Documenter Named-@refs), example syntax:
 `[see contributor guide](@ref "Contributing")` for a page or

@@ -1,7 +1,7 @@
-# https://github.com/jheinen/GR.jl/issues/278#issuecomment-587090846
-ENV["GKSwstype"] = "nul"
 push!(LOAD_PATH, joinpath(@__DIR__, ".."))
 using Distributed
+# https://github.com/jheinen/GR.jl/issues/278#issuecomment-587090846
+@everywhere ENV["GKSwstype"] = "nul"
 @everywhere using Documenter
 @everywhere using Literate
 @everywhere using ClimaLand
