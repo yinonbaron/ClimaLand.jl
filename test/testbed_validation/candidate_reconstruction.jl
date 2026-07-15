@@ -10,18 +10,17 @@ import Test
 
 const CANDIDATE_SPEC_PATH = joinpath(@__DIR__, "candidate_reconstruction.toml")
 
+# ============================================================================
+# Hashes and path safety
+# ============================================================================
+
 sha256sum(path) = bytes2hex(SHA.sha256(read(path)))
 
-function md5sum(path)
-    executable = Sys.which("md5sum")
-    isnothing(executable) && (executable = Sys.which("md5"))
-    isnothing(executable) && error("Neither md5sum nor md5 is available")
-    command =
-        basename(executable) == "md5" ? Cmd([executable, "-q", path]) :
-        Cmd([executable, path])
-    return first(split(readchomp(command)))
-end
+"""
+    safe_relative_path(path, description)
 
+Normalize a relative path and reject absolute or root-escaping values.
+"""
 function safe_relative_path(path, description)
     isabspath(path) && error("$description must be relative: $path")
     normalized = normpath(path)
@@ -34,6 +33,11 @@ function safe_relative_path(path, description)
     return normalized
 end
 
+"""
+    canonical_path(path)
+
+Resolve existing path prefixes so missing descendants still expose aliases.
+"""
 function canonical_path(path)
     current = abspath(path)
     suffix = String[]
@@ -47,6 +51,11 @@ function canonical_path(path)
     return isempty(suffix) ? resolved : normpath(joinpath(resolved, suffix...))
 end
 
+"""
+    path_is_within(path, root)
+
+Return whether `path` is contained by `root`, including through symlinks.
+"""
 function path_is_within(path, root)
     relative = relpath(canonical_path(path), canonical_path(root))
     separator = string(Base.Filesystem.path_separator)
@@ -54,6 +63,11 @@ function path_is_within(path, root)
            !(relative == ".." || startswith(relative, ".." * separator))
 end
 
+"""
+    assert_disjoint_roots(left, right, left_name, right_name)
+
+Reject overlapping or aliased roots that could overwrite immutable inputs.
+"""
 function assert_disjoint_roots(left, right, left_name, right_name)
     (path_is_within(left, right) || path_is_within(right, left)) && error(
         "$left_name and $right_name roots must not overlap or alias: " *
@@ -62,6 +76,15 @@ function assert_disjoint_roots(left, right, left_name, right_name)
     return nothing
 end
 
+# ============================================================================
+# Candidate mutations and derivation
+# ============================================================================
+
+"""
+    replace_control_value(line, before, after)
+
+Replace one parsed control value while preserving comments and whitespace.
+"""
 function replace_control_value(line, before, after)
     parts = split(line, '!'; limit = 2)
     strip(parts[1]) == before || error(
@@ -80,6 +103,11 @@ function replace_control_value(line, before, after)
     return leading * after * trailing * suffix
 end
 
+"""
+    mutation_record(mutation, line; extra = Dict{String, Any}())
+
+Return the machine-readable audit record for one candidate mutation.
+"""
 function mutation_record(mutation, line; extra = Dict{String, Any}())
     record = Dict{String, Any}(
         "type" => mutation["type"],
@@ -92,6 +120,11 @@ function mutation_record(mutation, line; extra = Dict{String, Any}())
     return record
 end
 
+"""
+    apply_control_mutation(lines, mutation)
+
+Apply one asserted line mutation to a Fortran control.
+"""
 function apply_control_mutation(lines, mutation)
     line_number = mutation["line"]
     1 <= line_number <= length(lines) ||
@@ -110,6 +143,13 @@ function apply_control_mutation(lines, mutation)
     return derived, record
 end
 
+"""
+    apply_named_parameter_mutation(lines, mutation)
+
+Apply one asserted mutation to a uniquely named MIMICS parameter.
+
+Called from [`apply_mutation`](@ref).
+"""
 function apply_named_parameter_mutation(lines, mutation)
     matches = Int[]
     for (line_number, line) in enumerate(lines)
@@ -139,6 +179,13 @@ function apply_named_parameter_mutation(lines, mutation)
     return derived, record
 end
 
+"""
+    apply_casa_pft_mutation(lines, mutation)
+
+Apply one asserted field mutation to a CASA PFT row.
+
+Called from [`apply_mutation`](@ref).
+"""
 function apply_casa_pft_mutation(lines, mutation)
     header_matches = Int[]
     for (line_number, line) in enumerate(lines)
@@ -199,6 +246,11 @@ function apply_casa_pft_mutation(lines, mutation)
     return derived, record
 end
 
+"""
+    apply_mutation(lines, mutation)
+
+Dispatch a specification mutation to its format-specific implementation.
+"""
 function apply_mutation(lines, mutation)
     mutation_type = mutation["type"]
     if mutation_type == "control_line"
@@ -211,6 +263,11 @@ function apply_mutation(lines, mutation)
     error("Unsupported candidate mutation type: $mutation_type")
 end
 
+"""
+    checkout_commit(source_root)
+
+Return the source checkout commit, or `"unavailable"` outside a Git checkout.
+"""
 function checkout_commit(source_root)
     git = Sys.which("git")
     isnothing(git) && return "unavailable"
@@ -222,18 +279,26 @@ function checkout_commit(source_root)
     end
 end
 
+"""
+    candidate_record(candidate, source, destination, diffs)
+
+Return provenance, evidence, hashes, and mutations for a derived candidate.
+
+Called from [`derive_candidates`](@ref).
+"""
 function candidate_record(candidate, source, destination, diffs)
+    harness = reference_harness_module()
     return Dict(
         "id" => candidate["id"],
         "kind" => candidate["kind"],
         "confidence" => candidate["confidence"],
         "source" => candidate["source"],
         "source_bytes" => filesize(source),
-        "source_md5" => md5sum(source),
+        "source_md5" => harness.md5sum(source),
         "source_sha256" => sha256sum(source),
         "destination" => candidate["destination"],
         "derived_bytes" => filesize(destination),
-        "derived_md5" => md5sum(destination),
+        "derived_md5" => harness.md5sum(destination),
         "derived_sha256" => sha256sum(destination),
         "evidence" => candidate["evidence"],
         "rejected_alternative" =>
@@ -242,16 +307,11 @@ function candidate_record(candidate, source, destination, diffs)
     )
 end
 
-function write_toml_atomic(path, value)
-    mkpath(dirname(abspath(path)))
-    temporary = path * ".tmp"
-    open(temporary, "w") do io
-        TOML.print(io, value; sorted = true)
-    end
-    mv(temporary, path; force = true)
-    return path
-end
+"""
+    verify_expected_hash(candidate, field, actual)
 
+Reject a candidate whose pinned source or derived hash changed.
+"""
 function verify_expected_hash(candidate, field, actual)
     expected = get(candidate, field, actual)
     actual == expected || error(
@@ -261,6 +321,13 @@ function verify_expected_hash(candidate, field, actual)
     return actual
 end
 
+"""
+    write_candidate_atomic(destination, content, candidate)
+
+Write and hash-check candidate bytes before atomically replacing a destination.
+
+Called from [`derive_candidates`](@ref).
+"""
 function write_candidate_atomic(destination, content, candidate)
     mkpath(dirname(destination))
     temporary, io = mktemp(dirname(destination))
@@ -280,6 +347,13 @@ function write_candidate_atomic(destination, content, candidate)
     return destination
 end
 
+"""
+    verify_validation_inputs(source_root, spec; expected_paths = nothing)
+
+Verify every pinned upstream input staged by reduced validation.
+
+Called from [`validate_candidates`](@ref).
+"""
 function verify_validation_inputs(source_root, spec; expected_paths = nothing)
     inputs = get(spec, "validation_input", Any[])
     records = Dict{String, Any}[]
@@ -308,6 +382,11 @@ function verify_validation_inputs(source_root, spec; expected_paths = nothing)
     return records
 end
 
+"""
+    verify_fixture_inputs(fixture_dir)
+
+Verify the byte counts and SHA-256 hashes in a reduced fixture manifest.
+"""
 function verify_fixture_inputs(fixture_dir)
     manifest_path = joinpath(fixture_dir, "fixture.toml")
     isfile(manifest_path) || error("Missing fixture manifest: $manifest_path")
@@ -343,6 +422,14 @@ function verify_fixture_inputs(fixture_dir)
     return records
 end
 
+"""
+    derive_candidates(source_root, output_root, spec_path = CANDIDATE_SPEC_PATH)
+
+Generate the auditable candidate set without writing into the source checkout.
+
+# Returns
+The path to the generated `derivation_report.toml`.
+"""
 function derive_candidates(
     source_root,
     output_root,
@@ -405,129 +492,55 @@ function derive_candidates(
         "specification_sha256" => sha256sum(spec_path),
         "candidate" => records,
     )
-    return write_toml_atomic(
+    return reference_harness_module().write_toml_atomic(
         joinpath(output_root, "derivation_report.toml"),
         report,
     )
 end
 
-function validation_cases()
-    return [
-        (;
-            id = "casa_boreal_nfix",
-            soil_model = 1,
-            cycle = 2,
-            casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv",
-            mimics_parameter = nothing,
-            control_candidate = nothing,
-            covers = ("casa_boreal_nfix",),
-        ),
-        (;
-            id = "mimics_ko6_fi30",
-            soil_model = 2,
-            cycle = 2,
-            casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv",
-            mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI30.candidate.csv",
-            control_candidate = nothing,
-            covers = ("mimics_ko6_fi30",),
-        ),
-        (;
-            id = "mimics_ko6_fi10",
-            soil_model = 2,
-            cycle = 2,
-            casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv",
-            mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI10.candidate.csv",
-            control_candidate = nothing,
-            covers = ("mimics_ko6_fi10",),
-        ),
-        (;
-            id = "mimics_ko6_fi05",
-            soil_model = 2,
-            cycle = 2,
-            casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv",
-            mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI05.candidate.csv",
-            control_candidate = nothing,
-            covers = ("mimics_ko6_fi05",),
-        ),
-        (;
-            id = "casa_c_prespin",
-            soil_model = 1,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv",
-            mimics_parameter = nothing,
-            control_candidate = "candidate:controls/casa_c/prespin.lst",
-            covers = ("casa_c_prespin",),
-        ),
-        (;
-            id = "casa_c_adspin",
-            soil_model = 1,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0AD.csv",
-            mimics_parameter = nothing,
-            control_candidate = "candidate:controls/casa_c/adspin.lst",
-            covers = ("casa_c_adspin",),
-        ),
-        (;
-            id = "casa_c_spin",
-            soil_model = 1,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv",
-            mimics_parameter = nothing,
-            control_candidate = "candidate:controls/casa_c/spin.lst",
-            covers = ("casa_c_spin",),
-        ),
-        (;
-            id = "casa_c_history",
-            soil_model = 1,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv",
-            mimics_parameter = nothing,
-            control_candidate = "candidate:controls/casa_c/history.lst",
-            covers = ("casa_c_history",),
-        ),
-        (;
-            id = "mimics_c_prespin",
-            soil_model = 2,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv",
-            mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv",
-            control_candidate = "candidate:controls/mimics_c/prespin.lst",
-            covers = ("mimics_c_prespin",),
-        ),
-        (;
-            id = "mimics_c_spin",
-            soil_model = 2,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv",
-            mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv",
-            control_candidate = "candidate:controls/mimics_c/spin.lst",
-            covers = ("mimics_c_spin",),
-        ),
-        (;
-            id = "mimics_c_spin_continuation",
-            soil_model = 2,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv",
-            mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv",
-            control_candidate = "candidate:controls/mimics_c/spin_continuation.lst",
-            covers = ("mimics_c_spin_continuation",),
-        ),
-        (;
-            id = "mimics_c_history",
-            soil_model = 2,
-            cycle = 1,
-            casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv",
-            mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv",
-            control_candidate = "candidate:controls/mimics_c/history.lst",
-            covers = ("mimics_c_history",),
-        ),
-    ]
+# ============================================================================
+# Reduced-prespin validation
+# ============================================================================
+
+"""
+    validation_cases(spec_path = CANDIDATE_SPEC_PATH)
+
+Return the candidate-to-control matrix exercised by reduced validation.
+"""
+function validation_cases(spec_path = CANDIDATE_SPEC_PATH)
+    candidates = TOML.parsefile(spec_path)["candidate"]
+    return map(candidates) do candidate
+        kind = candidate["kind"]
+        candidate_reference = "candidate:" * candidate["destination"]
+        casa_parameter =
+            kind == "casa_parameter" ? candidate_reference :
+            candidate["validation_casa_parameter"]
+        mimics_parameter =
+            kind == "mimics_parameter" ? candidate_reference :
+            get(candidate, "validation_mimics_parameter", nothing)
+        control_candidate = kind == "control" ? candidate_reference : nothing
+        return (;
+            id = candidate["id"],
+            soil_model = candidate["validation_soil_model"],
+            cycle = candidate["validation_cycle"],
+            casa_parameter,
+            mimics_parameter,
+            control_candidate,
+        )
+    end
 end
 
-function validation_source_paths()
+"""
+    validation_source_paths(spec_path = CANDIDATE_SPEC_PATH)
+
+Return the complete set of upstream files required by the validation matrix.
+
+Called from [`validate_candidates`](@ref).
+"""
+function validation_source_paths(spec_path = CANDIDATE_SPEC_PATH)
     paths =
         ["GRID_CN/modis_phenology_wtundra.txt", "GRID_CN/co2delta_control.txt"]
-    for case in validation_cases()
+    for case in validation_cases(spec_path)
         for reference in (case.casa_parameter, case.mimics_parameter)
             isnothing(reference) && continue
             prefix, relative = split(reference, ':'; limit = 2)
@@ -537,6 +550,11 @@ function validation_source_paths()
     return sort!(unique!(paths))
 end
 
+"""
+    reference_harness_module()
+
+Return the loaded pinned-Fortran reference harness module.
+"""
 function reference_harness_module()
     parent = parentmodule(@__MODULE__)
     isdefined(parent, :TestbedReferenceHarness) ||
@@ -544,6 +562,11 @@ function reference_harness_module()
     return getfield(parent, :TestbedReferenceHarness)
 end
 
+"""
+    resolve_validation_parameter(reference, source_root, candidate_root)
+
+Resolve a `source:` or `candidate:` parameter reference to a verified file.
+"""
 function resolve_validation_parameter(reference, source_root, candidate_root)
     prefix, relative = split(reference, ':'; limit = 2)
     root = if prefix == "source"
@@ -558,6 +581,17 @@ function resolve_validation_parameter(reference, source_root, candidate_root)
     return abspath(path)
 end
 
+"""
+    write_reduced_candidate_control(source, destination, case)
+
+Reduce only runtime extent, required input, and output fields for one case.
+
+The candidate's model, nutrient cycle, vegetation count, daily-output mode,
+initial-path fields, and NetCDF interval are preserved for the pinned Fortran
+parser and executor.
+
+Called from [`write_validation_workflow`](@ref).
+"""
 function write_reduced_candidate_control(source, destination, case)
     harness = reference_harness_module()
     parsed = harness.parse_control(source)
@@ -591,8 +625,27 @@ function write_reduced_candidate_control(source, destination, case)
         )
         source_lines = readlines(source; keep = true)
         target_lines = readlines(target; keep = true)
+        reduction_fields = Set((
+            :points,
+            :loops,
+            :initialization,
+            :years,
+            :grid_info,
+            :casa_parameters,
+            :phenology,
+            :soil_properties,
+            :meteorology,
+            :casa_final,
+            :casa_flux_final,
+            :casa_netcdf,
+            :mimics_parameters,
+            :mimics_final,
+            :mimics_netcdf,
+            :perturbation,
+        ))
         diffs = Dict{String, Any}[]
         for (line, field) in enumerate(harness.CONTROL_FIELDS)
+            field in reduction_fields || continue
             mutation = Dict(
                 "type" => "control_line",
                 "line" => line,
@@ -617,7 +670,12 @@ function write_reduced_candidate_control(source, destination, case)
     end
 end
 
-function write_validation_workflow(
+"""
+    assert_validation_roots(source_root, fixture_dir, candidate_root, run_root)
+
+Reject validation roots that could overwrite source, candidates, or fixtures.
+"""
+function assert_validation_roots(
     source_root,
     fixture_dir,
     candidate_root,
@@ -647,6 +705,25 @@ function write_validation_workflow(
         "Validation fixture",
         "candidate output",
     )
+    return nothing
+end
+
+"""
+    write_validation_workflow(source_root, fixture_dir, candidate_root, run_root,
+                              spec_path = CANDIDATE_SPEC_PATH)
+
+Materialize the two-repeat workflow and auditable minimal control reductions.
+
+Called from [`validate_candidates`](@ref).
+"""
+function write_validation_workflow(
+    source_root,
+    fixture_dir,
+    candidate_root,
+    run_root,
+    spec_path = CANDIDATE_SPEC_PATH,
+)
+    assert_validation_roots(source_root, fixture_dir, candidate_root, run_root)
     verify_fixture_inputs(fixture_dir)
     harness = reference_harness_module()
     fixture_manifest = TOML.parsefile(joinpath(fixture_dir, "fixture.toml"))
@@ -659,7 +736,7 @@ function write_validation_workflow(
     stages = Dict{String, Any}[]
     reductions = Dict{String, Any}[]
 
-    for case in validation_cases(), repeat in 1:2
+    for case in validation_cases(spec_path), repeat in 1:2
         control_name = "$(case.id)-repeat-$repeat.lst"
         control_path = joinpath(controls, control_name)
         if isnothing(case.control_candidate)
@@ -767,10 +844,17 @@ function write_validation_workflow(
     return (; workflow_path, reduction_report)
 end
 
-function validation_records(results)
+"""
+    validation_records(results, spec_path = CANDIDATE_SPEC_PATH)
+
+Verify repeat hashes and return one auditable record per candidate case.
+
+Called from [`validate_candidates`](@ref).
+"""
+function validation_records(results, spec_path = CANDIDATE_SPEC_PATH)
     records = Dict{String, Any}[]
     by_name = Dict(result.name => result for result in results)
-    for case in validation_cases()
+    for case in validation_cases(spec_path)
         repeats = Dict{String, Any}[]
         hashes = Dict{String, String}[]
         for repeat in 1:2
@@ -800,7 +884,6 @@ function validation_records(results)
                 "id" => case.id,
                 "soil_model" => case.soil_model,
                 "cycle" => case.cycle,
-                "covers" => collect(case.covers),
                 "status" => "pass_deterministic_reduced_prespin",
                 "repeat" => repeats,
             ),
@@ -809,6 +892,16 @@ function validation_records(results)
     return records
 end
 
+"""
+    validate_candidates(source_root, fixture_dir, candidate_root, run_root,
+                        spec_path = CANDIDATE_SPEC_PATH)
+
+Generate every candidate and run two deterministic reduced prespins with the
+pinned Fortran executable.
+
+# Returns
+The path to `reduced_prespin_validation.toml`.
+"""
 function validate_candidates(
     source_root,
     fixture_dir,
@@ -816,35 +909,12 @@ function validate_candidates(
     run_root,
     spec_path = CANDIDATE_SPEC_PATH,
 )
-    assert_disjoint_roots(
-        source_root,
-        run_root,
-        "Candidate source",
-        "validation run",
-    )
-    assert_disjoint_roots(
-        candidate_root,
-        run_root,
-        "Candidate output",
-        "validation run",
-    )
-    assert_disjoint_roots(
-        fixture_dir,
-        run_root,
-        "Validation fixture",
-        "validation run",
-    )
-    assert_disjoint_roots(
-        fixture_dir,
-        candidate_root,
-        "Validation fixture",
-        "candidate output",
-    )
+    assert_validation_roots(source_root, fixture_dir, candidate_root, run_root)
     spec = TOML.parsefile(spec_path)
     validation_inputs = verify_validation_inputs(
         source_root,
         spec;
-        expected_paths = validation_source_paths(),
+        expected_paths = validation_source_paths(spec_path),
     )
     fixture_inputs = verify_fixture_inputs(fixture_dir)
     derivation_report =
@@ -856,6 +926,7 @@ function validate_candidates(
         fixture_dir,
         candidate_root,
         run_root,
+        spec_path,
     )
     results = harness.run_stage_workflow(
         executable,
@@ -879,18 +950,32 @@ function validate_candidates(
             abspath(validation_workflow.reduction_report),
         "control_reduction_report_sha256" =>
             sha256sum(validation_workflow.reduction_report),
-        "case" => validation_records(results),
+        "case" => validation_records(results, spec_path),
     )
     report_path = joinpath(candidate_root, "reduced_prespin_validation.toml")
-    write_toml_atomic(report_path, report)
+    harness.write_toml_atomic(report_path, report)
     println("Candidate reduced-prespin validation: $report_path")
     return report_path
 end
 
+"""
+    self_test()
+
+Run the standalone candidate-reconstruction test set.
+"""
 function self_test()
     include(joinpath(@__DIR__, "candidate_reconstruction_tests.jl"))
 end
 
+# ============================================================================
+# Command-line interface
+# ============================================================================
+
+"""
+    usage(io = stdout)
+
+Print candidate-reconstruction command usage.
+"""
 function usage(io = stdout)
     println(
         io,
@@ -906,6 +991,15 @@ function usage(io = stdout)
     println(io, "       julia candidate_reconstruction.jl self-test")
 end
 
+"""
+    main(args)
+
+Run candidate generation, pinned validation, or standalone self-tests.
+
+# Returns
+Process exit status `0` on success, `1` on runtime failure, or `2` for usage
+errors.
+"""
 function main(args)
     try
         if !isempty(args) && args[1] == "generate" && length(args) in (3, 4)

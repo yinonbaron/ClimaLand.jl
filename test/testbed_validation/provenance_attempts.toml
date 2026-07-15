@@ -232,20 +232,34 @@ evidence = "published NetCDF parameter attributes select CASA exud0 and MIMICS b
 audit = "candidate_reconstruction.toml pins source/derived SHA-256 hashes and emits exact line-level diffs without modifying upstream files; blank legacy prespin line 29 is explicitly completed with the pinned reader's required NetCDF interval"
 
 [[attempt]]
+id = "carbon_nitrogen_prespin_control_candidates"
+target = "CASA-CN and bounded MIMICS-CN CLM5/GSWP3 prespin controls"
+status = "pass_auditable_derivation"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "one CASA-CN boreal-N-fix control and three MIMICS-CN KO6/FI controls derived from the committed prespin family"
+switches = "isomModel is explicit for CASA or MIMICS; icycle=2 is explicitly preserved"
+casa_cn_sha256 = "f327eda2dfd68d3acd9e166600b65c9eb94f36b27e27572d8a87c00078e93db6"
+mimics_cn_fi30_sha256 = "bb796d5d86b96c7d915c0c3376d9e5be3e69f7b8d7addfc49e9a71767f6bedde"
+mimics_cn_fi10_sha256 = "818e4042a08060bb6fc49e602b59ac963587a5981fc9013cf53d8188f2838d19"
+mimics_cn_fi05_sha256 = "88ff85b2259c55c7368d5cda73ec94845a2e11c45a334ee6e1ca3e76fda05031"
+audit = "each derived control points to explicitly named .candidate parameter files, records exact source/derived hashes and mutations, and leaves the upstream controls untouched"
+
+[[attempt]]
 id = "candidate_reduced_prespin_validation"
-target = "all reconstructed parameters and carbon-only control families"
+target = "all reconstructed parameters and carbon-only/carbon-nitrogen controls"
 status = "pass_deterministic_reduced_prespin"
 source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 fixture = "fixtures/casa_c_cell_11060/fixture.toml"
-configuration = "twelve cases, one per candidate, one productive cell, one 1901 loop, each executed twice"
+configuration = "sixteen cases, one per candidate, one productive cell, one 1901 loop, each executed twice"
 cases = [
     "CASA-CN boreal N-fix",
     "MIMICS-CN KO6/FI30",
     "MIMICS-CN KO6/FI10",
     "MIMICS-CN KO6/FI05",
+    "four derived CN prespin controls wired to the candidate parameter files",
     "four independently reduced CASA-C controls",
     "four independently reduced MIMICS-C controls",
 ]
-evidence = "all candidates parse and complete with the pinned executable; each generated control is mechanically reduced through an auditable 29-field diff; every staged upstream scientific and fixture input has a pinned SHA-256 hash; every CASA and MIMICS restart CSV is byte-identical between independent repeats"
-command = "julia candidate_reconstruction.jl validate <source-root> <fixture-dir> <candidate-output> <run-root>"
+evidence = "all candidates parse and complete with the pinned executable; control reduction changes only runtime extent, required input paths, and output paths while preserving model/cycle and other candidate configuration; every staged upstream scientific and fixture input has a pinned SHA-256 hash; every CASA and MIMICS restart CSV is byte-identical between independent repeats"
+command = "julia --project=.buildkite candidate_reconstruction.jl validate <source-root> <fixture-dir> <candidate-output> <run-root>"
 scope = "reader compatibility and deterministic reduced prespin only; archive-generating full-grid parity remains downstream"

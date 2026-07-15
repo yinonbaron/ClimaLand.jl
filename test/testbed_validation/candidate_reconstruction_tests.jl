@@ -244,6 +244,10 @@ using Test
             "mimics_ko6_fi30",
             "mimics_ko6_fi10",
             "mimics_ko6_fi05",
+            "casa_cn_prespin",
+            "mimics_cn_prespin_fi30",
+            "mimics_cn_prespin_fi10",
+            "mimics_cn_prespin_fi05",
             "casa_c_prespin",
             "mimics_c_prespin",
         ))
@@ -257,13 +261,37 @@ using Test
         @test length(candidates["mimics_ko6_fi30"]["mutation"]) == 2
         @test length(candidates["mimics_ko6_fi10"]["mutation"]) == 3
         @test length(candidates["mimics_ko6_fi05"]["mutation"]) == 3
+        case_cycles =
+            Dict(case.id => string(case.cycle) for case in validation_cases())
         @test all(
             candidate["kind"] != "control" || any(
                 mutation ->
                     get(mutation, "field", "") == "cycle" &&
-                        mutation["after"] == "1",
+                        mutation["after"] == case_cycles[candidate["id"]],
                 candidate["mutation"],
             ) for candidate in values(candidates)
+        )
+        cn_control_ids = (
+            "casa_cn_prespin",
+            "mimics_cn_prespin_fi30",
+            "mimics_cn_prespin_fi10",
+            "mimics_cn_prespin_fi05",
+        )
+        @test all(
+            any(
+                mutation ->
+                    get(mutation, "field", "") == "casa_parameters" &&
+                        occursin(".candidate.csv", mutation["after"]),
+                candidates[id]["mutation"],
+            ) for id in cn_control_ids
+        )
+        @test all(
+            any(
+                mutation ->
+                    get(mutation, "field", "") == "mimics_parameters" &&
+                        occursin(".candidate.csv", mutation["after"]),
+                candidates[id]["mutation"],
+            ) for id in cn_control_ids[2:end]
         )
     end
 
@@ -277,17 +305,17 @@ using Test
         @test cases["casa_boreal_nfix"].cycle == 2
         @test cases["mimics_ko6_fi30"].soil_model == 2
         @test cases["mimics_ko6_fi30"].cycle == 2
+        @test cases["casa_cn_prespin"].soil_model == 1
+        @test cases["casa_cn_prespin"].cycle == 2
+        @test !isnothing(cases["casa_cn_prespin"].control_candidate)
+        @test cases["mimics_cn_prespin_fi30"].soil_model == 2
+        @test cases["mimics_cn_prespin_fi30"].cycle == 2
+        @test !isnothing(cases["mimics_cn_prespin_fi30"].control_candidate)
         @test cases["casa_c_prespin"].cycle == 1
         @test cases["mimics_c_prespin"].cycle == 1
-        @test all(case.covers == (case.id,) for case in values(cases))
         @test all(
             (candidates[id]["kind"] == "control") ==
             !isnothing(case.control_candidate) for (id, case) in cases
-        )
-        @test Set(vcat((collect(item.covers) for item in values(cases))...)) ==
-              Set(
-            candidate["id"] for
-            candidate in TOML.parsefile(CANDIDATE_SPEC_PATH)["candidate"]
         )
     end
 
@@ -319,7 +347,15 @@ using Test
             @test reduced[:cycle] == 1
             @test record["source_sha256"] == sha256sum(source)
             @test record["derived_sha256"] == sha256sum(destination)
-            @test length(record["diff"]) == length(harness.CONTROL_FIELDS)
+            reduced_fields = Set(item["field"] for item in record["diff"])
+            @test !isempty(reduced_fields)
+            @test length(reduced_fields) < length(harness.CONTROL_FIELDS)
+            @test !in("soil_model", reduced_fields)
+            @test !in("cycle", reduced_fields)
+            @test reduced[:vegetation_types] ==
+                  harness.parse_control(source)[:vegetation_types]
+            @test reduced[:netcdf_interval] ==
+                  harness.parse_control(source)[:netcdf_interval]
         end
     end
 end

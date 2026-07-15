@@ -45,14 +45,20 @@ the older table parses all preceding values and then stops at the missing
 fields. Selecting the parser-complete committed table is therefore a source
 compatibility choice, not another inferred scientific parameter change.
 
-The control candidates cover the CASA carbon-only prespin, accelerated spin,
-normal spin, and historical stages, and the MIMICS carbon-only prespin, two
-long-spin stages, and historical stage. They are derived from the checked-in
-CN families with explicit `isomModel` and `icycle=1` rules. Output paths are
-changed from `OUTPUT_CN` to `OUTPUT_C`; CASA and MIMICS parameter paths are
-changed only where the source prespin named one of the missing CN candidates.
-Assertions whose before and after values are equal are retained in the report
-so the model switch is explicit even when it was already correct.
+Four CN prespin controls wire the inferred files into runnable derived controls
+without using the missing original filenames: one CASA-CN boreal-N-fix control
+and one MIMICS-CN control for each KO6/FI candidate. Their parameter paths keep
+the `.candidate` classification visible, and their `isomModel` and `icycle=2`
+values are explicit in the machine-readable derivation.
+
+The remaining control candidates cover the CASA carbon-only prespin,
+accelerated spin, normal spin, and historical stages, and the MIMICS
+carbon-only prespin, two long-spin stages, and historical stage. They are
+derived from the checked-in CN families with explicit `isomModel` and
+`icycle=1` rules. Output paths are changed from `OUTPUT_CN` to `OUTPUT_C`;
+CASA and MIMICS parameter paths are changed only where the source prespin named
+one of the missing CN candidates. Assertions whose before and after values are
+equal are retained in the report so the switches remain explicit.
 
 ## Generate and inspect candidates
 
@@ -74,17 +80,18 @@ Candidate bytes are written to a temporary file, hash-verified, and only then
 atomically moved into place; a failed derivation leaves any prior valid
 candidate intact.
 
-The standalone reconstruction tests can be run without external data:
+Run the package test suite through its canonical test environment:
 
 ```sh
-julia --startup-file=no \
-  test/testbed_validation/candidate_reconstruction.jl self-test
+julia --startup-file=no --project=test test/runtests.jl
 ```
+
+For a focused check without external data, the script also supports `self-test`.
 
 ## Validate with the pinned Fortran executable
 
 ```sh
-julia --startup-file=no \
+julia --startup-file=no --project=.buildkite \
   test/testbed_validation/candidate_reconstruction.jl validate \
   ../biogeochem_testbed \
   test/testbed_validation/fixtures/casa_c_cell_11060 \
@@ -92,25 +99,28 @@ julia --startup-file=no \
 ```
 
 Validation compiles or reuses the pinned executable through the resumable
-reference harness. Twelve one-cell, one-year cases execute every generated
+reference harness. Sixteen one-cell, one-year cases execute every generated
 candidate independently: the CASA boreal-N-fix table, all three bounded MIMICS
-KO6/FI alternatives, four CASA-C controls, and four MIMICS-C controls.
+KO6/FI alternatives, four derived CN prespin controls, four CASA-C controls,
+and four MIMICS-C controls.
 The validation-run and candidate-output roots must also be disjoint from the
 upstream checkout and immutable fixture tree, including through symlink aliases.
 
 For a control candidate, the reduced validation control is derived from that
-exact generated `.lst`, not synthesized independently. Each of its 29 parsed
-fields is replaced by an explicit one-cell validation value with asserted
-before and after values. `control_reduction_report.toml` records the source and
-derived hashes plus the complete field-level reduction diff. This preserves
-evidence that the candidate itself parsed while keeping the runtime small.
+exact generated `.lst`, not synthesized independently. Only runtime extent,
+required input paths, and output paths are replaced with explicit one-cell
+values. The model, nutrient cycle, vegetation count, daily-output mode,
+initial-path fields, point-output settings, and NetCDF interval remain the
+candidate values read by Fortran. `control_reduction_report.toml` records the
+source and derived hashes plus every field-level reduction, making the reduced
+execution auditable without masking candidate configuration.
 
-Each of the twelve cases is run independently twice. Parsing and execution must complete, and
-the CASA and MIMICS restart CSV hashes must be identical between repeats. The
-result is written to `reduced_prespin_validation.toml`, including executable,
-fixture, control, and output hashes. NetCDF file bytes are not used for this
-repeatability gate because their global creation timestamp is intentionally
-variable.
+Each of the sixteen cases is run independently twice. Parsing and execution
+must complete, and the CASA and MIMICS restart CSV hashes must be identical
+between repeats. The result is written to `reduced_prespin_validation.toml`,
+including executable, fixture, control, and output hashes. NetCDF file bytes
+are not used for this repeatability gate because their global creation
+timestamp is intentionally variable.
 
 The reduced runs prove that the candidates are internally consistent with the
 pinned reader and deterministic for the selected productive cell. They do not
