@@ -70,6 +70,14 @@ restart_file = ClimaLand.find_restart(output_dir)
 Y, t = ClimaLand.read_checkpoint(restart_file; model)
 ```
 
+On singleton contexts, checkpoints for `ColumnGrid` domains and rectilinear
+latitude-longitude vertical domains store prognostic field values without
+asking ClimaCore to reconstruct the unsupported grid. Pass `model` to
+`read_checkpoint` so that ClimaLand can initialize the equivalent destination
+domain before restoring all state fields. Alternatively, initialize the
+destination model yourself and use `set_initial_conditions_from_checkpoint!`
+to restore in place.
+
 ## Output Structure
 
 `ClimaLand` utilizes the `OutputPathGenerator` from `ClimaUtilities` to manage

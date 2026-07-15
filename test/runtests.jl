@@ -20,6 +20,9 @@ end
 @safetestset "General utilities tests" begin
     include("shared_utilities/utilities.jl")
 end
+@safetestset "Checkpoint grid compatibility" begin
+    include("shared_utilities/checkpoints.jl")
+end
 @safetestset "Variable types tests" begin
     include("shared_utilities/variable_types.jl")
 end
