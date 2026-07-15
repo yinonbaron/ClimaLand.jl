@@ -52,6 +52,10 @@ units, finite values, missing values, and sign changes while ignoring
 non-scientific global creation metadata.
 The archive is checked against its manifest byte count and MD5 before use,
 and each atomically extracted comparison member has its own recorded MD5.
+Separately, the nine carbon stocks are summed and tested statistically: every
+annual area-weighted global sum uses `rtol = 2e-6`, and the pooled cell-year
+99th-percentile absolute relative error must not exceed `1e-3`. Grid cells
+with zero archived stock are excluded from division and reported explicitly.
 
 `search_report.toml` pins an exact match. If the evidence-backed source
 revision does not match, it instead records the exhausted matrix, best
@@ -78,10 +82,17 @@ unpublished archive compiler/toolchain: the source Makefile records GNU
 Fortran 8.1.0, while the reproducible run used GNU Fortran 16.1.0 because the
 archive metadata does not identify or publish its compiler binary.
 
+The statistical reproduction tests pass. The largest annual global-stock
+relative error is `1.0552e-6`, below the `2e-6` tolerance. Across 338,466
+cell-years with nonzero archived stock, the 99th-percentile absolute relative
+error is `5.8361e-4` (0.0584%), below the `1e-3` criterion. Of 147,516
+zero-reference cell-years, 147,402 are also zero in the reconstruction and 114
+belong to one nonzero reconstructed grid cell repeated across all years.
+
 The reconstruction report SHA-256 is
-`8367bad22fc35d3d2dedb10d51da33213c49be7d1ef5da4c7a8dc7b3067b1b72`;
+`cf0d6f454886f61e82a6dc02a3ad075027150112dd2d19a07a0cb07b6e28b805`;
 the exhausted-search report SHA-256 is
-`377a053bd8e10d02517b83ea73aca7240a2369c5a3935cb3dcbec2f391f1460e`.
+`584c394d397cacc953d787e996e851a94a8fd35f932c3d3ae046fc5c39d1a28c`.
 
 If execution completed but reporting was interrupted, regenerate only the
 report:

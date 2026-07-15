@@ -50,6 +50,12 @@ annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
 daily_windows = [[1901, 1905], [2010, 2014]]
 nco_version_recorded_by_archive = "4.7.5"
 
+[statistical_comparison]
+stock_variables = ["cleaf", "cwood", "cfroot", "clitmetb", "clitstr", "clitcwd", "csoilmic", "csoilslow", "csoilpass"]
+global_sum_rtol = 2.0e-6
+grid_absolute_relative_quantile = 0.99
+grid_absolute_relative_rtol = 1.0e-3
+
 [compiler]
 source_makefile_version = "GNU Fortran 8.1.0"
 source_makefile_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall"

@@ -11,6 +11,7 @@ end
 module TestbedCASACReconstruction
 
 import SHA
+import Statistics
 import TOML
 import Test
 
@@ -51,6 +52,15 @@ function load_matrix(path = MATRIX_PATH)
     matrix["transformation"]["passive_restoration"]["multiplier"] ==
     matrix["passive_carbon_multiplier"] ||
         error("CASA-C passive restoration matrix is inconsistent")
+    statistics = matrix["statistical_comparison"]
+    0 < statistics["global_sum_rtol"] < 1 ||
+        error("CASA-C global-stock relative tolerance is invalid")
+    0 < statistics["grid_absolute_relative_quantile"] < 1 ||
+        error("CASA-C grid-stock quantile is invalid")
+    0 < statistics["grid_absolute_relative_rtol"] < 1 ||
+        error("CASA-C grid-stock relative tolerance is invalid")
+    isempty(statistics["stock_variables"]) &&
+        error("CASA-C statistical comparison has no stock variables")
     return matrix
 end
 
@@ -763,6 +773,63 @@ function accumulate_result!(record, result, year)
     return record
 end
 
+function stock_statistics(
+    reference_values,
+    candidate_values,
+    annual_global_sums,
+    settings,
+)
+    length(reference_values) == length(candidate_values) ||
+        error("Stock comparison lengths differ")
+    nonzero_reference = .!iszero.(reference_values)
+    absolute_relative_errors =
+        abs.(
+            (
+                candidate_values[nonzero_reference] .-
+                reference_values[nonzero_reference]
+            ) ./ reference_values[nonzero_reference],
+        )
+    isempty(absolute_relative_errors) &&
+        error("Stock comparison has no nonzero reference values")
+    quantile = settings["grid_absolute_relative_quantile"]
+    grid_statistic = Statistics.quantile(absolute_relative_errors, quantile)
+    grid_rtol = settings["grid_absolute_relative_rtol"]
+    global_rtol = settings["global_sum_rtol"]
+    global_relative_errors = map(
+        record -> record["absolute_relative_error"],
+        values(annual_global_sums),
+    )
+    global_passes =
+        all(record["passes"] for record in values(annual_global_sums))
+    zero_reference = .!nonzero_reference
+    return Dict(
+        "all_pass" => global_passes && grid_statistic <= grid_rtol,
+        "global_sum" => Dict(
+            "rtol" => global_rtol,
+            "passes" => global_passes,
+            "maximum_absolute_relative_error" =>
+                maximum(global_relative_errors),
+            "year" => annual_global_sums,
+        ),
+        "grid_cell_year" => Dict(
+            "quantile" => quantile,
+            "absolute_relative_error" => grid_statistic,
+            "rtol" => grid_rtol,
+            "passes" => grid_statistic <= grid_rtol,
+            "count" => length(reference_values),
+            "defined_relative_error_count" =>
+                length(absolute_relative_errors),
+            "exact_defined_count" =>
+                count(iszero, absolute_relative_errors),
+            "zero_reference_count" => count(zero_reference),
+            "zero_reference_candidate_nonzero_count" => count(
+                value -> !iszero(value),
+                candidate_values[zero_reference],
+            ),
+        ),
+    )
+end
+
 function annual_comparison(
     data_root,
     case_root;
@@ -778,10 +845,19 @@ function annual_comparison(
     )
     historical = joinpath(case_root, "stages", "04-historical")
     history_years = matrix["stages"]["historical"]["years"]
+    statistical_settings = matrix["statistical_comparison"]
+    stock_variables = Set(String.(statistical_settings["stock_variables"]))
+    reference_stock_values = Float64[]
+    candidate_stock_values = Float64[]
+    annual_global_sums = Dict{String, Any}()
     records = Dict{String, Any}()
     metadata_mismatches = String[]
     NCDatasets.NCDataset(reference_path) do reference
         reference_names = Set(String.(keys(reference)))
+        issubset(stock_variables, reference_names) ||
+            error("Archive is missing configured carbon-stock variables")
+        land_mask = reference["cellMissing"].var[:, :] .== 0
+        land_area = Float64.(reference["landarea"].var[:, :])[land_mask]
         for year in first(history_years):last(history_years)
             candidate_path =
                 joinpath(historical, netcdf_name(year; daily = true))
@@ -790,6 +866,11 @@ function annual_comparison(
                 if reference_names != candidate_names
                     push!(metadata_mismatches, "variable names differ in $year")
                 end
+                issubset(stock_variables, candidate_names) || error(
+                    "Candidate is missing configured carbon-stock variables in $year",
+                )
+                reference_stock_total = zeros(Float64, size(land_mask))
+                candidate_stock_total = zeros(Float64, size(land_mask))
                 for name in
                     sort!(collect(intersect(reference_names, candidate_names)))
                     reference_variable = reference[name]
@@ -842,6 +923,10 @@ function annual_comparison(
                         (reference_values = [reference_values])
                     candidate_values isa AbstractArray ||
                         (candidate_values = [candidate_values])
+                    if name in stock_variables
+                        reference_stock_total .+= Float64.(reference_values)
+                        candidate_stock_total .+= Float64.(candidate_values)
+                    end
                     result = comparator().compare_values(
                         reference_values,
                         candidate_values;
@@ -860,6 +945,27 @@ function annual_comparison(
                     end
                     accumulate_result!(record, result, year)
                 end
+                reference_active = reference_stock_total[land_mask]
+                candidate_active = candidate_stock_total[land_mask]
+                append!(reference_stock_values, reference_active)
+                append!(candidate_stock_values, candidate_active)
+                reference_global_pg =
+                    sum(reference_active .* land_area) * 1.0e-9
+                candidate_global_pg =
+                    sum(candidate_active .* land_area) * 1.0e-9
+                annual_global_sums[string(year)] = Dict(
+                    "reference_pg_c" => reference_global_pg,
+                    "candidate_pg_c" => candidate_global_pg,
+                    "absolute_relative_error" =>
+                        abs(candidate_global_pg - reference_global_pg) /
+                        abs(reference_global_pg),
+                    "passes" => isapprox(
+                        candidate_global_pg,
+                        reference_global_pg;
+                        rtol = statistical_settings["global_sum_rtol"],
+                        atol = 0.0,
+                    ),
+                )
             end
         end
     end
@@ -874,6 +980,12 @@ function annual_comparison(
         "metadata_mismatches" => unique(metadata_mismatches),
         "failed_variables" => failed_variables,
         "variable" => records,
+        "stock_statistics" => stock_statistics(
+            reference_stock_values,
+            candidate_stock_values,
+            annual_global_sums,
+            statistical_settings,
+        ),
     )
 end
 
@@ -906,6 +1018,8 @@ function write_case_report(data_root, case_root)
         "schema_version" => 1,
         "case" => basename(case_root),
         "status" => matches ? "matching_setup_pinned" : "mismatch",
+        "statistical_reproduction_passes" =>
+            annual["stock_statistics"]["all_pass"],
         "documented_convergence_checks_pass" => convergence_passes,
         "passive_restoration_verified" => restoration_verified,
         "configuration" => Dict(
@@ -1083,6 +1197,41 @@ function self_test()
         Test.@test length(matrix["case"]) == 1
         Test.@test haskey(matrix["excluded"], "pinned_current")
         Test.@test Set(keys(candidate_control_paths())) == Set(CONTROL_IDS)
+        statistical_settings = matrix["statistical_comparison"]
+        Test.@test statistical_settings["global_sum_rtol"] == 2.0e-6
+        Test.@test statistical_settings["grid_absolute_relative_quantile"] ==
+                   0.99
+        Test.@test statistical_settings["grid_absolute_relative_rtol"] == 1.0e-3
+        synthetic_reference = [100.0, 100.0, 0.0]
+        synthetic_candidate = [100.05, 99.95, 1.0]
+        synthetic_global = Dict(
+            "1901" =>
+                Dict("absolute_relative_error" => 1.0e-3, "passes" => true),
+        )
+        synthetic_settings = Dict(
+            "global_sum_rtol" => 2.0e-3,
+            "grid_absolute_relative_quantile" => 0.99,
+            "grid_absolute_relative_rtol" => 1.0e-3,
+        )
+        synthetic_statistics = stock_statistics(
+            synthetic_reference,
+            synthetic_candidate,
+            synthetic_global,
+            synthetic_settings,
+        )
+        Test.@test synthetic_statistics["all_pass"]
+        Test.@test synthetic_statistics["grid_cell_year"]["absolute_relative_error"] ≈
+                   5.0e-4
+        Test.@test synthetic_statistics["grid_cell_year"]["zero_reference_candidate_nonzero_count"] ==
+                   1
+        strict_settings = copy(synthetic_settings)
+        strict_settings["grid_absolute_relative_rtol"] = 1.0e-4
+        Test.@test !stock_statistics(
+            synthetic_reference,
+            synthetic_candidate,
+            synthetic_global,
+            strict_settings,
+        )["all_pass"]
         mktempdir() do root
             source = joinpath(root, "source.lst")
             harness().write_smoke_control(
