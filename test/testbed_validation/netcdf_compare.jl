@@ -1,7 +1,8 @@
 module TestbedNetCDFCompare
 
-import NCDatasets
 import Test
+
+import NCDatasets
 
 const CRITICAL_ATTRIBUTES = (
     "units",

@@ -108,13 +108,15 @@ parameters
 
 ## /test folder
 
-The `/test` folder contains a test suite that can be run with `make test`. It contains 4
+The `/test` folder contains a test suite that can be run with `make test`. It contains 5
 subfolders:
 
 - diagnostics: This folder contains tests for `ClimaLand.Diagnostics`
 - integrated: This folder contains tests for the integrated LSMs
 - shared_utilities: This folder tests ClimaLand utilities. It contains four files and a subfolder, `implicit_timestepping`, which contains tests for Richards and full soil model implicit timestepping tests
 - standalone: This contains 5 subfolders, `Bucket`, `Snow`, `Soil`, `SurfaceWater`, and `Vegetation`. These contain tests for each of the respective standalone models.
+- testbed_validation: Reproducibility tooling and focused tests for the external
+  biogeochemistry testbed reference workflows.
 
 `/test` also contains 3 files:
 

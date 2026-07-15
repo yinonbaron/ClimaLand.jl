@@ -39,6 +39,10 @@ const CONTROL_FIELDS = (
     :netcdf_interval,
 )
 
+# ============================================================================
+# Manifest, controls, and artifacts
+# ============================================================================
+
 load_manifest(path = MANIFEST_PATH) = TOML.parsefile(path)
 
 function control_value(line)
@@ -148,6 +152,10 @@ function md5sum(path)
     return strip(output)
 end
 
+# ============================================================================
+# Restart transformations
+# ============================================================================
+
 function increment_decimal_exponent(exponent)
     parsed = parse(Int, exponent)
     incremented = parsed + 1
@@ -227,6 +235,10 @@ function restore_casa_passive_carbon(source, destination)
     write(destination, join(transformed))
     return destination
 end
+
+# ============================================================================
+# Resumable workflow orchestration
+# ============================================================================
 
 function write_toml_atomic(path, value)
     mkpath(dirname(abspath(path)))
@@ -625,6 +637,10 @@ function run_stage_workflow(executable, workflow_path, run_root)
     return results
 end
 
+# ============================================================================
+# Artifact verification
+# ============================================================================
+
 function verify_artifact(artifact, data_root; require_present)
     result = artifact_status(artifact, data_root)
     if result.status == :missing
@@ -675,6 +691,10 @@ function report_artifacts(manifest, data_root, ids; verify, require_present)
     end
     return all_ok
 end
+
+# ============================================================================
+# Pinned Fortran builds
+# ============================================================================
 
 function require_tool(name)
     path = Sys.which(name)
@@ -907,6 +927,10 @@ function ensure_fortran_build(source_root, run_root; manifest = load_manifest())
     return executable
 end
 
+# ============================================================================
+# CASA prespin-to-history tracer
+# ============================================================================
+
 function stage_smoke_input(source_root, relative_path, run_dir, staged_name)
     source = joinpath(source_root, relative_path)
     isfile(source) || error("Missing smoke-test input $source")
@@ -1125,6 +1149,10 @@ function casa_workflow_tracer(source_root, fixture_dir, run_root)
     println("CASA workflow tracer: $run_root")
     return results
 end
+
+# ============================================================================
+# Smoke tests and reference fixtures
+# ============================================================================
 
 function run_smoke_fortran(
     source_root,
@@ -1360,6 +1388,10 @@ function corpse_one_day(source_root, run_parent = tempdir())
     println("CORPSE one-day probe: $run_dir")
     return run_dir
 end
+
+# ============================================================================
+# Self-tests
+# ============================================================================
 
 function self_test(source_root = "")
     manifest = load_manifest()
@@ -1694,6 +1726,10 @@ function self_test(source_root = "")
     end
     return true
 end
+
+# ============================================================================
+# Command-line interface
+# ============================================================================
 
 function usage(io = stdout)
     println(io, "Usage:")
