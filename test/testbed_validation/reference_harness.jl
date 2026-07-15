@@ -397,6 +397,36 @@ function reusable_stage(metadata_path, expected_fingerprint, stage_dir, outputs)
     return true
 end
 
+function recoverable_output_contract_stage(
+    metadata_path,
+    name,
+    stage_dir,
+    outputs,
+    expected_execution_fingerprint,
+)
+    isfile(metadata_path) || return nothing
+    metadata = try
+        TOML.parsefile(metadata_path)
+    catch
+        return nothing
+    end
+    get(metadata, "status", "") == "failed" || return nothing
+    startswith(get(metadata, "error", ""), "Stage '$name' did not create:") ||
+        return nothing
+    get(metadata, "execution_fingerprint", "") ==
+    expected_execution_fingerprint || return nothing
+    recorded_outputs = get(metadata, "outputs", Dict())
+    issubset(Set(outputs), Set(keys(recorded_outputs))) || return nothing
+    for output in outputs
+        path = joinpath(stage_dir, output)
+        isfile(path) || return nothing
+        record = recorded_outputs[output]
+        filesize(path) == record["bytes"] || return nothing
+        md5sum(path) == record["md5"] || return nothing
+    end
+    return metadata
+end
+
 function stage_metadata(
     stage,
     stage_fingerprint,
@@ -407,6 +437,7 @@ function stage_metadata(
     elapsed_seconds,
     status;
     error_message = nothing,
+    execution_fingerprint = nothing,
 )
     metadata = Dict(
         "schema_version" => 1,
@@ -419,6 +450,8 @@ function stage_metadata(
         "inputs" => inputs,
         "outputs" => outputs,
     )
+    isnothing(execution_fingerprint) ||
+        (metadata["execution_fingerprint"] = execution_fingerprint)
     isnothing(error_message) || (metadata["error"] = error_message)
     return metadata
 end
@@ -499,6 +532,7 @@ function run_stage_workflow(executable, workflow_path, run_root)
         control = Dict{String, Any}()
         inputs = Dict{String, Any}[]
         outputs = String[]
+        execution_fingerprint = nothing
         stage_fingerprint = fingerprint(
             Dict(
                 "source_commit" => workflow["source_commit"],
@@ -531,6 +565,15 @@ function run_stage_workflow(executable, workflow_path, run_root)
                     ),
                 )
             end
+            execution_fingerprint = fingerprint(
+                Dict(
+                    "schema_version" => 1,
+                    "source_commit" => workflow["source_commit"],
+                    "executable" => executable_record,
+                    "control" => control,
+                    "inputs" => inputs,
+                ),
+            )
             stage_fingerprint = fingerprint(
                 Dict(
                     "schema_version" => 1,
@@ -550,6 +593,38 @@ function run_stage_workflow(executable, workflow_path, run_root)
                 push!(
                     results,
                     (; name, status = :reused, directory = stage_dir),
+                )
+                stage_dirs[name] = stage_dir
+                continue
+            end
+            recovery = recoverable_output_contract_stage(
+                metadata_path,
+                name,
+                stage_dir,
+                outputs,
+                execution_fingerprint,
+            )
+            if !isnothing(recovery)
+                records = Dict(
+                    output => recovery["outputs"][output] for output in outputs
+                )
+                metadata = stage_metadata(
+                    stage,
+                    stage_fingerprint,
+                    control,
+                    inputs,
+                    records,
+                    log,
+                    recovery["elapsed_seconds"],
+                    "complete";
+                    execution_fingerprint,
+                )
+                metadata["recovered_from_output_contract_error"] =
+                    recovery["error"]
+                write_toml_atomic(metadata_path, metadata)
+                push!(
+                    results,
+                    (; name, status = :recovered, directory = stage_dir),
                 )
                 stage_dirs[name] = stage_dir
                 continue
@@ -582,7 +657,8 @@ function run_stage_workflow(executable, workflow_path, run_root)
                 records,
                 log,
                 elapsed_seconds,
-                "complete",
+                "complete";
+                execution_fingerprint,
             )
             write_toml_atomic(metadata_path, metadata)
             push!(results, (; name, status = :ran, directory = stage_dir))
@@ -609,6 +685,7 @@ function run_stage_workflow(executable, workflow_path, run_root)
                 elapsed_seconds,
                 "failed";
                 error_message,
+                execution_fingerprint,
             )
             write_toml_atomic(metadata_path, metadata)
             push!(results, (; name, status = :failed, directory = stage_dir))
@@ -883,8 +960,12 @@ function fortran_build_inputs(source_root, manifest)
     )
 end
 
-function ensure_fortran_build(source_root, run_root; manifest = load_manifest())
-    expected_commit = manifest["source"]["local_checkout_commit"]
+function ensure_fortran_build(
+    source_root,
+    run_root;
+    manifest = load_manifest(),
+    expected_commit = manifest["source"]["local_checkout_commit"],
+)
     actual_commit = source_commit(source_root)
     actual_commit == expected_commit || error(
         "Fortran source must be pinned to $expected_commit; found $actual_commit",
