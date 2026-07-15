@@ -173,3 +173,7 @@ end
 @safetestset "ILAMB setup" begin
     include("../experiments/ilamb/tests/test_ilamb_setup.jl")
 end
+
+@safetestset "Testbed candidate reconstruction" begin
+    include("testbed_validation/candidate_runtests.jl")
+end

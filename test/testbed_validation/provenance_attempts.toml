@@ -1,5 +1,5 @@
 schema_version = 1
-updated = "2026-07-11"
+updated = "2026-07-15"
 
 [[attempt]]
 id = "artifact_checksums"
@@ -193,3 +193,59 @@ target = "missing control directories and restart files"
 status = "not_found"
 evidence = "exact searches of the public GitHub repository and indexed web results returned no control/restart copies"
 notes = "the published paper documents the 1901-1920 repeated spinup concept but not the missing restart byte content"
+
+[[attempt]]
+id = "casa_boreal_nfix_candidate"
+target = "pftlookup_igbp_updated4_borealNfix.csv"
+status = "pass_evidence_bounded_candidate"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source = "GRID_CN/pftlookup_igbp_updated4.csv"
+source_sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+candidate_sha256 = "d5c034fa3ab75fe55eaf5145ddb125888eb4114ef830df91a59cb6c109dc84f4"
+derivation = "PFT 1 evergreen needleleaf forest nfixrate 0.08 -> 0.21"
+evidence = "the KO4_push README names exactly this change and says the result equals the larch value; PFT 3 is 0.21 in the source table"
+rejected = "changing PFT 3 or every boreal PFT is not supported by the singular 0.08-to-0.21 statement"
+
+[[attempt]]
+id = "mimics_ko6_candidate_matrix"
+target = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO6 parameter family"
+status = "pass_bounded_three_candidate_matrix"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+source_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+ko6_fi30_sha256 = "7a97606ff0a17ef78b66abc1eeb07f72a593053dbe0ae9668ff946df408cd4c9"
+ko6_fi10_sha256 = "9fc1e9db3e138c16a02c6f4e6e2671848475eb4f5bc5262da20b17888c52b046"
+ko6_fi05_sha256 = "bcd7b733ceb830cbcc4dc9bafca600e2fbc275fa95141cdd7de163a7272961b5"
+common_derivation = "KO(1) 4 -> 6 and KO(2) 4 -> 6"
+bounded_ambiguity = "retain FI(struc)=0.30 at high confidence, use README-supported desorb2 FI(struc)=0.10 at medium confidence, or use the legacy KO6 table's FI(struc)=0.05 at medium confidence"
+rejected = "KO=9 and KO=12 belong to differently named experiment branches"
+parser_compatibility = "the older KO4_push table lacks desorpQ10 and desorpTref; the chosen committed JAMES baseline adds only the pinned reader's required -1 and 25 values"
+
+[[attempt]]
+id = "carbon_only_control_candidates"
+target = "CASA-C and MIMICS-C CLM5/GSWP3 control families"
+status = "pass_auditable_derivation"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "four CASA stages and four MIMICS stages derived from checked-in CN controls"
+switches = "isomModel explicitly asserted for each family; icycle 2 -> 1; output roots OUTPUT_CN -> OUTPUT_C"
+evidence = "published NetCDF parameter attributes select CASA exud0 and MIMICS base CASA/KO4 tables"
+audit = "candidate_reconstruction.toml pins source/derived SHA-256 hashes and emits exact line-level diffs without modifying upstream files; blank legacy prespin line 29 is explicitly completed with the pinned reader's required NetCDF interval"
+
+[[attempt]]
+id = "candidate_reduced_prespin_validation"
+target = "all reconstructed parameters and carbon-only control families"
+status = "pass_deterministic_reduced_prespin"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+fixture = "fixtures/casa_c_cell_11060/fixture.toml"
+configuration = "twelve cases, one per candidate, one productive cell, one 1901 loop, each executed twice"
+cases = [
+    "CASA-CN boreal N-fix",
+    "MIMICS-CN KO6/FI30",
+    "MIMICS-CN KO6/FI10",
+    "MIMICS-CN KO6/FI05",
+    "four independently reduced CASA-C controls",
+    "four independently reduced MIMICS-C controls",
+]
+evidence = "all candidates parse and complete with the pinned executable; each generated control is mechanically reduced through an auditable 29-field diff; every staged upstream scientific and fixture input has a pinned SHA-256 hash; every CASA and MIMICS restart CSV is byte-identical between independent repeats"
+command = "julia candidate_reconstruction.jl validate <source-root> <fixture-dir> <candidate-output> <run-root>"
+scope = "reader compatibility and deterministic reduced prespin only; archive-generating full-grid parity remains downstream"

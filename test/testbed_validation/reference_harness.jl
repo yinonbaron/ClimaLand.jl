@@ -930,6 +930,10 @@ function write_smoke_control(
     casa_final = "casa_final.csv",
     casa_flux_final = "casa_flux_final.csv",
     casa_netcdf = "casaclm_pool_flux_yyyy.nc",
+    mimics_parameters = "unused_mimics_parameters.csv",
+    mimics_initial = "unused_mimics_initial.csv",
+    mimics_final = "unused_mimics_final.csv",
+    mimics_netcdf = "unused_mimics_yyyy.nc",
 )
     values = (
         string(points),
@@ -949,10 +953,10 @@ function write_smoke_control(
         casa_final,
         casa_flux_final,
         casa_netcdf,
-        "unused_mimics_parameters.csv",
-        "unused_mimics_initial.csv",
-        "unused_mimics_final.csv",
-        "unused_mimics_yyyy.nc",
+        mimics_parameters,
+        mimics_initial,
+        mimics_final,
+        mimics_netcdf,
         "unused_corpse_initial.csv",
         "unused_corpse_final.csv",
         soil_model == 3 ? "corpse_parameters.nml" :
