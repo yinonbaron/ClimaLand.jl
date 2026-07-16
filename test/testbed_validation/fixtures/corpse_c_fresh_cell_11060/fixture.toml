@@ -1,0 +1,60 @@
+license = "MIT source; CC-BY-4.0 driver"
+schema_version = 1
+
+[cell]
+id = 11060
+pft = 7
+reason = "productive-cell fallback after the historical CRU-NCEP audit"
+
+[comparison]
+expected_alignment_warnings = 1
+records = 365
+reference_kind = "fresh pinned Fortran; not the legacy 2000-2010 mean"
+
+[fixture.casa_output]
+bytes = 72016
+filename = "casa_fortran_1901_cell_11060.nc"
+md5 = "f5115c8a479f7f48a947c51a8817be65"
+sha256 = "8bda3edeeb4e3ad1b2d3d51a2f5221b83c0b52f107209dfa152a9e9db7d24c88"
+
+[fixture.corpse_output]
+bytes = 63940
+filename = "corpse_fortran_1901_cell_11060.nc"
+md5 = "77c2773626df42500265873bf0ac5cfd"
+sha256 = "48b64747fe914a61309e6aac83a86e21e55c9d86928a8f07dab1602cae44317f"
+
+[fixture.corpse_restart]
+bytes = 1983
+filename = "corpse_final_1901_cell_11060.csv"
+md5 = "813d5555b0961415b2a895a90cf921ff"
+sha256 = "23df5533609a3346e89897d5252160f38abc171537ba9fb005302835ecf69b7c"
+
+[fortran]
+command = "reference_harness.jl corpse-fortran-fixture"
+compatibility_patch_md5 = "75957ffdeee94402806c3728d3a2e1a5"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall -std=legacy"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source_md5 = "8462f575650535d06692d0d8ee6ef17a"
+
+[generation]
+independent_runs = 2
+netcdf_scientific_payload_exact = true
+restart_byte_exact = true
+raw_netcdf_checksums_include_creation_time = true
+
+[inputs]
+casa_parameters_md5 = "9919e045af0226a2198b5988190de398"
+corpse_parameters_md5 = "575cf154cbb1e293117b57a150f565a1"
+driver_fixture = "../casa_c_cell_11060/met_1901_cell_11060.nc"
+grid_fixture = "../casa_c_cell_11060/grid_cell_11060.csv"
+phenology_md5 = "4fe9fa658ead31026882c60540428a5c"
+perturbation_md5 = "616f3ef6153196979e79fb73b1a8f8ff"
+soil_fixture = "../casa_c_cell_11060/soil_cell_11060.csv"
+
+[legacy_mean_audit]
+status = "not_reproducible_from_published_inputs"
+forcing = "CLM4.5/CRU-NCEP, 4299 active cells"
+missing = ["1901-2010 CRU-NCEP met files", "exact CORPSE CASA restart"]
+incompatible_available_forcing = "CLM5/GSWP3, 4263 active cells"
+legacy_mean_role = "informational only"

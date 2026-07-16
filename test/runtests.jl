@@ -70,6 +70,21 @@ end
 @safetestset "Soil Biogeochemistry module tests" begin
     include("standalone/Soil/Biogeochemistry/biogeochemistry_module.jl")
 end
+@safetestset "CASA biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/casa.jl")
+end
+@safetestset "MIMICS biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/mimics.jl")
+end
+@safetestset "CORPSE biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/corpse.jl")
+end
+@safetestset "Biogeochemical testbed reference harness" begin
+    include("testbed_validation/runtests.jl")
+end
+@safetestset "CASA plant-soil litter coupling" begin
+    include("integrated/casa_biogeochemistry.jl")
+end
 @safetestset "Soil CO2 parameterization tests" begin
     include("standalone/Soil/Biogeochemistry/co2_parameterizations.jl")
 end
@@ -111,6 +126,10 @@ end
 end
 
 # Standalone Vegetation model tests
+@safetestset "CASA plant module tests" begin
+    include("standalone/Vegetation/casa.jl")
+end
+
 @safetestset "Canopy module tests" begin
     include("standalone/Vegetation/canopy_model.jl")
 end

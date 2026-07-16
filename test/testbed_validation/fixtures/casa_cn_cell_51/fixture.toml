@@ -1,0 +1,50 @@
+license = "CC-BY-4.0"
+schema_version = 1
+
+[cell]
+fixture_lat_index = 1
+fixture_lon_index = 1
+id = 51
+pft = 17
+reason = "ice/water boundary fixture"
+reference_maximum_gpp = 0.0
+source_lat_index = 51
+source_lon_index = 1
+
+[comparison]
+candidate_time_offset = 1900
+expected_alignment_warnings = 1
+reference_time_start = 1
+reference_time_stop = 365
+
+[fixture.driver]
+bytes = 77220
+filename = "met_1901_cell_51.nc"
+sha256 = "def8ad523f677c48dcc6e51b81485347450c7f3dd9b01da24f5c5c4b17167d70"
+
+[fixture.grid]
+bytes = 244
+filename = "grid_cell_51.csv"
+sha256 = "66df3c2b0b9d22e012b569130a15a60b7de8d9e2a3514b6a398f7a1d22d78f44"
+
+[fixture.output]
+bytes = 217506
+filename = "casa_1901_1905_cell_51.nc"
+sha256 = "c222a38750b7057acc8aac6a30ebc2de9555da504c8757105a5db2cf34909cec"
+
+[fixture.soil]
+bytes = 125
+filename = "soil_cell_51.csv"
+sha256 = "5bc7df7713af52cc2737d7414a44501f14ea39cedae59f376300e814179b227f"
+
+[generation]
+roundtrip_exact = true
+script = "extract_fixture.jl casa-cn"
+
+[source]
+driver_archive = "INPUT_GSWP3_CLM5dev110_hist.tar.gz"
+driver_archive_md5 = "7b2a438bf095e1133fdf966327167171"
+driver_member = "INPUT_GSWP3_CLM5dev110_hist/met_1901_1901.nc"
+output_archive = "CASACNP_mod5_GSWP3_exudate0_cwdN.tar.gz"
+output_archive_md5 = "ffbf1ec50070d9d497d0521fb17e85e3"
+output_member = "CASACNP_mod5_GSWP3_exudate0_cwdN/OUTPUT_CN/HIST/casaclm_pool_flux_1901_1905_daily.nc"

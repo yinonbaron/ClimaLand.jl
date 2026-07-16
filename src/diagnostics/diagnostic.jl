@@ -250,6 +250,7 @@ end
 
 # Do you want to define more diagnostics? Add them here
 include("land_compute_methods.jl")
+include("testbed_diagnostics.jl")
 
 # define_diagnostics.jl contains the list of all the diagnostics
 include("define_diagnostics.jl")

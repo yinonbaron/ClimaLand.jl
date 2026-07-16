@@ -5,6 +5,20 @@ main
 - ![][badge-🐛bugfix] Preserve complete checkpoint state by field name and add
   singleton vertical-domain fallbacks for `ColumnGrid` and rectilinear
   latitude-longitude grids that ClimaCore cannot reconstruct.
+- ![][badge-✨feature] Add standalone carbon-only `CASAPlantModel`,
+  `CASASoilModel`, `MIMICSSoilModel`, and `CORPSESoilModel` implementations
+  with a selectable `CASAPlantSoilModel` and a soil-biogeochemical-testbed
+  validation workflow. All four models and their litter coupling accept native
+  surface parameter fields for heterogeneous PFT and soil properties. Add the
+  compile-time `CarbonNitrogen` CASA and MIMICS configurations, mineral-N
+  cycling, native diagnostics/restarts, and checksum-pinned CASA/MIMICS CN
+  validation fixtures and archive-grid transition reports. Add native
+  root-weighted `EnergyHydrology` temperature and moisture coupling for CASA,
+  MIMICS, and CORPSE, including heterogeneous rooting depth and integrated
+  component diagnostics. Add an opt-in CORPSE `ContinuousRate` formulation
+  that evaluates all fixed-cohort processes as one timestep-independent,
+  simultaneous ODE while retaining `LegacyDaily` as the exact Fortran-parity
+  default.
 - ![][badge-🔥behavioralΔ] Remove SAI from energy fluxes, tendency PR [#1782](https://github.com/CliMA/ClimaLand.jl/pull/1782)
 - ![][badge-🔥behavioralΔ] Set the `optimal_lai_z`/`optimal_lai_sigma`/`optimal_lai_alpha`
   defaults to values calibrated against MODIS LAI (Yuan et al. 2017): 21.4 / 0.939 / 0.0701.

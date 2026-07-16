@@ -1,0 +1,13 @@
+include("reference_harness.jl")
+include("candidate_reconstruction.jl")
+include("netcdf_compare.jl")
+include("extract_fixture.jl")
+include("grid_transition_parity.jl")
+include("native_workflow.jl")
+include("native_workflow_tests.jl")
+
+TestbedReferenceHarness.self_test()
+TestbedCandidateReconstruction.self_test()
+TestbedNetCDFCompare.self_test()
+TestbedFixtureExtraction.self_test()
+TestbedGridTransitionParity.self_test()

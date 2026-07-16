@@ -238,6 +238,12 @@ function default_diagnostics(
         SoilCanopyModel{FT},
         LandModel{FT},
         BucketModel{FT},
+        CASAPlantModel{FT},
+        CASASoilModel{FT},
+        MIMICSSoilModel{FT},
+        CORPSESoilModel{FT},
+        CASAPlantSoilModel{FT},
+        CASAPlantEnergyHydrologyModel{FT},
     },
     start_date::DateTime,
     outdir;
@@ -558,6 +564,12 @@ function get_possible_diagnostics(model::BucketModel)
     ]
 end
 
+get_possible_diagnostics(model::CASAPlantModel) = testbed_diagnostic_names(model)
+get_possible_diagnostics(model::CASASoilModel) = testbed_diagnostic_names(model)
+get_possible_diagnostics(model::MIMICSSoilModel) = testbed_diagnostic_names(model)
+get_possible_diagnostics(::CORPSESoilModel) =
+    testbed_diagnostic_names(:corpse_soil)
+
 ## Possible diagnostics for integrated models
 """
     get_component_diagnostics(model::AbstractLandModel, diagnostics_function::Function)
@@ -627,6 +639,12 @@ function get_possible_diagnostics(model::LandModel)
     ]
 
     return unique!(append!(component_diagnostics, additional_diagnostics))
+end
+function get_possible_diagnostics(model::CASAPlantSoilModel)
+    return get_component_diagnostics(model, get_possible_diagnostics)
+end
+function get_possible_diagnostics(model::CASAPlantEnergyHydrologyModel)
+    return get_component_diagnostics(model, get_possible_diagnostics)
 end
 
 """
@@ -698,4 +716,47 @@ function get_short_diagnostics(model::LandModel)
 end
 function get_short_diagnostics(model::BucketModel)
     return get_possible_diagnostics(model)
+end
+get_short_diagnostics(::CASAPlantModel) = [
+    "casa_plant_c_leaf",
+    "casa_plant_c_wood",
+    "casa_plant_c_fine_root",
+    "casa_plant_gpp",
+    "casa_plant_npp",
+    "casa_plant_autotrophic_respiration",
+    "casa_plant_lai",
+]
+get_short_diagnostics(::CASASoilModel) = [
+    "casa_soil_c_litter_metabolic",
+    "casa_soil_c_litter_structural",
+    "casa_soil_c_litter_cwd",
+    "casa_soil_c_soil_microbial",
+    "casa_soil_c_soil_slow",
+    "casa_soil_c_soil_passive",
+    "casa_soil_heterotrophic_respiration",
+]
+get_short_diagnostics(::MIMICSSoilModel) = [
+    "mimics_soil_c_litter_metabolic",
+    "mimics_soil_c_litter_structural",
+    "mimics_soil_c_litter_cwd",
+    "mimics_soil_c_microbe_r",
+    "mimics_soil_c_microbe_k",
+    "mimics_soil_c_soil_available",
+    "mimics_soil_c_soil_chemical",
+    "mimics_soil_c_soil_physical",
+    "mimics_soil_heterotrophic_respiration",
+]
+get_short_diagnostics(::CORPSESoilModel) = [
+    "corpse_soil_c_litter_cwd",
+    "corpse_soil_soil_rhiz_live_microbe",
+    "corpse_soil_soil_bulk_live_microbe",
+    "corpse_soil_litter_rhiz_live_microbe",
+    "corpse_soil_litter_bulk_live_microbe",
+    "corpse_soil_heterotrophic_respiration",
+]
+function get_short_diagnostics(model::CASAPlantSoilModel)
+    return get_component_diagnostics(model, get_short_diagnostics)
+end
+function get_short_diagnostics(model::CASAPlantEnergyHydrologyModel)
+    return get_component_diagnostics(model, get_short_diagnostics)
 end

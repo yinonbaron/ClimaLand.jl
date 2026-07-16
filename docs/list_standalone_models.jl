@@ -3,6 +3,10 @@ standalone_models = [
         "Slab Lake model" => "standalone/pages/inland_waters/slab_lake.md",
     ]
     "Vegetation" => [
+        "Plant carbon" => [
+            "CASA model" => "standalone/pages/vegetation/casa/CASA_model.md",
+            "CASA-soil coupling" => "standalone/pages/vegetation/casa/CASA_soil_coupling.md",
+        ]
         "Radiative transfer" => [
             "Beer model" => "standalone/pages/vegetation/radiative_transfer/beer_model.md",
             "Two-Stream model" => "standalone/pages/vegetation/radiative_transfer/twostream_model.md",
@@ -47,6 +51,9 @@ standalone_models = [
         ]
         "Biogeochemistry" => [
             "DAMM model" => "standalone/pages/soil/biogeochemistry/DAMM_model.md",
+            "CASA soil carbon model" => "standalone/pages/soil/biogeochemistry/CASA_model.md",
+            "MIMICS soil carbon model" => "standalone/pages/soil/biogeochemistry/MIMICS_model.md",
+            "CORPSE soil carbon model" => "standalone/pages/soil/biogeochemistry/CORPSE_model.md",
         ]
     ]
     "Snow" => ["Snow model" => "standalone/pages/snow/snow_model.md"]
