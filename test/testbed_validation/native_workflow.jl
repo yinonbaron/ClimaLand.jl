@@ -238,7 +238,7 @@ function state_units(variable)
     return "native SI"
 end
 
-function define_output!(output, model, Y)
+function define_output!(output, model, Y, diagnostics)
     variables = state_variables(model)
     first_component, first_variable = first(variables)
     points = length(
@@ -257,6 +257,16 @@ function define_output!(output, model, Y)
         state.attrib["long_name"] = "$component $variable"
         state.attrib["units"] = state_units(variable)
     end
+    for diagnostic in diagnostics
+        state = NCDatasets.defVar(
+            output,
+            diagnostic.name,
+            Float64,
+            ("point", "time"),
+        )
+        state.attrib["long_name"] = diagnostic.long_name
+        state.attrib["units"] = diagnostic.units
+    end
     return variables
 end
 
@@ -264,6 +274,8 @@ function write_state!(
     output,
     variables,
     Y,
+    p,
+    diagnostics,
     record,
     time,
     stage_index,
@@ -276,6 +288,10 @@ function write_state!(
         field = getproperty(getproperty(Y, component), variable)
         output[output_name(component, variable)][:, record] =
             vec(Array(parent(field)))
+    end
+    for diagnostic in diagnostics
+        field = diagnostic.compute(Y, p)
+        output[diagnostic.name][:, record] = vec(Array(parent(field)))
     end
     return nothing
 end
@@ -341,6 +357,8 @@ function run_workflow(
     output_dir;
     dt = 86400.0,
     update_forcing! = (_, _, _) -> nothing,
+    after_step! = (_, _, _, _, _) -> nothing,
+    diagnostics = (),
     provenance,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
@@ -361,7 +379,7 @@ function run_workflow(
     recorded_steps = 0
 
     NCDatasets.NCDataset(output_path, "c") do output
-        variables = define_output!(output, model, Y)
+        variables = define_output!(output, model, Y, diagnostics)
         output_record = 0
         for (stage_index, stage) in enumerate(stages)
             start_time = time
@@ -379,6 +397,13 @@ function run_workflow(
                 index = forcing_index(stage, step)
                 update_forcing!(stage, index, integrator.t)
                 CTS.step!(integrator)
+                after_step!(
+                    stage,
+                    step,
+                    integrator.u,
+                    integrator.p,
+                    integrator.t,
+                )
                 recorded_steps += 1
                 if stage.write_output
                     output_record += 1
@@ -386,6 +411,8 @@ function run_workflow(
                         output,
                         variables,
                         integrator.u,
+                        integrator.p,
+                        diagnostics,
                         output_record,
                         integrator.t - start_time,
                         stage_index,
