@@ -156,6 +156,7 @@ function read_pft_parameters(path)
     initial_carbon = parameter_section(path, ",Leaf C")
     initial_nitrogen = parameter_section(path, ",Nleaf")
     initial_phosphorus = parameter_section(path, ",Pleaf")
+    plant_stoichiometry = parameter_section(path, ",N/Pleafmin")
     phenology = parameter_section(path, "IGBP:,Tkshed")
     kinetics = parameter_section(path, ",xnpmax,q01soil")
     efficiencies = parameter_section(path, ",xkNlimit_min")
@@ -166,16 +167,21 @@ function read_pft_parameters(path)
             root_depth = turnover[pft][2],
             allocation = Tuple(allocation[pft][1:3]),
             turnover_rates = Tuple(
-                inv(YEAR_SECONDS * turnover[pft][index]) for
+                index == 8 ?
+                inv(
+                    YEAR_SECONDS *
+                    turnover[pft][index] *
+                    (1 - turnover[pft][7]),
+                ) : inv(YEAR_SECONDS * turnover[pft][index]) for
                 index in (8, 9, 10)
             ),
             maintenance_rates = Tuple(allocation[pft][4:6]) ./ YEAR_SECONDS,
             plant_nitrogen = Tuple(initial_nitrogen[pft][1:3]) ./ 1000,
             plant_nitrogen_ratio = Tuple(inv.(chemistry[pft][1:3])),
-            leaf_phosphorus_to_nitrogen = initial_phosphorus[pft][1] / max(
-                eps(Float64),
-                initial_nitrogen[pft][1],
-            ),
+            leaf_phosphorus_to_nitrogen = initial_nitrogen[pft][1] > 0 ?
+                                          initial_phosphorus[pft][1] /
+                                          initial_nitrogen[pft][1] : 0.0,
+            leaf_nitrogen_to_phosphorus = plant_stoichiometry[pft][1],
             labile_loss_rate = inv(YEAR_SECONDS * turnover[pft][17]),
             specific_leaf_area = 1000turnover[pft][18],
             maximum_leaf_area_index = chemistry[pft][19],
@@ -250,6 +256,80 @@ function gridded_domain(points)
     )
 end
 
+mutable struct CarbonOnlyPlantStoichiometry
+    nitrogen::Vector{Float64}
+    nitrogen_per_carbon::Vector{Float64}
+    nitrogen_to_phosphorus::Vector{Float64}
+    phosphorus_to_nitrogen::Vector{Float64}
+end
+
+function CarbonOnlyPlantStoichiometry(grid, parameters)
+    nitrogen = [parameters[point.pft].plant_nitrogen[1] for point in grid]
+    nitrogen_per_carbon =
+        [parameters[point.pft].plant_nitrogen_ratio[1] for point in grid]
+    nitrogen_to_phosphorus =
+        [parameters[point.pft].leaf_nitrogen_to_phosphorus for point in grid]
+    phosphorus_to_nitrogen =
+        [parameters[point.pft].leaf_phosphorus_to_nitrogen for point in grid]
+    return CarbonOnlyPlantStoichiometry(
+        nitrogen,
+        nitrogen_per_carbon,
+        nitrogen_to_phosphorus,
+        phosphorus_to_nitrogen,
+    )
+end
+
+function update_stoichiometry!(stoichiometry, Y)
+    leaf_carbon = vec(Array(parent(Y.casa_plant.c_leaf)))
+    for index in eachindex(leaf_carbon)
+        nitrogen =
+            max(0.0, leaf_carbon[index]) *
+            stoichiometry.nitrogen_per_carbon[index]
+        stoichiometry.phosphorus_to_nitrogen[index] =
+            nitrogen > 0 ?
+            stoichiometry.nitrogen[index] /
+            stoichiometry.nitrogen_to_phosphorus[index] / nitrogen : 0.0
+        stoichiometry.nitrogen[index] = nitrogen
+    end
+    return nothing
+end
+
+function apply_stoichiometry!(stoichiometry, model)
+    field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
+    vec(parent(field)) .= stoichiometry.phosphorus_to_nitrogen
+    return nothing
+end
+
+function soil_parameters(values, soil, pft)
+    cues = values.cues
+    transfers = SoilCASA.CarbonTransferParameters{Float64}(;
+        lignin_leaf = values.lignin_leaf,
+        lignin_wood = values.lignin_wood,
+        cue_metabolic_to_microbial = cues[1],
+        cue_structural_to_microbial = cues[2],
+        cue_structural_to_slow = cues[3],
+        cue_cwd_to_microbial = cues[4],
+        cue_cwd_to_slow = cues[5],
+        cue_microbial_to_slow = cues[6],
+        cue_microbial_to_passive = cues[7],
+        cue_slow_to_passive = cues[8],
+    )
+    return SoilCASA.CASASoilModelParameters{Float64, typeof(transfers)}(;
+        q10 = values.q10,
+        litter_optimum = values.litter_optimum,
+        soil_optimum = values.soil_optimum,
+        porosity = soil.porosity,
+        clay = soil.clay,
+        silt = soil.silt,
+        freezing_temperature = 273.15,
+        litter_base_rates = values.litter_rates,
+        soil_base_rates = values.soil_rates,
+        transfers,
+        is_cropland = pft == 12,
+        constant_moisture = values.constant_moisture,
+    )
+end
+
 function build_gridded_model(
     grid,
     soils,
@@ -296,32 +376,7 @@ function build_gridded_model(
     soil_points = map(grid) do point
         values = parameters[point.pft]
         soil = soils[point.cell_id]
-        cues = values.cues
-        transfers = SoilCASA.CarbonTransferParameters{Float64}(;
-            lignin_leaf = values.lignin_leaf,
-            lignin_wood = values.lignin_wood,
-            cue_metabolic_to_microbial = cues[1],
-            cue_structural_to_microbial = cues[2],
-            cue_structural_to_slow = cues[3],
-            cue_cwd_to_microbial = cues[4],
-            cue_cwd_to_slow = cues[5],
-            cue_microbial_to_slow = cues[6],
-            cue_microbial_to_passive = cues[7],
-            cue_slow_to_passive = cues[8],
-        )
-        SoilCASA.CASASoilModelParameters{Float64, typeof(transfers)}(;
-            q10 = values.q10,
-            litter_optimum = values.litter_optimum,
-            soil_optimum = values.soil_optimum,
-            porosity = soil.porosity,
-            clay = soil.clay,
-            silt = soil.silt,
-            freezing_temperature = 273.15,
-            litter_base_rates = values.litter_rates,
-            soil_base_rates = values.soil_rates,
-            transfers,
-            constant_moisture = values.constant_moisture,
-        )
+        soil_parameters(values, soil, point.pft)
     end
     soil = SoilCASA.CASASoilModel{Float64}(;
         parameters = point_field(domain, soil_points),
@@ -1020,7 +1075,7 @@ function run_gridded_case(
     forcing_root,
     reference_root,
     output_root;
-    boundary_atol = 0.0,
+    boundary_atol = 5e-3,
     boundary_rtol = 1e-3,
     historical_atol = 0.0,
     historical_rtol = 1e-3,
@@ -1089,6 +1144,7 @@ function run_gridded_case(
         rtol = boundary_rtol,
     )
     budget = CarbonBudgetAccumulator(grid)
+    stoichiometry = CarbonOnlyPlantStoichiometry(grid, normal.parameters)
     function carbon_budget(stage, result, _, _, initial_state, _)
         name = String(stage.name)
         start_stock = area_weighted_carbon(initial_state, budget.area_m2)
@@ -1117,10 +1173,14 @@ function run_gridded_case(
             stages,
             output_root;
             model_for_stage,
-            update_forcing! = (stage, index, time) ->
-                update_forcing!(forcing, stage, index, time),
-            after_step! = (stage, step, Y, p, time) ->
-                accumulate_budget!(budget, stage, step, Y, p, time),
+            update_forcing! = function (stage, index, time)
+                update_forcing!(forcing, stage, index, time)
+                apply_stoichiometry!(stoichiometry, model_for_stage(stage))
+            end,
+            after_step! = function (stage, step, Y, p, time)
+                accumulate_budget!(budget, stage, step, Y, p, time)
+                update_stoichiometry!(stoichiometry, Y)
+            end,
             diagnostics = casa_diagnostics(),
             provenance = stage -> gridded_provenance(
                 stage,

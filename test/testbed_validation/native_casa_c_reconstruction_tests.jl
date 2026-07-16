@@ -62,6 +62,7 @@ function write_gridded_parameter_fixture(path)
             ),
             (",Leaf C", collect(1.0:9.0)),
             (",Nleaf", collect(1.0:10.0)),
+            (",N/Pleafmin", [10, 10, 15, 15, 15, 15, 0.5, 0.95, 0.9]),
             (",Pleaf", collect(1.0:12.0)),
             ("IGBP:,Tkshed", [273.15, 0.1, 3, 0.1, 3]),
             (",xnpmax,q01soil", [1, 1.72, 0.4, 0.4, 0, 0, 0, 0, 0, 0]),
@@ -213,6 +214,45 @@ end
         @test TestbedNativeCASACReconstruction.root_fractions(
             built.parameters[1],
         ) == expected_roots
+        @test built.parameters[1].turnover_rates[1] ==
+              inv(365 * 86400 * 1 * (1 - 0))
+        @test built.parameters[1].leaf_phosphorus_to_nitrogen == 1
+        stoichiometry =
+            TestbedNativeCASACReconstruction.CarbonOnlyPlantStoichiometry(
+                grid,
+                built.parameters,
+            )
+        TestbedNativeCASACReconstruction.update_stoichiometry!(
+            stoichiometry,
+            initial,
+        )
+        @test stoichiometry.phosphorus_to_nitrogen[1] == 5
+        TestbedNativeCASACReconstruction.apply_stoichiometry!(
+            stoichiometry,
+            built.model,
+        )
+        @test first(
+            vec(
+                parent(
+                    built.model.casa_plant.parameters.leaf_phosphorus_to_nitrogen,
+                ),
+            ),
+        ) == 5
+        TestbedNativeCASACReconstruction.update_stoichiometry!(
+            stoichiometry,
+            initial,
+        )
+        @test stoichiometry.phosphorus_to_nitrogen[1] == 0.1
+        @test !TestbedNativeCASACReconstruction.soil_parameters(
+            built.parameters[1],
+            soils[1],
+            1,
+        ).is_cropland
+        @test TestbedNativeCASACReconstruction.soil_parameters(
+            built.parameters[12],
+            soils[1],
+            12,
+        ).is_cropland
         default_phenology = TestbedNativeCASACReconstruction.read_phenology(
             fixture.phenology,
             [(; latitude = 79.75, pft = 16)],

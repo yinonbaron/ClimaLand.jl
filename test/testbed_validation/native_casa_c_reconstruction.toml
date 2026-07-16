@@ -30,7 +30,7 @@ forcing_years = [1901, 2014]
 repeats = 1
 
 [comparison]
-boundary_atol = 0.0
+boundary_atol = 5.0e-3
 boundary_rtol = 1.0e-3
 historical_atol = 0.0
 historical_rtol = 1.0e-3

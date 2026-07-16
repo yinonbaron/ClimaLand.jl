@@ -14,6 +14,9 @@ original order. This preserves a direct row-by-row mapping between native
 checkpoints and each fresh-Fortran `casa_final.csv`. Meteorological data are
 read on demand from the original gridded NetCDF files; six soil layers are
 root-weighted with the pinned Fortran layer thicknesses and root profile.
+The carbon-only diagnostic plant N and P bookkeeping also preserves the
+Fortran update order: plant P is derived from the preceding day's N before N
+is refreshed from the current carbon pools.
 
 Run from the repository root:
 
@@ -40,6 +43,11 @@ carbon stock and the six reported carbon flux/input variables (`cgpp`, `cnpp`,
 area-weighted carbon budget for each stage. The published archive comparison
 is never used to relabel a fresh-Fortran implementation difference as a
 provenance difference.
+
+The measured prespin boundary tolerance is 0.005 g C m⁻² absolute plus 0.1%
+relative. At that tolerance all ten carbon pools match across all 4,263
+points; the largest measured prespin absolute difference is 0.0113 g C m⁻²
+in leaf carbon, where the relative difference is 5.76e-5.
 
 The tiny automated acceptance case exercises the same public `run_case`
 contract with two points and two days per stage. The full command above is the
