@@ -1,0 +1,86 @@
+schema_version = 1
+controls_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+prespin_loops = 100
+spin_loops = 499
+spin_years = [1901, 1920]
+history_years = [1901, 2014]
+comparison_atol = 0.0
+comparison_rtol = 0.0
+
+[inputs]
+driver_directory = "INPUT_GSWP3_CLM5dev110_hist"
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+perturbation = "GRID_CN/co2delta_control.txt"
+casa_parameters = "GRID_CN/pftlookup_igbp_updated4.csv"
+mimics_parameters = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+mimics_parameters_sha256 = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+
+[stages.prespin]
+control_candidate = "mimics_c_prespin"
+loops = 100
+years = [1901, 1901]
+
+[stages.spin]
+control_candidate = "mimics_c_spin"
+loops = 499
+years = [1901, 1920]
+
+[stages.spin_continuation]
+control_candidate = "mimics_c_spin_continuation"
+loops = 499
+years = [1901, 1920]
+
+[stages.historical]
+control_candidate = "mimics_c_history"
+loops = 1
+years = [1901, 2014]
+
+[postprocessing]
+annual_reduction = "ncra -O each daily year to one annual mean"
+annual_concatenation = "ncrcat -O annual means in 1901-2014 order"
+daily_windows = [[1901, 1905], [2010, 2014]]
+nco_version_recorded_by_archive = "4.7.5"
+
+[[postprocessing.model]]
+id = "casa"
+prefix = "casaclm"
+annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
+
+[[postprocessing.model]]
+id = "mimics"
+prefix = "mimics"
+annual_reference = "ann_mimics_pool_flux_1901_2014.nc"
+
+[compiler]
+source_makefile_version = "GNU Fortran 8.1.0"
+source_makefile_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall"
+archive_compiler_status = "not recorded in archive metadata"
+
+[[compiler.blocked_candidate]]
+id = "gnu_fortran_8_1"
+version = "GNU Fortran 8.1.0"
+status = "blocked_unavailable_toolchain"
+reason = "The documented source-Makefile compiler is not installed on the current macOS ARM host; only GNU Fortran 16.1.0 is available."
+
+[evidence]
+controls = "Committed KO4 MIMICS-CN CLM5/GSWP3 controls, derived to icycle=1 by candidate_reconstruction.toml"
+source = "Archive creation 2021-02-02; latest public source revision before creation is 9988b1b"
+parameters = "Archive metadata names the committed pre-Q10 KO4_micCN_FI30 table"
+spin = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt documents prespin, repeated 20-year spin phases, convergence checks, and restart continuation when needed"
+postprocessing = "Archive history records ncra annual means, ncrcat concatenation, and retained 1901-1905/2010-2014 daily windows"
+
+[[case]]
+id = "archive_predecessor"
+source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+reason = "Latest public source revision before the MIMICS-C archive creation timestamp"
+
+[excluded.post_archive_q10]
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+reason = "Postdates archive creation and adds temperature-sensitive desorption fields absent from the archive-named KO4 table"
+
+[excluded.history_continuations]
+controls = ["fcasacnp_clm_HIST2_1901_1910_STEP_3of4.lst", "fcasacnp_clm_HIST3_1901_2014_STEP_3of4.lst"]
+reason = "These controls select carbon-nitrogen KO6 settings and are not supported for the carbon-only KO4 archive"

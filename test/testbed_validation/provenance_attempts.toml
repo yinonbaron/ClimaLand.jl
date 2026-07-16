@@ -297,3 +297,37 @@ matrix_sha256 = "6a92e65fa3a7d17c6b0e924fb16d386aeb277c0d6fed8845e02ac574a8f9371
 reconstruction_report_sha256 = "cf0d6f454886f61e82a6dc02a3ad075027150112dd2d19a07a0cb07b6e28b805"
 search_report_sha256 = "584c394d397cacc953d787e996e851a94a8fd35f932c3d3ae046fc5c39d1a28c"
 blocker = "the exact archive compiler/toolchain is unpublished; the only later pinned source revision postdates archive creation and changes only icycle > 1 branches, so it is excluded from the carbon-only matrix"
+
+[[attempt]]
+id = "mimics_c_archive_reconstruction"
+target = "MIMICS-C CLM5/GSWP3 1901-2014 archive"
+status = "evidence_backed_matrix_exhausted"
+source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+configuration = "4,263 points; carbon-only; 100-year prespin; 9,980-year spin; second 9,980-year restart continuation; 1901-2014 daily history; pre-Q10 KO4_micCN_FI30 table"
+parameter_sha256 = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+archive_compiler = "not recorded in archive metadata; source Makefile records GNU Fortran 8.1.0"
+source_makefile_compiler_candidate = "GNU Fortran 8.1.0 blocked because it is unavailable on the current macOS ARM host"
+archive_md5 = "1be7b02d77da6f85134b85086c918331"
+archive_reference_md5 = "annual CASA=74f21a3912cbf4373c06198049fa0769; annual MIMICS=d3bd53bc949e86966fe04b18c3cf2f7d; CASA 1901-1905 daily=357c2a798d786937b46ad52e8c9f3da0; CASA 2010-2014 daily=9888b5acfb6966c8f00bf4925074f6a4; MIMICS 1901-1905 daily=fd349b97609ef4d5b35dbc6143dbd1f8; MIMICS 2010-2014 daily=d829e8fccb2ee6b72e327bc0540d5c2c"
+comparison = "zero absolute and relative tolerance; CASA and MIMICS annual 1901-2014 plus daily 1901-1905 and 2010-2014; coordinates, masks, variable sets, types, critical attributes, finite values, missing values, and sign changes"
+annual_reduction_validation = "the in-process Float64 annual reduction exactly reproduces all archived NCO 4.7.5 annual values for both retained five-year daily windows and both models"
+best_mismatch_count = 21942324
+annual_casa_failed_variables = 11
+annual_casa_failed_values = 224153
+annual_mimics_failed_variables = 11
+annual_mimics_failed_values = 469593
+daily_casa_failed_values = 6667873
+daily_mimics_failed_values = 14580704
+metadata_mismatches = 0
+first_spin_global_delta_pg = 0.01052900855277753
+first_spin_fraction_below_1_g_m2 = 0.9725545390570021
+first_spin_fraction_below_0_1_percent = 0.9819376026272578
+continuation_global_delta_pg = 0.013343572261862042
+continuation_fraction_below_1_g_m2 = 0.9758386113065916
+continuation_fraction_below_0_1_percent = 0.9908515130190007
+convergence_status = "both spins fail dSOC <0.01 Pg C and >98% below 1 g C m-2; both pass >98% below 0.1%"
+matrix_sha256 = "0f7e6ede66d5a6f4ce308b9ffa5fd876b1e416f50afe7841bda0ccd9d83ea10e"
+reconstruction_report_sha256 = "093f99cdc05629554f2582c6e0274f3871707d56006138c38ee071775da68012"
+search_report_sha256 = "e9d7a658f406bb6beccc86df7bcb05012f3dd76da6f4a70c29fee91cf144fc7d"
+blocker = "the archive compiler/toolchain is unpublished and the source-Makefile GNU Fortran 8.1.0 candidate is unavailable locally; post-archive Q10 source and carbon-nitrogen KO6 history continuations are not evidence-backed substitutes"
