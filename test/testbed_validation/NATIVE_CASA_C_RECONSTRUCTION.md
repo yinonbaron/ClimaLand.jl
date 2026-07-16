@@ -16,7 +16,12 @@ read on demand from the original gridded NetCDF files; six soil layers are
 root-weighted with the pinned Fortran layer thicknesses and root profile.
 The carbon-only diagnostic plant N and P bookkeeping also preserves the
 Fortran update order: plant P is derived from the preceding day's N before N
-is refreshed from the current carbon pools.
+is refreshed from the current carbon pools. Each standalone stage resets
+plant P to the parameter-table initial value, matching the Fortran
+initialization that reads only carbon pools from the preceding checkpoint.
+The exported structural-litter diagnostic includes the CWD-to-soil transfer
+reported by the Fortran driver; this is a reporting convention and does not
+add a second transfer to the native carbon equations.
 
 Run from the repository root:
 
@@ -46,8 +51,29 @@ provenance difference.
 
 The measured prespin boundary tolerance is 0.005 g C m⁻² absolute plus 0.1%
 relative. At that tolerance all ten carbon pools match across all 4,263
-points; the largest measured prespin absolute difference is 0.0113 g C m⁻²
-in leaf carbon, where the relative difference is 5.76e-5.
+points; the largest measured prespin absolute difference is 0.0009178004
+g C m⁻² in slow soil carbon.
+
+The full-grid validation gives the following measured acceptance result at
+the same mixed tolerance:
+
+- Prespin, accelerated-spin, and normal-spin boundaries match all 42,630
+  point-pool values. The historical boundary has six failures: one metabolic
+  litter, one structural litter, three leaf, and one microbial-soil value.
+  The largest failing historical boundary difference is 0.0153911 g C m⁻²
+  in leaf carbon (0.5275% relative).
+- All six annual fresh-Fortran flux diagnostics match. Across stocks and
+  fluxes together, 113 of 7,289,730 annual values fail; they are confined to
+  leaf, structural-litter, and microbial-soil carbon.
+- The fresh-Fortran daily windows have 6 failures among 116,699,625 values
+  for 1901–1905 and 1,249 among 116,699,625 for 2010–2014. The largest litter
+  input differences occur as adjacent-day swaps around abrupt turnover
+  transitions, while their annual means match.
+- Every stage carbon budget closes at `budget_rtol = 5e-12`. The final
+  historical replay has a relative residual of 1.25e-14.
+
+Published-archive differences remain in their own report tables because the
+archive adds postprocessing differences beyond the fresh Fortran run.
 
 The tiny automated acceptance case exercises the same public `run_case`
 contract with two points and two days per stage. The full command above is the

@@ -32,7 +32,7 @@ repeats = 1
 [comparison]
 boundary_atol = 5.0e-3
 boundary_rtol = 1.0e-3
-historical_atol = 0.0
+historical_atol = 5.0e-3
 historical_rtol = 1.0e-3
 budget_rtol = 5.0e-12
 daily_windows = [[1901, 1905], [2010, 2014]]

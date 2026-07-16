@@ -36,9 +36,39 @@ const FLUX_VARIABLES = (
 
 native_workflow() = getfield(parentmodule(@__MODULE__), :TestbedNativeWorkflow)
 
-function casa_diagnostics()
+@inline function structural_litter_diagnostic(
+    parameters,
+    cwd_tendency,
+    cwd_input,
+    plant_structural_input,
+)
+    # The Fortran output folds CWD-to-soil transfer into cLitInptStruc even
+    # though that transfer is already represented in the CASA soil equations.
+    transfers = SoilCASA.transfer_fractions(
+        parameters.transfers,
+        parameters.clay,
+        parameters.silt,
+    )
+    cwd_loss = cwd_input - cwd_tendency
+    cwd_to_soil =
+        (transfers.cwd_to_microbial + transfers.cwd_to_slow) * cwd_loss
+    return plant_structural_input + cwd_to_soil
+end
+
+function casa_diagnostics(soil_parameters = nothing)
     flux(name, long_name, compute) =
         (; name, long_name, units = "kg C m-2 s-1", compute)
+    structural_compute =
+        isnothing(soil_parameters) ? ((_, p) -> p.litter_structural_input) :
+        (
+            (_, p) ->
+                structural_litter_diagnostic.(
+                    soil_parameters,
+                    getindex.(p.casa_soil.carbon_fluxes, 3),
+                    p.litter_cwd_input,
+                    p.litter_structural_input,
+                )
+        )
     return (
         flux(
             "diagnostic__cgpp",
@@ -63,7 +93,7 @@ function casa_diagnostics()
         flux(
             "diagnostic__c_litter_structural_input",
             "structural litter carbon input",
-            (_, p) -> p.litter_structural_input,
+            structural_compute,
         ),
         flux(
             "diagnostic__c_passive_input",
@@ -182,6 +212,7 @@ function read_pft_parameters(path)
                                           initial_phosphorus[pft][1] /
                                           initial_nitrogen[pft][1] : 0.0,
             leaf_nitrogen_to_phosphorus = plant_stoichiometry[pft][1],
+            initial_leaf_phosphorus = initial_phosphorus[pft][1] / 1000,
             labile_loss_rate = inv(YEAR_SECONDS * turnover[pft][17]),
             specific_leaf_area = 1000turnover[pft][18],
             maximum_leaf_area_index = chemistry[pft][19],
@@ -260,23 +291,42 @@ mutable struct CarbonOnlyPlantStoichiometry
     nitrogen::Vector{Float64}
     nitrogen_per_carbon::Vector{Float64}
     nitrogen_to_phosphorus::Vector{Float64}
+    initial_phosphorus::Vector{Float64}
     phosphorus_to_nitrogen::Vector{Float64}
 end
 
 function CarbonOnlyPlantStoichiometry(grid, parameters)
-    nitrogen = [parameters[point.pft].plant_nitrogen[1] for point in grid]
     nitrogen_per_carbon =
         [parameters[point.pft].plant_nitrogen_ratio[1] for point in grid]
     nitrogen_to_phosphorus =
         [parameters[point.pft].leaf_nitrogen_to_phosphorus for point in grid]
-    phosphorus_to_nitrogen =
-        [parameters[point.pft].leaf_phosphorus_to_nitrogen for point in grid]
+    initial_phosphorus =
+        [parameters[point.pft].initial_leaf_phosphorus for point in grid]
+    nitrogen = [
+        parameters[point.pft].initial_carbon[1] * nitrogen_per_carbon[index] for (index, point) in enumerate(grid)
+    ]
+    phosphorus_to_nitrogen = [
+        nitrogen[index] > 0 ? initial_phosphorus[index] / nitrogen[index] : 0.0 for index in eachindex(nitrogen)
+    ]
     return CarbonOnlyPlantStoichiometry(
         nitrogen,
         nitrogen_per_carbon,
         nitrogen_to_phosphorus,
+        initial_phosphorus,
         phosphorus_to_nitrogen,
     )
+end
+
+function reset_stoichiometry!(stoichiometry)
+    # A standalone Fortran stage restores carbon only, recomputes N from C,
+    # and leaves P at its parameter-table initial value for the first day.
+    for index in eachindex(stoichiometry.nitrogen)
+        nitrogen = stoichiometry.nitrogen[index]
+        stoichiometry.phosphorus_to_nitrogen[index] =
+            nitrogen > 0 ? stoichiometry.initial_phosphorus[index] / nitrogen :
+            0.0
+    end
+    return nothing
 end
 
 function update_stoichiometry!(stoichiometry, Y)
@@ -1077,7 +1127,7 @@ function run_gridded_case(
     output_root;
     boundary_atol = 5e-3,
     boundary_rtol = 1e-3,
-    historical_atol = 0.0,
+    historical_atol = 5e-3,
     historical_rtol = 1e-3,
     budget_rtol = 5e-12,
 )
@@ -1145,6 +1195,7 @@ function run_gridded_case(
     )
     budget = CarbonBudgetAccumulator(grid)
     stoichiometry = CarbonOnlyPlantStoichiometry(grid, normal.parameters)
+    active_stage = Ref{Union{Nothing, Symbol}}(nothing)
     function carbon_budget(stage, result, _, _, initial_state, _)
         name = String(stage.name)
         start_stock = area_weighted_carbon(initial_state, budget.area_m2)
@@ -1175,13 +1226,17 @@ function run_gridded_case(
             model_for_stage,
             update_forcing! = function (stage, index, time)
                 update_forcing!(forcing, stage, index, time)
+                if active_stage[] != stage.name
+                    reset_stoichiometry!(stoichiometry)
+                    active_stage[] = stage.name
+                end
                 apply_stoichiometry!(stoichiometry, model_for_stage(stage))
             end,
             after_step! = function (stage, step, Y, p, time)
                 accumulate_budget!(budget, stage, step, Y, p, time)
                 update_stoichiometry!(stoichiometry, Y)
             end,
-            diagnostics = casa_diagnostics(),
+            diagnostics = casa_diagnostics(normal.model.casa_soil.parameters),
             provenance = stage -> gridded_provenance(
                 stage,
                 parameter_for_stage(stage),

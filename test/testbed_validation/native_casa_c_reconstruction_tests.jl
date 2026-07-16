@@ -222,11 +222,14 @@ end
                 grid,
                 built.parameters,
             )
+        @test stoichiometry.phosphorus_to_nitrogen[1] == 50
         TestbedNativeCASACReconstruction.update_stoichiometry!(
             stoichiometry,
             initial,
         )
-        @test stoichiometry.phosphorus_to_nitrogen[1] == 5
+        @test stoichiometry.phosphorus_to_nitrogen[1] == 0.1
+        TestbedNativeCASACReconstruction.reset_stoichiometry!(stoichiometry)
+        @test stoichiometry.phosphorus_to_nitrogen[1] == 50
         TestbedNativeCASACReconstruction.apply_stoichiometry!(
             stoichiometry,
             built.model,
@@ -237,12 +240,7 @@ end
                     built.model.casa_plant.parameters.leaf_phosphorus_to_nitrogen,
                 ),
             ),
-        ) == 5
-        TestbedNativeCASACReconstruction.update_stoichiometry!(
-            stoichiometry,
-            initial,
-        )
-        @test stoichiometry.phosphorus_to_nitrogen[1] == 0.1
+        ) == 50
         @test !TestbedNativeCASACReconstruction.soil_parameters(
             built.parameters[1],
             soils[1],
@@ -253,6 +251,63 @@ end
             soils[1],
             12,
         ).is_cropland
+        point_soil = TestbedNativeCASACReconstruction.soil_parameters(
+            built.parameters[1],
+            soils[1],
+            1,
+        )
+        rates = TestbedNativeCASACReconstruction.SoilCASA.decomposition_rates(
+            point_soil.litter_optimum,
+            point_soil.soil_optimum,
+            point_soil.litter_base_rates,
+            point_soil.soil_base_rates,
+            point_soil.transfers.lignin_leaf,
+            point_soil.clay,
+            point_soil.silt,
+            point_soil.is_cropland,
+        )
+        transfers =
+            TestbedNativeCASACReconstruction.SoilCASA.transfer_fractions(
+                point_soil.transfers,
+                point_soil.clay,
+                point_soil.silt,
+            )
+        cwd_input = 0.25
+        cwd_tendency = cwd_input - 2.0 * rates.litter[3]
+        @test TestbedNativeCASACReconstruction.structural_litter_diagnostic(
+            point_soil,
+            cwd_tendency,
+            cwd_input,
+            1.0,
+        ) ≈
+              1.0 +
+              2.0 *
+              rates.litter[3] *
+              (transfers.cwd_to_microbial + transfers.cwd_to_slow)
+        Y, p, _ =
+            TestbedNativeCASACReconstruction.ClimaLand.initialize(built.model)
+        TestbedNativeWorkflow.set_initial_state!(Y, built.model, initial)
+        TestbedNativeCASACReconstruction.ClimaLand.make_set_initial_cache(
+            built.model,
+        )(
+            p,
+            Y,
+            0.0,
+        )
+        structural = only(
+            diagnostic for diagnostic in
+            TestbedNativeCASACReconstruction.casa_diagnostics(
+                built.model.casa_soil.parameters,
+            ) if diagnostic.name == "diagnostic__c_litter_structural_input"
+        )
+        expected_structural =
+            TestbedNativeCASACReconstruction.structural_litter_diagnostic.(
+                built.model.casa_soil.parameters,
+                getindex.(p.casa_soil.carbon_fluxes, 3),
+                p.litter_cwd_input,
+                p.litter_structural_input,
+            )
+        @test structural.compute(Y, p) == expected_structural
         default_phenology = TestbedNativeCASACReconstruction.read_phenology(
             fixture.phenology,
             [(; latitude = 79.75, pft = 16)],
