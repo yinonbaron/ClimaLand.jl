@@ -15,12 +15,21 @@ import NCDatasets
 
 const MATRIX_PATH = joinpath(@__DIR__, "mimics_c_reconstruction.toml")
 const CANDIDATE_SPEC_PATH = joinpath(@__DIR__, "candidate_reconstruction.toml")
-const CONTROL_IDS = (
-    "mimics_c_prespin",
-    "mimics_c_spin",
-    "mimics_c_spin_continuation",
-    "mimics_c_history",
+const STAGE_SPECS = (
+    (
+        name = "prespin",
+        control_id = "mimics_c_prespin",
+        directory = "01-prespin",
+    ),
+    (name = "spin", control_id = "mimics_c_spin", directory = "02-spin"),
+    (
+        name = "historical",
+        control_id = "mimics_c_history",
+        directory = "03-historical",
+    ),
 )
+const CONTROL_IDS = map(stage -> stage.control_id, STAGE_SPECS)
+const HISTORICAL_STAGE_DIRECTORY = last(STAGE_SPECS).directory
 
 casa() = getfield(parentmodule(@__MODULE__), :TestbedCASACReconstruction)
 harness() = casa().harness()
@@ -46,12 +55,10 @@ function load_matrix(path = MATRIX_PATH)
         error("MIMICS-C comparison must be exact")
     matrix["stages"]["prespin"]["loops"] == matrix["prespin_loops"] ||
         error("MIMICS-C prespin matrix is inconsistent")
-    for stage in ("spin", "spin_continuation")
-        matrix["stages"][stage]["loops"] == matrix["spin_loops"] ||
-            error("MIMICS-C $stage matrix is inconsistent")
-        matrix["stages"][stage]["years"] == matrix["spin_years"] ||
-            error("MIMICS-C $stage years are inconsistent")
-    end
+    matrix["stages"]["spin"]["loops"] == matrix["spin_loops"] ||
+        error("MIMICS-C spin matrix is inconsistent")
+    matrix["stages"]["spin"]["years"] == matrix["spin_years"] ||
+        error("MIMICS-C spin years are inconsistent")
     matrix["stages"]["historical"]["years"] == matrix["history_years"] ||
         error("MIMICS-C history matrix is inconsistent")
     models = matrix["postprocessing"]["model"]
@@ -211,7 +218,7 @@ end
 """
     write_full_workflow(source_root, data_root, candidate_root, run_root, case_id)
 
-Materialize the four-stage carbon-only workflow for one evidence-backed case.
+Materialize the three-stage carbon-only workflow for one evidence-backed case.
 """
 function write_full_workflow(
     source_root,
@@ -254,8 +261,9 @@ function write_full_workflow(
         :point_output_directory => "./",
     )
     controls_by_stage = Dict{String, String}()
-    for (name, candidate_id) in
-        zip(("prespin", "spin", "spin_continuation", "historical"), CONTROL_IDS)
+    for stage_spec in STAGE_SPECS
+        name = stage_spec.name
+        candidate_id = stage_spec.control_id
         stage_matrix = matrix["stages"][name]
         candidate_id == stage_matrix["control_candidate"] ||
             error("MIMICS-C $name control matrix is inconsistent")
@@ -287,14 +295,13 @@ function write_full_workflow(
         first(years):last(years)
     end
     stage_inputs = Dict(
-        name => common_inputs(source_root, data_root, stage_years(name)) for
-        name in ("prespin", "spin", "spin_continuation", "historical")
+        stage.name =>
+            common_inputs(source_root, data_root, stage_years(stage.name))
+        for stage in STAGE_SPECS
     )
-    for (name, predecessor) in (
-        "spin" => "prespin",
-        "spin_continuation" => "spin",
-        "historical" => "spin_continuation",
-    )
+    for index in 2:length(STAGE_SPECS)
+        name = STAGE_SPECS[index].name
+        predecessor = STAGE_SPECS[index - 1].name
         push!(
             stage_inputs[name],
             harness().workflow_input(
@@ -311,8 +318,11 @@ function write_full_workflow(
         )
     end
     stages = [
-        stage_definition(name, controls_by_stage[name], stage_inputs[name])
-        for name in ("prespin", "spin", "spin_continuation", "historical")
+        stage_definition(
+            stage.name,
+            controls_by_stage[stage.name],
+            stage_inputs[stage.name],
+        ) for stage in STAGE_SPECS
     ]
     workflow = Dict(
         "schema_version" => 1,
@@ -485,14 +495,10 @@ Record paired restart diagnostics and convergence evidence for every stage bound
 """
 function boundary_report(case_root)
     stages = joinpath(case_root, "stages")
-    stage_directories = (
-        "prespin" => "01-prespin",
-        "spin" => "02-spin",
-        "spin_continuation" => "03-spin_continuation",
-        "historical" => "04-historical",
-    )
     boundaries = Dict{String, Any}()
-    for (name, directory) in stage_directories
+    for stage_spec in STAGE_SPECS
+        name = stage_spec.name
+        directory = stage_spec.directory
         stage = joinpath(stages, directory)
         casa_path = joinpath(stage, "casa_final.csv")
         mimics_path = joinpath(stage, "mimics_final.csv")
@@ -510,14 +516,13 @@ function boundary_report(case_root)
             Dict("casa" => casa_record, "mimics" => mimics_record)
     end
     previous_checkpoint, final_checkpoint = final_spin_checkpoints()
-    convergence = Dict{String, Any}()
-    for (name, directory) in stage_directories[2:3]
-        stage = joinpath(stages, directory)
-        convergence[name] = spin_convergence(
-            joinpath(stage, netcdf_name("mimics", previous_checkpoint)),
-            joinpath(stage, netcdf_name("mimics", final_checkpoint)),
-        )
-    end
+    spin_stage = joinpath(stages, STAGE_SPECS[2].directory)
+    convergence = Dict(
+        "spin" => spin_convergence(
+            joinpath(spin_stage, netcdf_name("mimics", previous_checkpoint)),
+            joinpath(spin_stage, netcdf_name("mimics", final_checkpoint)),
+        ),
+    )
     return Dict(
         "restart_boundary" => boundaries,
         "spin_convergence" => convergence,
@@ -634,7 +639,7 @@ function daily_comparison(
     archive = archive_record(data_root),
 )
     model = model_spec(model_id)
-    historical = joinpath(case_root, "stages", "04-historical")
+    historical = joinpath(case_root, "stages", HISTORICAL_STAGE_DIRECTORY)
     comparisons = Dict{String, Any}()
     for window in load_matrix()["postprocessing"]["daily_windows"]
         years = first(window):last(window)
@@ -686,7 +691,7 @@ function annual_comparison(
         model["annual_reference"];
         archive,
     )
-    historical = joinpath(case_root, "stages", "04-historical")
+    historical = joinpath(case_root, "stages", HISTORICAL_STAGE_DIRECTORY)
     history_years = matrix["stages"]["historical"]["years"]
     records = Dict{String, Any}()
     metadata_mismatches = String[]
@@ -970,19 +975,14 @@ function write_case_report(data_root, case_root)
             ),
             "build_metadata" => file_record(build_metadata),
             "stage_metadata" => Dict(
-                name => file_record(
+                stage.name => file_record(
                     joinpath(
                         case_root,
                         "stages",
-                        directory,
+                        stage.directory,
                         "stage_metadata.toml",
                     ),
-                ) for (name, directory) in (
-                    "prespin" => "01-prespin",
-                    "spin" => "02-spin",
-                    "spin_continuation" => "03-spin_continuation",
-                    "historical" => "04-historical",
-                )
+                ) for stage in STAGE_SPECS
             ),
         ),
         "boundaries" => boundaries,
@@ -1165,8 +1165,15 @@ function self_test()
         Test.@test matrix["spin_loops"] == 499
         Test.@test matrix["history_years"] == [1901, 2014]
         Test.@test final_spin_checkpoints() == (9960, 9980)
+        Test.@test CONTROL_IDS ==
+                   ("mimics_c_prespin", "mimics_c_spin", "mimics_c_history")
+        Test.@test map(stage -> stage.name, STAGE_SPECS) ==
+                   ("prespin", "spin", "historical")
+        Test.@test HISTORICAL_STAGE_DIRECTORY == "03-historical"
+        Test.@test !haskey(matrix["stages"], "spin_continuation")
         Test.@test length(matrix["case"]) == 1
         Test.@test haskey(matrix["excluded"], "post_archive_q10")
+        Test.@test haskey(matrix["excluded"], "post_archive_spin_continuation")
         Test.@test haskey(matrix["excluded"], "history_continuations")
         Test.@test Set(keys(candidate_control_paths())) == Set(CONTROL_IDS)
         Test.@test matrix["inputs"]["mimics_parameters"] ==

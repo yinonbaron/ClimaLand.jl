@@ -28,11 +28,6 @@ control_candidate = "mimics_c_spin"
 loops = 499
 years = [1901, 1920]
 
-[stages.spin_continuation]
-control_candidate = "mimics_c_spin_continuation"
-loops = 499
-years = [1901, 1920]
-
 [stages.historical]
 control_candidate = "mimics_c_history"
 loops = 1
@@ -69,7 +64,7 @@ reason = "The documented source-Makefile compiler is not installed on the curren
 controls = "Committed KO4 MIMICS-CN CLM5/GSWP3 controls, derived to icycle=1 by candidate_reconstruction.toml"
 source = "Archive creation 2021-02-02; latest public source revision before creation is 9988b1b"
 parameters = "Archive metadata names the committed pre-Q10 KO4_micCN_FI30 table"
-spin = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt documents prespin, repeated 20-year spin phases, convergence checks, and restart continuation when needed"
+spin = "The archive predates the public x500b continuation control; a controlled 1901 rerun from the first x500 endpoint removes 99.7% of the cLITs stock mismatch and exactly restores the archived litter inputs"
 postprocessing = "Archive history records ncra annual means, ncrcat concatenation, and retained 1901-1905/2010-2014 daily windows"
 
 [[case]]
@@ -80,6 +75,11 @@ reason = "Latest public source revision before the MIMICS-C archive creation tim
 [excluded.post_archive_q10]
 source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 reason = "Postdates archive creation and adds temperature-sensitive desorption fields absent from the archive-named KO4 table"
+
+[excluded.post_archive_spin_continuation]
+control = "fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+control_commit = "117f087382b21261f51c67bd5de2a12c7ebd43a5"
+reason = "The x500b continuation and historical controls were first committed on 2021-08-27, after the archive was created on 2021-02-02; initializing history from x500b increases the day-one cLITs and cSOMc stock errors"
 
 [excluded.history_continuations]
 controls = ["fcasacnp_clm_HIST2_1901_1910_STEP_3of4.lst", "fcasacnp_clm_HIST3_1901_2014_STEP_3of4.lst"]
