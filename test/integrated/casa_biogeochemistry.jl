@@ -73,6 +73,7 @@ function integrated_casa_cn_model(
         z_sfc = zero(FT),
         context = ClimaComms.context(),
     ),
+    plant_temporal_mode = PlantCASA.LegacyDaily(),
 ) where {FT}
     day = FT(86400)
     year = FT(365) * day
@@ -124,6 +125,7 @@ function integrated_casa_cn_model(
         drivers = plant_drivers,
         nitrogen_drivers = plant_nitrogen_drivers,
         domain,
+        temporal_mode = plant_temporal_mode,
     )
 
     transfers = SoilCASA.CarbonTransferParameters{FT}(;
@@ -206,10 +208,14 @@ function integrated_casa_cn_model(
     return (; model, deposition, fixation)
 end
 
-function integrated_mimics_cn_model(::Type{FT}; domain = nothing) where {FT}
+function integrated_mimics_cn_model(
+    ::Type{FT};
+    domain = nothing,
+    plant_temporal_mode = PlantCASA.LegacyDaily(),
+) where {FT}
     casa_setup =
-        isnothing(domain) ? integrated_casa_cn_model(FT) :
-        integrated_casa_cn_model(FT; domain)
+        isnothing(domain) ? integrated_casa_cn_model(FT; plant_temporal_mode) :
+        integrated_casa_cn_model(FT; domain, plant_temporal_mode)
     plant = casa_setup.model.casa_plant
     domain = plant.domain
     carbon = MIMICS.CarbonParameters{FT}(;
@@ -779,9 +785,12 @@ for FT in (Float32, Float64)
 end
 
 
-for FT in (Float32, Float64)
-    @testset "Integrated MIMICS carbon-nitrogen conservation, FT = $FT" begin
-        setup = integrated_mimics_cn_model(FT)
+for FT in (Float32, Float64),
+    temporal_mode in (PlantCASA.LegacyDaily(), PlantCASA.ContinuousRate())
+
+    @testset "Integrated MIMICS carbon-nitrogen conservation, FT = $FT, mode = $(typeof(temporal_mode))" begin
+        setup =
+            integrated_mimics_cn_model(FT; plant_temporal_mode = temporal_mode)
         model = setup.model
         Y, p, _ = ClimaLand.initialize(model)
         plant_initial = FT.((0.09, 0.37, 0.14, 0.01, 0.002, 0.003, 0.004))
@@ -824,6 +833,35 @@ for FT in (Float32, Float64)
 
         dY = similar(Y)
         ClimaLand.make_exp_tendency(model)(dY, Y, p, zero(FT))
+        plant_carbon_tendency = sum(
+            getproperty(dY.casa_plant, name)[] for
+            name in (:c_leaf, :c_wood, :c_fine_root, :c_labile)
+        )
+        soil_carbon_tendency = sum(
+            getproperty(dY.mimics_soil, name)[] for name in (
+                :c_litter_metabolic,
+                :c_litter_structural,
+                :c_litter_cwd,
+                :c_microbe_r,
+                :c_microbe_k,
+                :c_soil_available,
+                :c_soil_chemical,
+                :c_soil_physical,
+            )
+        )
+        carbon_input = p.casa_plant.carbon_fluxes[][14]
+        carbon_tolerance = max(
+            FT(2e-5) * carbon_input,
+            FT(64) * eps(FT) *
+            (sum(abs, plant_initial[1:4]) + sum(abs, soil_initial[1:8])) /
+            FT(86400),
+        )
+        @test plant_carbon_tendency +
+              soil_carbon_tendency +
+              p.casa_plant.carbon_fluxes[][16] +
+              p.casa_plant.carbon_fluxes[][21] +
+              p.mimics_soil.carbon_fluxes[][9] ≈
+              carbon_input atol = carbon_tolerance
         plant_nitrogen_tendency = sum(
             getproperty(dY.casa_plant, name)[] for
             name in (:n_leaf, :n_wood, :n_fine_root)
@@ -864,9 +902,12 @@ for FT in (Float32, Float64)
     end
 end
 
-for FT in (Float32, Float64)
-    @testset "Integrated CASA carbon-nitrogen conservation, FT = $FT" begin
-        setup = integrated_casa_cn_model(FT)
+for FT in (Float32, Float64),
+    temporal_mode in (PlantCASA.LegacyDaily(), PlantCASA.ContinuousRate())
+
+    @testset "Integrated CASA carbon-nitrogen conservation, FT = $FT, mode = $(typeof(temporal_mode))" begin
+        setup =
+            integrated_casa_cn_model(FT; plant_temporal_mode = temporal_mode)
         model = setup.model
         @test length(ClimaLand.lsm_aux_vars(model)) == 12
         Y, p, _ = ClimaLand.initialize(model)
@@ -918,6 +959,33 @@ for FT in (Float32, Float64)
 
         dY = similar(Y)
         ClimaLand.make_exp_tendency(model)(dY, Y, p, zero(FT))
+        plant_carbon_tendency = sum(
+            getproperty(dY.casa_plant, name)[] for
+            name in (:c_leaf, :c_wood, :c_fine_root, :c_labile)
+        )
+        soil_carbon_tendency = sum(
+            getproperty(dY.casa_soil, name)[] for name in (
+                :c_litter_metabolic,
+                :c_litter_structural,
+                :c_litter_cwd,
+                :c_soil_microbial,
+                :c_soil_slow,
+                :c_soil_passive,
+            )
+        )
+        carbon_input = p.casa_plant.carbon_fluxes[][14]
+        carbon_tolerance = max(
+            FT(64) * eps(FT) * carbon_input,
+            FT(64) * eps(FT) *
+            (sum(abs, plant_initial[1:4]) + sum(abs, soil_initial[1:6])) /
+            FT(86400),
+        )
+        @test plant_carbon_tendency +
+              soil_carbon_tendency +
+              p.casa_plant.carbon_fluxes[][16] +
+              p.casa_plant.carbon_fluxes[][21] +
+              p.casa_soil.carbon_fluxes[][7] ≈
+              carbon_input atol = carbon_tolerance
         plant_nitrogen_tendency = sum(
             getproperty(dY.casa_plant, name)[] for
             name in (:n_leaf, :n_wood, :n_fine_root)
@@ -948,6 +1016,7 @@ function carbon_only_model(model::CASAPlantCASASoilModel{FT}) where {FT}
         parameters = model.casa_plant.parameters,
         drivers = model.casa_plant.drivers,
         domain = model.casa_plant.domain,
+        temporal_mode = model.casa_plant.temporal_mode,
     )
     soil = SoilCASA.CASASoilModel{FT}(;
         parameters = model.casa_soil.parameters,
@@ -962,6 +1031,7 @@ function carbon_only_model(model::CASAPlantMIMICSSoilModel{FT}) where {FT}
         parameters = model.casa_plant.parameters,
         drivers = model.casa_plant.drivers,
         domain = model.casa_plant.domain,
+        temporal_mode = model.casa_plant.temporal_mode,
     )
     soil = MIMICS.MIMICSSoilModel{FT}(;
         parameters = model.mimics_soil.parameters,
@@ -969,6 +1039,61 @@ function carbon_only_model(model::CASAPlantMIMICSSoilModel{FT}) where {FT}
         domain = model.mimics_soil.domain,
     )
     return CASAPlantSoilModel{FT}(plant, soil, model.coupling)
+end
+
+for FT in (Float32, Float64),
+    temporal_mode in (PlantCASA.LegacyDaily(), PlantCASA.ContinuousRate()),
+    soil_name in (:casa_soil, :mimics_soil)
+
+    @testset "Integrated carbon-only conservation, FT = $FT, mode = $(typeof(temporal_mode)), soil = $soil_name" begin
+        source = if soil_name == :casa_soil
+            integrated_casa_cn_model(FT; plant_temporal_mode = temporal_mode)
+        else
+            integrated_mimics_cn_model(FT; plant_temporal_mode = temporal_mode)
+        end
+        model = carbon_only_model(source.model)
+        @test model.casa_plant.temporal_mode isa typeof(temporal_mode)
+        Y, p, _ = ClimaLand.initialize(model)
+        plant_initial = FT.((0.09, 0.37, 0.14, 0.01))
+        for (name, value) in
+            zip(ClimaLand.prognostic_vars(model.casa_plant), plant_initial)
+            getproperty(Y.casa_plant, name) .= value
+        end
+        soil = getproperty(model, soil_name)
+        for (index, name) in enumerate(ClimaLand.prognostic_vars(soil))
+            getproperty(getproperty(Y, soil_name), name) .= FT(index) / FT(100)
+        end
+        ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
+        dY = similar(Y)
+        ClimaLand.make_exp_tendency(model)(dY, Y, p, zero(FT))
+        plant_tendency = sum(
+            getproperty(dY.casa_plant, name)[] for
+            name in ClimaLand.prognostic_vars(model.casa_plant)
+        )
+        soil_tendency = sum(
+            getproperty(getproperty(dY, soil_name), name)[] for
+            name in ClimaLand.prognostic_vars(soil)
+        )
+        soil_fluxes = getproperty(p, soil_name).carbon_fluxes[]
+        soil_respiration =
+            soil_name == :casa_soil ? soil_fluxes[7] : soil_fluxes[9]
+        carbon_fluxes = p.casa_plant.carbon_fluxes[]
+        soil_initial_total = sum(
+            FT(index) / FT(100) for
+            index in 1:length(ClimaLand.prognostic_vars(soil))
+        )
+        carbon_tolerance = max(
+            FT(2e-5) * carbon_fluxes[14],
+            FT(64) * eps(FT) *
+            (sum(abs, plant_initial) + soil_initial_total) /
+            FT(86400),
+        )
+        @test plant_tendency +
+              soil_tendency +
+              carbon_fluxes[16] +
+              carbon_fluxes[21] +
+              soil_respiration ≈ carbon_fluxes[14] atol = carbon_tolerance
+    end
 end
 
 function tracer_initial_state(model, ::Type{FT}) where {FT}

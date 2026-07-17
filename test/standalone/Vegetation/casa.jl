@@ -24,12 +24,16 @@ function plant_parameters(
     nonwoody = false,
     root_exudate_fraction = zero(FT),
     plant_nitrogen_ratio = ntuple(_ -> zero(FT), 3),
+    turnover_rates = nothing,
 ) where {FT}
     day = FT(86400)
     year = FT(365) * day
+    turnover_rates =
+        isnothing(turnover_rates) ?
+        (inv(year), inv(FT(40) * year), inv(FT(5) * year)) : turnover_rates
     return CASA.CASAPlantModelParameters{FT}(;
         allocation = (FT(0.4), FT(0.15), FT(0.45)),
-        turnover_rates = (inv(year), inv(FT(40) * year), inv(FT(5) * year)),
+        turnover_rates,
         maintenance_rates = (FT(0.1) / year, FT(6) / year, FT(6) / year),
         plant_nitrogen = (FT(2.2e-3), FT(2.5e-3), FT(19e-3)),
         plant_nitrogen_ratio,
@@ -47,6 +51,240 @@ function plant_parameters(
         root_exudate_fraction,
         nonwoody,
     )
+end
+
+@testset "CASA plant temporal modes" begin
+    FT = Float64
+    day = FT(86400)
+    parameters =
+        plant_parameters(FT; turnover_rates = ntuple(_ -> FT(2) / day, 3))
+    nitrogen_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+        nitrogen_ratio_minimum = (FT(0.02), FT(0.006666667), FT(0.024390244)),
+        nitrogen_ratio_maximum = (FT(0.03), FT(0.008), FT(0.029268293)),
+        nitrogen_fraction_to_litter = (FT(0.5), FT(0.95), FT(0.9)),
+        lignin_fraction = (FT(0.2), FT(0.4), FT(0.2)),
+        structural_litter_nitrogen_ratio = inv(FT(150)),
+        limitation_minimum = FT(0.5e-3),
+        limitation_maximum = FT(2e-3),
+        mineral_half_saturation = FT(2e-3),
+    )
+    drivers = CASA.PrescribedDrivers(
+        t -> zero(FT),
+        t -> FT(240),
+        t -> FT(240),
+        t -> one(FT),
+        t -> FT(2),
+        t -> one(FT),
+        t -> zero(FT),
+    )
+    nitrogen_drivers = CASA.NitrogenPrescribedDrivers(
+        t -> zero(FT),
+        t -> zero(FT),
+        t -> zero(FT),
+    )
+    domain = Point(; z_sfc = zero(FT), context = ClimaComms.context())
+    legacy = CASA.CASAPlantModel{FT}(;
+        configuration = CASA.CarbonNitrogen(),
+        parameters,
+        nitrogen_parameters,
+        drivers,
+        nitrogen_drivers,
+        domain,
+    )
+    continuous = CASA.CASAPlantModel{FT}(;
+        configuration = CASA.CarbonNitrogen(),
+        parameters,
+        nitrogen_parameters,
+        drivers,
+        nitrogen_drivers,
+        domain,
+        temporal_mode = CASA.ContinuousRate(),
+    )
+    @test legacy.temporal_mode isa CASA.LegacyDaily
+    @test continuous.temporal_mode isa CASA.ContinuousRate
+    @test ClimaLand.prognostic_vars(continuous) ==
+          ClimaLand.prognostic_vars(legacy)
+    @test ClimaLand.auxiliary_vars(continuous) ==
+          ClimaLand.auxiliary_vars(legacy)
+
+    initial = FT.((0.09, 0.37, 0.14, 0.01, 0.002, 0.003, 0.004))
+    function cached_fluxes(model)
+        Y, p, _ = ClimaLand.initialize(model)
+        for (name, value) in zip(ClimaLand.prognostic_vars(model), initial)
+            getproperty(Y.casa_plant, name) .= value
+        end
+        ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
+        return p.casa_plant.carbon_fluxes[], p.casa_plant.nitrogen_fluxes[]
+    end
+    legacy_carbon, legacy_nitrogen = cached_fluxes(legacy)
+    continuous_carbon, continuous_nitrogen = cached_fluxes(continuous)
+
+    @test Tuple(legacy_carbon[1:3]) ==
+          Tuple(-initial[index] / day for index in 1:3)
+    @test Tuple(continuous_carbon[1:3]) ==
+          Tuple(-continuous_carbon[index] for index in 8:10)
+    @test Tuple(legacy_carbon[8:10]) == Tuple(continuous_carbon[8:10])
+    @test all(iszero, legacy_nitrogen[1:3])
+    @test any(!iszero, continuous_nitrogen[1:3])
+    legacy_carbon_kernel = @inferred CASA.packed_carbon_fluxes(
+        CASA.LegacyDaily(),
+        parameters,
+        initial[1:4]...,
+        zero(FT),
+        FT(240),
+        FT(240),
+        one(FT),
+        FT(2),
+        one(FT),
+        zero(FT),
+        initial[5:7]...,
+    )
+    @test legacy_carbon_kernel == legacy_carbon
+    @test @allocated(
+        CASA.packed_carbon_fluxes(
+            CASA.LegacyDaily(),
+            parameters,
+            initial[1:4]...,
+            zero(FT),
+            FT(240),
+            FT(240),
+            one(FT),
+            FT(2),
+            one(FT),
+            zero(FT),
+            initial[5:7]...,
+        )
+    ) == 0
+    legacy_nitrogen_kernel = @inferred CASA.packed_nitrogen_fluxes(
+        CASA.LegacyDaily(),
+        nitrogen_parameters,
+        initial[1:3]...,
+        initial[5:7]...,
+        zero(FT),
+        zero(FT),
+        zero(FT),
+        legacy_carbon,
+    )
+    @test legacy_nitrogen_kernel == legacy_nitrogen
+    @test @allocated(
+        CASA.packed_nitrogen_fluxes(
+            CASA.LegacyDaily(),
+            nitrogen_parameters,
+            initial[1:3]...,
+            initial[5:7]...,
+            zero(FT),
+            zero(FT),
+            zero(FT),
+            legacy_carbon,
+        )
+    ) == 0
+    continuous_nitrogen_kernel = @inferred CASA.packed_nitrogen_fluxes(
+        CASA.ContinuousRate(),
+        nitrogen_parameters,
+        initial[1:3]...,
+        initial[5:7]...,
+        zero(FT),
+        zero(FT),
+        zero(FT),
+        continuous_carbon,
+    )
+    @test continuous_nitrogen_kernel == continuous_nitrogen
+    @test @allocated(
+        CASA.packed_nitrogen_fluxes(
+            CASA.ContinuousRate(),
+            nitrogen_parameters,
+            initial[1:3]...,
+            initial[5:7]...,
+            zero(FT),
+            zero(FT),
+            zero(FT),
+            continuous_carbon,
+        )
+    ) == 0
+
+    edge_leaf_carbon = FT(0.003)
+    edge_carbon_fluxes =
+        Base.setindex(legacy_carbon, -edge_leaf_carbon / day, 1)
+    edge_nitrogen = CASA.packed_nitrogen_fluxes(
+        CASA.LegacyDaily(),
+        nitrogen_parameters,
+        edge_leaf_carbon,
+        initial[2:3]...,
+        initial[5:7]...,
+        zero(FT),
+        zero(FT),
+        zero(FT),
+        edge_carbon_fluxes,
+    )
+    @test all(iszero, edge_nitrogen[1:3])
+end
+
+function integrate_plant(model, initial, stop_time, timestep)
+    Y, p, _ = ClimaLand.initialize(model)
+    for (name, value) in zip(ClimaLand.prognostic_vars(model), initial)
+        getproperty(Y.casa_plant, name) .= value
+    end
+    tendency! = ClimaLand.make_exp_tendency(model)
+    problem = CTS.ODEProblem(
+        CTS.ClimaODEFunction((T_exp!) = tendency!),
+        Y,
+        (0.0, Float64(stop_time)),
+        p,
+    )
+    integrator = CTS.init(
+        problem,
+        FORWARD_EULER;
+        dt = Float64(timestep),
+        save_everystep = false,
+    )
+    for _ in 1:round(Int, stop_time / timestep)
+        CTS.step!(integrator)
+    end
+    return map(ClimaLand.prognostic_vars(model)) do name
+        getproperty(integrator.u.casa_plant, name)[]
+    end
+end
+
+@testset "CASA ContinuousRate timestep refinement" begin
+    FT = Float64
+    day = FT(86400)
+    parameters = plant_parameters(FT)
+    drivers = CASA.PrescribedDrivers(
+        t -> FT(2e-7),
+        t -> FT(283.15),
+        t -> FT(278.15),
+        t -> FT(0.7),
+        t -> FT(2),
+        t -> one(FT),
+        t -> zero(FT),
+    )
+    domain = Point(; z_sfc = zero(FT), context = ClimaComms.context())
+    continuous = CASA.CASAPlantModel{FT}(;
+        parameters,
+        drivers,
+        domain,
+        temporal_mode = CASA.ContinuousRate(),
+    )
+    legacy = CASA.CASAPlantModel{FT}(; parameters, drivers, domain)
+    initial = FT.((0.09, 0.37, 0.14, 0.01))
+    stop_time = FT(30) * day
+    refinements = (1, 2, 4, 8, 16, 32)
+    solutions = map(refinements) do refinement
+        integrate_plant(continuous, initial, stop_time, day / FT(refinement))
+    end
+    reference = solutions[end]
+    errors = map(solutions[1:(end - 1)]) do solution
+        sum(abs.(solution .- reference))
+    end
+    @test all(
+        errors[index] > errors[index + 1] for index in 1:(length(errors) - 1)
+    )
+
+    legacy_solution = integrate_plant(legacy, initial, stop_time, day)
+    @test legacy_solution == solutions[1]
+    relative_legacy_distance =
+        sum(abs.(legacy_solution .- reference)) / sum(abs, reference)
+    @test relative_legacy_distance ≈ FT(2.508246047039484e-4) rtol = FT(1e-6)
 end
 
 @testset "CASA carbon-only dummy plant nitrogen" begin
@@ -218,7 +456,23 @@ for FT in (Float32, Float64)
             zero(FT),
         )
         fluxes = @inferred CASA.carbon_fluxes(args...)
+        packed_fluxes = @inferred CASA.packed_carbon_fluxes(
+            CASA.ContinuousRate(),
+            parameters,
+            carbon...,
+            args[3:end]...,
+        )
+        @test packed_fluxes ==
+              CASA.packed_carbon_fluxes(parameters, carbon..., args[3:end]...)
         @test packed_flux_allocations(args...) == 0
+        @test @allocated(
+            CASA.packed_carbon_fluxes(
+                CASA.ContinuousRate(),
+                parameters,
+                carbon...,
+                args[3:end]...,
+            )
+        ) == 0
         @test sum(fluxes.allocation) ≈ one(FT) atol = 4eps(FT)
         @test sum(fluxes.tendencies[1:3]) ≈ fluxes.npp - sum(fluxes.turnover) atol =
             8eps(FT)
@@ -524,6 +778,17 @@ end
         @test all(isapprox.(actual, expected; rtol = 16eps(FT)))
         if FT == Float32
             test_checkpoint_roundtrip(model, integrator.u, Float64(day))
+            continuous_model = CASA.CASAPlantModel{FT}(;
+                parameters,
+                drivers,
+                domain,
+                temporal_mode = CASA.ContinuousRate(),
+            )
+            test_checkpoint_roundtrip(
+                continuous_model,
+                integrator.u,
+                Float64(day),
+            )
             plane = Plane(;
                 xlim = FT.((0, 2)),
                 ylim = FT.((0, 2)),
@@ -555,6 +820,7 @@ end
                 parameters = spatial_parameters,
                 drivers,
                 domain = plane,
+                temporal_mode = CASA.ContinuousRate(),
             )
             spatial_Y, spatial_p, _ = ClimaLand.initialize(spatial_model)
             for (name, value) in

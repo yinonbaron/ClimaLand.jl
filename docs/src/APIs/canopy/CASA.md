@@ -14,6 +14,9 @@ PrescribedDrivers
 NitrogenPrescribedDrivers
 CarbonOnly
 CarbonNitrogen
+AbstractTemporalMode
+LegacyDaily
+ContinuousRate
 ```
 
 ## Carbon kernels

@@ -7,7 +7,7 @@ retranslocation, and litter-N production. The model can be stepped on its own
 and is the common plant component for CASA, MIMICS, and CORPSE soil
 configurations.
 
-The implementation follows the pinned Fortran routines `casa_rplant`,
+The `LegacyDaily` implementation follows the pinned Fortran routines `casa_rplant`,
 `casa_allocation`, `casa_xrateplant`, `casa_coeffplant`, `casa_delplant`, and
 the plant part of `casa_cnpcycle`. The parity configuration uses the testbed's
 fixed carbon allocation mode. Dynamic and Wolf allocation are not part of the
@@ -134,6 +134,35 @@ enters CWD-N. MIMICS coupling instead applies its bounded plant C:N rule and
 input-weighted metabolic quality. All litter and uptake transfers are
 equal-and-opposite between plant and soil tendencies.
 
+## Temporal formulations
+
+`CASAPlantModel` has two compile-time temporal modes. The default,
+`temporal_mode = LegacyDaily()`, preserves the reference testbed map. It
+computes carbon and nitrogen deltas from the state at the beginning of the
+day, applies the plant-carbon update first, updates tissue nitrogen only when
+the resulting leaf-carbon pool is positive, and resets negative tissue C and N
+to zero. In ClimaLand this map is exposed as
+
+```math
+\dot Y = \frac{\Phi_{day}(Y)-Y}{86400}.
+```
+
+Use `LegacyDaily` only with Forward Euler and `dt = 86400` seconds. A smaller
+timestep or a multistage solver reevaluates a map that was defined to run once
+per day and therefore does not retain archive semantics. The legacy bounds are
+part of parity, not a general positivity treatment; when activated they can
+discard mass just as the pinned source does.
+
+`temporal_mode = ContinuousRate()` selects the timestep-independent ODE. GPP,
+respiration, allocation, turnover, litter production, exudation, nutrient
+demand, mineral-N uptake, and tissue tendencies are all evaluated in SI rates
+from one current state. No hidden day, within-call state update, or generic
+pool clamp enters this RHS. Choose an ODE solver and timestep from accuracy and
+stability tests for the intended forcing and parameter range. Explicit Euler
+refinement from 86400 to 2700 seconds over the committed 30-day representative
+case converges monotonically; the 2700-second solution is `2.50825e-4` relative
+L1 from the daily legacy map.
+
 ## Cache contract
 
 `p.casa_plant.carbon_fluxes` is a static GPU-compatible vector.
@@ -156,7 +185,12 @@ using ClimaLand
 using ClimaLand.Vegetation
 
 const CASA = Vegetation.CASA
-model = CASA.CASAPlantModel{Float64}(; parameters, drivers, domain)
+model = CASA.CASAPlantModel{Float64}(;
+    parameters,
+    drivers,
+    domain,
+    temporal_mode = CASA.LegacyDaily(),
+)
 Y, p, _ = initialize(model)
 
 # Set the four fields in Y.casa_plant before stepping.
@@ -178,9 +212,9 @@ integrator = CTS.init(problem, forward_euler; dt = 86400.0)
 CTS.step!(integrator)
 ```
 
-A one-day Euler step matches the algebraic daily update while drivers remain
-fixed. A dedicated `LegacyDaily` map is still needed when the Fortran
-post-step nonnegativity reset is active.
+A one-day Euler step applies the complete `LegacyDaily` map while drivers
+remain fixed. For a normal ODE solve, construct the model with
+`temporal_mode = CASA.ContinuousRate()` and select the timestep independently.
 
 ## Spatial PFT parameters and accelerators
 
@@ -218,5 +252,4 @@ and its exact plant initialization. CN plant states and fluxes reproduce 364
 productive-cell daily transitions and pass coupled CASA- and MIMICS-soil
 nitrogen conservation gates.
 
-Phosphorus, dynamic allocation, native canopy GPP, and a timestep-independent
-continuous-rate formulation are post-parity tasks.
+Phosphorus, dynamic allocation, and native canopy GPP remain post-parity tasks.

@@ -516,6 +516,7 @@ function update_native_plant_drivers!(
     @. p.casa_plant.water_stress = p.root_weighted_liquid_saturation
     @. p.casa_plant.carbon_fluxes =
         Vegetation.CASA.packed_carbon_fluxes(
+            plant.temporal_mode,
             plant.parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -545,6 +546,7 @@ function update_native_plant_drivers!(
     @. p.casa_plant.water_stress = p.root_weighted_liquid_saturation
     @. p.casa_plant.carbon_fluxes =
         Vegetation.CASA.packed_carbon_fluxes(
+            plant.temporal_mode,
             plant.parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -669,6 +671,7 @@ function make_update_boundary_fluxes(model::CASAPlantCASASoilModel)
             Vegetation.CASA.update_nitrogen_fluxes!(
                 p,
                 Y,
+                model.casa_plant.temporal_mode,
                 model.casa_plant.nitrogen_parameters,
                 Y.casa_soil.n_mineral,
                 p.casa_plant.nitrogen_demand_fraction,
@@ -738,6 +741,7 @@ function make_update_boundary_fluxes(model::CASAPlantMIMICSSoilModel)
             Vegetation.CASA.update_mimics_nitrogen_fluxes!(
                 p,
                 Y,
+                model.casa_plant.temporal_mode,
                 plant_nitrogen_parameters,
                 Y.mimics_soil.n_mineral,
                 p.casa_plant.nitrogen_demand_fraction,

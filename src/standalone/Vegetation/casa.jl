@@ -8,9 +8,12 @@ import ...Soil.Biogeochemistry: CarbonNitrogen, CarbonOnly
 
 export CarbonNitrogen,
     CarbonOnly,
+    AbstractTemporalMode,
     CASAPlantModel,
     CASAPlantNitrogenParameters,
     CASAPlantModelParameters,
+    ContinuousRate,
+    LegacyDaily,
     NitrogenPrescribedDrivers,
     PrescribedDrivers,
     allocation_fractions,
@@ -24,6 +27,17 @@ export CarbonNitrogen,
     respiration_fluxes,
     senescence_rates,
     temperature_response
+
+"Compile-time temporal formulation for the CASA plant model."
+abstract type AbstractTemporalMode end
+
+"Exact ordered one-day map used by the reference Fortran testbed."
+struct LegacyDaily <: AbstractTemporalMode end
+
+"Timestep-independent, simultaneous CASA plant ordinary differential equation."
+struct ContinuousRate <: AbstractTemporalMode end
+
+Base.broadcastable(mode::AbstractTemporalMode) = tuple(mode)
 
 """
     CASAPlantModelParameters{FT}
@@ -198,12 +212,13 @@ struct NitrogenPrescribedDrivers{M, D, L}
 end
 
 """
-    CASAPlantModel{FT}(; parameters, drivers, domain)
+    CASAPlantModel{FT}(; parameters, drivers, domain, temporal_mode)
 
 Standalone CASA plant-carbon model with leaf, wood, fine-root, and labile
-surface pools.
+surface pools. `temporal_mode = LegacyDaily()` preserves the ordered reference
+map; `ContinuousRate()` selects a simultaneous, timestep-independent ODE.
 """
-struct CASAPlantModel{FT, C, PS, NP, D, DR, NR} <:
+struct CASAPlantModel{FT, C, PS, NP, D, DR, NR, TM} <:
        ClimaLand.AbstractExpModel{FT}
     configuration::C
     parameters::PS
@@ -211,6 +226,7 @@ struct CASAPlantModel{FT, C, PS, NP, D, DR, NR} <:
     domain::D
     drivers::DR
     nitrogen_drivers::NR
+    temporal_mode::TM
 end
 
 function CASAPlantModel{FT}(;
@@ -222,6 +238,7 @@ function CASAPlantModel{FT}(;
     domain::ClimaLand.Domains.AbstractDomain{FT} = ClimaLand.Domains.Point(;
         z_sfc = zero(FT),
     ),
+    temporal_mode::AbstractTemporalMode = LegacyDaily(),
 ) where {FT}
     @assert parameters isa CASAPlantModelParameters{FT} || (
         parameters isa ClimaCore.Fields.Field &&
@@ -249,8 +266,15 @@ function CASAPlantModel{FT}(;
         domain,
         drivers,
         nitrogen_drivers,
+        temporal_mode,
     )
     return CASAPlantModel{FT, typeof.(args)...}(args...)
+end
+
+@inline function legacy_bounded_tendency(state, tendency)
+    seconds_per_day = oftype(state, 86400)
+    next_state = max(zero(state), state + seconds_per_day * tendency)
+    return (next_state - state) / seconds_per_day
 end
 
 ClimaLand.name(::CASAPlantModel) = :casa_plant
@@ -819,6 +843,70 @@ end
     )
 end
 
+@inline packed_carbon_fluxes(::ContinuousRate, args...) =
+    packed_carbon_fluxes(args...)
+
+@inline function packed_carbon_fluxes(
+    ::LegacyDaily,
+    parameters,
+    c_leaf,
+    c_wood,
+    c_fine_root,
+    c_labile,
+    gpp,
+    air_temperature,
+    soil_temperature,
+    water_stress,
+    phase,
+    npp_scalar,
+    labile_fraction,
+    n_leaf = carbon_only_plant_nitrogen(
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+    )[1],
+    n_wood = carbon_only_plant_nitrogen(
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+    )[2],
+    n_fine_root = carbon_only_plant_nitrogen(
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+    )[3],
+)
+    fluxes = packed_carbon_fluxes(
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+        c_labile,
+        gpp,
+        air_temperature,
+        soil_temperature,
+        water_stress,
+        phase,
+        npp_scalar,
+        labile_fraction,
+        n_leaf,
+        n_wood,
+        n_fine_root,
+    )
+    fluxes =
+        Base.setindex(fluxes, legacy_bounded_tendency(c_leaf, fluxes[1]), 1)
+    fluxes =
+        Base.setindex(fluxes, legacy_bounded_tendency(c_wood, fluxes[2]), 2)
+    return Base.setindex(
+        fluxes,
+        legacy_bounded_tendency(c_fine_root, fluxes[3]),
+        3,
+    )
+end
+
 @inline function packed_nitrogen_fluxes(
     parameters,
     c_leaf,
@@ -858,7 +946,58 @@ end
     )
 end
 
+@inline packed_nitrogen_fluxes(::ContinuousRate, args...) =
+    packed_nitrogen_fluxes(args...)
+
+@inline function packed_nitrogen_fluxes(
+    ::LegacyDaily,
+    parameters,
+    c_leaf,
+    c_wood,
+    c_fine_root,
+    n_leaf,
+    n_wood,
+    n_fine_root,
+    mineral_nitrogen,
+    demand_fraction,
+    limitation,
+    carbon_fluxes,
+    metabolic_fractions = plant_litter_fractions(
+        parameters,
+        (c_leaf, c_wood, c_fine_root),
+        (n_leaf, n_wood, n_fine_root),
+    ),
+)
+    fluxes = packed_nitrogen_fluxes(
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+        n_leaf,
+        n_wood,
+        n_fine_root,
+        mineral_nitrogen,
+        demand_fraction,
+        limitation,
+        carbon_fluxes,
+        metabolic_fractions,
+    )
+    seconds_per_day = oftype(c_leaf, 86400)
+    update_nitrogen = carbon_fluxes[1] > -c_leaf / seconds_per_day
+    nitrogen = (n_leaf, n_wood, n_fine_root)
+    for index in 1:3
+        tendency = ifelse(update_nitrogen, fluxes[index], zero(fluxes[index]))
+        fluxes = Base.setindex(
+            fluxes,
+            legacy_bounded_tendency(nitrogen[index], tendency),
+            index,
+        )
+    end
+    return fluxes
+end
+
 @inline function packed_mimics_nitrogen_fluxes(
+    temporal_mode,
     parameters,
     c_leaf,
     c_wood,
@@ -877,6 +1016,7 @@ end
         (n_leaf, n_wood, n_fine_root),
     )
     return packed_nitrogen_fluxes(
+        temporal_mode,
         parameters,
         c_leaf,
         c_wood,
@@ -904,6 +1044,7 @@ function ClimaLand.make_update_aux(
         npp_scalar = model.drivers.npp_scalar(t)
         labile_fraction = model.drivers.labile_fraction(t)
         parameters = model.parameters
+        temporal_mode = model.temporal_mode
 
         @. p.casa_plant.gross_primary_production = gpp
         @. p.casa_plant.air_temperature = air_temperature
@@ -911,6 +1052,7 @@ function ClimaLand.make_update_aux(
         @. p.casa_plant.water_stress = water_stress
         @. p.casa_plant.phenology_phase = phase
         @. p.casa_plant.carbon_fluxes = packed_carbon_fluxes(
+            temporal_mode,
             parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -944,6 +1086,7 @@ function ClimaLand.make_update_aux(
         demand_fraction = model.nitrogen_drivers.demand_fraction(t)
         limitation = model.nitrogen_drivers.limitation(t)
         parameters = model.parameters
+        temporal_mode = model.temporal_mode
 
         @. p.casa_plant.gross_primary_production = gpp
         @. p.casa_plant.air_temperature = air_temperature
@@ -951,6 +1094,7 @@ function ClimaLand.make_update_aux(
         @. p.casa_plant.water_stress = water_stress
         @. p.casa_plant.phenology_phase = phase
         @. p.casa_plant.carbon_fluxes = packed_carbon_fluxes(
+            temporal_mode,
             parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -970,6 +1114,7 @@ function ClimaLand.make_update_aux(
         update_nitrogen_fluxes!(
             p,
             Y,
+            temporal_mode,
             model.nitrogen_parameters,
             mineral_nitrogen,
             demand_fraction,
@@ -982,6 +1127,7 @@ end
 function update_nitrogen_fluxes!(
     p,
     Y,
+    temporal_mode,
     parameters,
     mineral_nitrogen,
     demand_fraction,
@@ -993,6 +1139,7 @@ function update_nitrogen_fluxes!(
     @. p.casa_plant.nitrogen_limitation = limitation
     if isnothing(metabolic_fractions)
         @. p.casa_plant.nitrogen_fluxes = packed_nitrogen_fluxes(
+            temporal_mode,
             parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -1007,6 +1154,7 @@ function update_nitrogen_fluxes!(
         )
     else
         @. p.casa_plant.nitrogen_fluxes = packed_nitrogen_fluxes(
+            temporal_mode,
             parameters,
             Y.casa_plant.c_leaf,
             Y.casa_plant.c_wood,
@@ -1028,6 +1176,7 @@ end
 function update_mimics_nitrogen_fluxes!(
     p,
     Y,
+    temporal_mode,
     parameters,
     mineral_nitrogen,
     demand_fraction,
@@ -1037,6 +1186,7 @@ function update_mimics_nitrogen_fluxes!(
     @. p.casa_plant.nitrogen_demand_fraction = demand_fraction
     @. p.casa_plant.nitrogen_limitation = limitation
     @. p.casa_plant.nitrogen_fluxes = packed_mimics_nitrogen_fluxes(
+        temporal_mode,
         parameters,
         Y.casa_plant.c_leaf,
         Y.casa_plant.c_wood,

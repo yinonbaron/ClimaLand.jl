@@ -5,6 +5,13 @@
 standard `AbstractLandModel` initialization, cache, tendency, and
 ClimaTimeSteppers paths.
 
+The plant's temporal mode is retained by the coupled model. Use
+`CASA.LegacyDaily()` with a one-day Forward Euler step when the plant and an
+ordered CASA or MIMICS soil map are serving as an archive oracle. Use
+`CASA.ContinuousRate()` when plant processes should be reevaluated by the ODE
+solver from each current stage state. Carbon and nitrogen litter and uptake
+remain equal-and-opposite coupling fluxes in either mode.
+
 ## Litter exchange
 
 The plant model computes leaf, wood, and fine-root turnover before the
