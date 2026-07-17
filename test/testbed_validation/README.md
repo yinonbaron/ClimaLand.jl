@@ -617,6 +617,60 @@ fixture manifest records the source archive and checksum, source commit,
 selection script, cells, dates, variables, conversions, and measured tolerance
 contract.
 
+### Selected-cell workflow fixture
+
+`fixtures/selected_cells/fixture.toml` publishes one archive-independent
+1901–2014 forcing bundle for both fixture tiers. The 11-cell core tier is a
+subset of the 37-cell extended tier, so the historical forcing is stored only
+once. The core covers productive woody and non-woody vegetation, contrasting
+soil-temperature, liquid-moisture, clay, and silt regimes, and the inactive
+cell-51 ice/water boundary. The extended tier adds a productive representative
+for every active PFT in the source grid and the cells nearest the 0.1, 0.5, and
+0.9 empirical quantiles of GPP, soil temperature, liquid moisture, nitrogen
+deposition, clay, silt, and porosity. Non-vegetated PFTs 13, 15, and 17 are
+excluded from the productive distribution; PFT 17 appears only as the explicit
+boundary case.
+
+The fixture retains all daily `xtairk`, `ndep`, `xcgpp`, `xtsoil`, `xmoist`,
+and `xfrznmoist` values, coordinates, masks, global cell IDs, selected grid and
+soil rows, CASA-C and CASA-CN parameter tables, the MIMICS KO4 table, the
+CORPSE namelist, phenology, and perturbation controls. Raw values and storage
+types are unchanged; only the scattered longitude/latitude cells are packed
+into a single `cell` dimension and the yearly no-leap time dimensions are
+concatenated. The manifest records selection reasons and historical means for
+every cell, source and fixture hashes, units, dimensions, conversions, code
+revision, calendar, per-source and per-file licenses, and both exact extraction
+audits. The forcing is CC-BY-4.0; copied testbed repository inputs are MIT.
+
+Load either tier without the source archive:
+
+```julia
+include("test/testbed_validation/selected_cell_fixtures.jl")
+using .TestbedSelectedCellFixtures
+
+manifest = "test/testbed_validation/fixtures/selected_cells/fixture.toml"
+TestbedSelectedCellFixtures.load_selected_cell_fixture(manifest; tier = :core) do fixture
+    forcing = fixture.forcing
+    core_gpp = forcing["xcgpp"][:, fixture.cell_indices]
+end
+```
+
+Regenerate it from a verified local copy of the published archive and the
+pinned testbed source checkout:
+
+```sh
+julia --project=test test/testbed_validation/selected_cell_fixtures.jl build \
+    /path/to/data-root /path/to/biogeochem_testbed \
+    test/testbed_validation/fixtures/selected_cells
+```
+
+The builder verifies the 13 GB archive size and MD5, streams every forcing
+member from that archive to prove the extracted NetCDF files are byte-exact,
+and checks copied repository inputs against the pinned Git commit. It then
+recomputes selection statistics over all 114 years, independently audits
+selected source values before packing, and checks the packed fixture against
+every source year, coordinate, and mask.
+
 `Reproduces the Fortran` means the same pinned equations, ordering, daily map,
 parameters, drivers, initialization, restarts, and postprocessing; bitwise
 identity across languages is not required. An archive/source discrepancy must
