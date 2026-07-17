@@ -503,7 +503,12 @@ function write_workflow_metadata(
     )
 end
 
-function run_stage_workflow(executable, workflow_path, run_root)
+function run_stage_workflow(
+    executable,
+    workflow_path,
+    run_root;
+    stage_hook = nothing,
+)
     isfile(executable) || error("Missing workflow executable: $executable")
     workflow = TOML.parsefile(workflow_path)
     get(workflow, "schema_version", 0) == 1 ||
@@ -634,14 +639,21 @@ function run_stage_workflow(executable, workflow_path, run_root)
                 path = joinpath(stage_dir, output)
                 ispath(path) && rm(path; force = true, recursive = true)
             end
-            open(log, "w") do io
-                run(
-                    pipeline(
-                        Cmd(Cmd([executable]); dir = stage_dir);
-                        stdout = io,
-                        stderr = io,
-                    ),
-                )
+            isnothing(stage_hook) ||
+                stage_hook(stage, name, stage_dir, :before_run)
+            try
+                open(log, "w") do io
+                    run(
+                        pipeline(
+                            Cmd(Cmd([executable]); dir = stage_dir);
+                            stdout = io,
+                            stderr = io,
+                        ),
+                    )
+                end
+            finally
+                isnothing(stage_hook) ||
+                    stage_hook(stage, name, stage_dir, :after_run)
             end
             missing =
                 filter(output -> !isfile(joinpath(stage_dir, output)), outputs)
@@ -1658,9 +1670,23 @@ function self_test(source_root = "")
                 end
                 run_root = joinpath(root, "run")
 
-                first_run =
-                    run_stage_workflow(executable, workflow_path, run_root)
+                hook_events = Tuple{String, Symbol}[]
+                first_run = run_stage_workflow(
+                    executable,
+                    workflow_path,
+                    run_root;
+                    stage_hook = (stage, name, directory, event) ->
+                        push!(hook_events, (name, event)),
+                )
                 Test.@test getproperty.(first_run, :status) == fill(:ran, 3)
+                Test.@test hook_events == [
+                    ("prespin", :before_run),
+                    ("prespin", :after_run),
+                    ("spin", :before_run),
+                    ("spin", :after_run),
+                    ("historical", :before_run),
+                    ("historical", :after_run),
+                ]
                 second_run =
                     run_stage_workflow(executable, workflow_path, run_root)
                 Test.@test getproperty.(second_run, :status) == fill(:reused, 3)

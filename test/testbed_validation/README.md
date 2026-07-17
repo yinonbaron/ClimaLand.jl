@@ -423,6 +423,11 @@ julia --startup-file=no --project=test \
   <pftlookup_igbp_updated4_exud0.csv> \
   <gridinfo_soil_CLM5_GSWP3.csv> [report.toml]
 
+# Run the complete bounded CASA-CN archive reconstruction search.
+julia --startup-file=no --project=.buildkite \
+  test/testbed_validation/casa_cn_reconstruction.jl search \
+  <biogeochem-testbed-source-root> <data-root> <run-root>
+
 # Validate the ordered MIMICS-CN map, working DIN, overflow, and N fluxes.
 julia --startup-file=no --project=test \
   test/testbed_validation/grid_transition_parity.jl mimics-cn \

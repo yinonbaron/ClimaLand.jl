@@ -1,0 +1,95 @@
+schema_version = 1
+issue = 24
+controls_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+prespin_loops = 100
+spin_loops = 499
+spin_years = [1901, 1920]
+history_years = [1901, 2014]
+passive_carbon_multiplier = 10
+comparison_atol = 0.0
+comparison_rtol = 0.0
+
+[inputs]
+driver_directory = "INPUT_GSWP3_CLM5dev110_hist"
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+perturbation = "GRID_CN/co2delta_control.txt"
+normal_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+normal_parameters_sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+accelerated_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0AD.csv"
+accelerated_parameters_sha256 = "9dac2d263b43eb5a2df71ed7dbef398bc58ae55421829af8db97018fa93509e2"
+prespin_casa_candidate = "casa_boreal_nfix"
+prespin_mimics_candidate = "mimics_ko6_fi30"
+
+[stages.prespin]
+control_candidate = "casa_cn_prespin"
+loops = 100
+years = [1901, 1901]
+
+[stages.accelerated_spin]
+control = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_spin_1901-1920_x500_STEP_2of4.lst"
+loops = 499
+years = [1901, 1920]
+
+[stages.normal_spin]
+control = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+loops = 499
+years = [1901, 1920]
+
+[stages.historical]
+control = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+loops = 1
+years = [1901, 2014]
+
+[transformation.passive_restoration]
+boundary = "accelerated_spin -> normal_spin"
+carbon_field = "casapool%csoil(PASS)"
+carbon_multiplier = 10
+nitrogen_field = "casapool%nsoil(PASS)"
+nitrogen_rule = "byte-for-byte unchanged"
+unaffected_columns_rule = "byte-for-byte unchanged"
+
+[postprocessing]
+annual_reduction = "ncra -O each daily year to one annual mean"
+annual_concatenation = "ncrcat -O annual means in 1901-2014 order"
+stream_completion = "the next year's file closes 1901-2013; process completion closes 2014"
+annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
+daily_windows = [[1901, 1905], [2010, 2014]]
+nco_version_recorded_by_archive = "4.7.5"
+
+[scientific_comparison]
+plant_states = ["cleaf", "nleaf", "cwood", "nwood", "cfroot", "nfroot"]
+organic_pools = ["clitmetb", "nlitmetb", "clitstr", "nlitstr", "clitcwd", "nlitcwd", "csoilmic", "nsoilmic", "csoilslow", "nsoilslow", "csoilpass", "nsoilpass"]
+mineral_nitrogen = ["nMineral", "nMinDep", "nMinFix", "nMinUptake", "nMinLeach", "nMinLoss", "nLitMineralization", "nSoilMineralization", "nSoilImmob", "nNetMineralization"]
+major_fluxes = ["cgpp", "cnpp", "cresp", "cLitInptMet", "cLitInptStruc", "cpassInpt", "nLitInptMet", "nLitInptStruc"]
+cwd_nitrogen = ["nlitcwd", "nLitInptStruc"]
+exudation_rule = "fracRootExudate is zero for all 18 PFTs in normal and accelerated parameter tables"
+
+[compiler]
+source_makefile_version = "GNU Fortran 8.1.0"
+source_makefile_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall"
+archive_compiler_status = "not recorded in archive metadata"
+
+[[compiler.blocked_candidate]]
+id = "gnu_fortran_8_1"
+version = "GNU Fortran 8.1.0"
+status = "blocked_unavailable_toolchain"
+reason = "The documented source-Makefile compiler is not installed on the current macOS ARM host; GNU Fortran 16.1.0 is available."
+
+[evidence]
+controls = "Committed CASA-CN CLM5/GSWP3 JAMES controls plus the hash-pinned boreal-N-fix prespin candidate"
+parameters = "Prespin uses the high-confidence boreal-N-fix and KO6/FI30 candidates; spin and history use the archive-named exudate0 tables"
+source = "Archive daily output was created 2022-05-10; 82c57f8 is the latest public source revision before creation"
+spin = "The committed controls and README document prespin, accelerated spin, passive-carbon restoration, normal spin, and history"
+postprocessing = "Archive history records ncra annual means, ncrcat concatenation, and retained 1901-1905/2010-2014 daily windows"
+
+[[case]]
+id = "archive_predecessor"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+reason = "Latest public source revision before the CASA-CN archive creation timestamp"
+
+[excluded.pinned_current]
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+reason = "Postdates archive creation; retained only as the immutable control and candidate source"
