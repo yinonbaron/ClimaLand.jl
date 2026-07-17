@@ -1,5 +1,5 @@
 schema_version = 1
-updated = "2026-07-15"
+updated = "2026-07-17"
 
 [[attempt]]
 id = "artifact_checksums"
@@ -220,6 +220,20 @@ common_derivation = "KO(1) 4 -> 6 and KO(2) 4 -> 6"
 bounded_ambiguity = "retain FI(struc)=0.30 at high confidence, use README-supported desorb2 FI(struc)=0.10 at medium confidence, or use the legacy KO6 table's FI(struc)=0.05 at medium confidence"
 rejected = "KO=9 and KO=12 belong to differently named experiment branches"
 parser_compatibility = "the older KO4_push table lacks desorpQ10 and desorpTref; the chosen committed JAMES baseline adds only the pinned reader's required -1 and 25 values"
+
+[[attempt]]
+id = "casa_cn_full_grid_reconstruction"
+target = "CASA-CN CLM5/GSWP3 1901-2014 archive"
+status = "evidence_backed_matrix_exhausted"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+compiler = "GNU Fortran 16.1.0"
+configuration = "100-year prespin; 499 repeated 1901-1920 accelerated cycles; passive C x10 with passive N unchanged; 499 normal cycles; 1901-2014 history"
+best_mismatch_count = 284242354
+comparison = "exact annual 1901-2014 plus daily 1901-1905 and 2010-2014; no tolerance"
+verified = "4,263-point restart hashes at all boundaries; passive restoration; unaffected columns; zero exudation; normal-spin carbon convergence"
+failed = "all scientific comparison groups differ; accelerated-spin carbon misses the global-change and fraction-below-1-g-m-2 convergence thresholds"
+blocker = "archive compiler is unrecorded; source-named GNU Fortran 8.1.0 is unavailable on the current macOS ARM host"
+report_sha256 = "d51d9c830c728251c3495d25be98ba4931951d58ff8772c0ee25e9c3df366c59"
 
 [[attempt]]
 id = "carbon_only_control_candidates"
