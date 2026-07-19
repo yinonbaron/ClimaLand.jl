@@ -338,7 +338,10 @@ Compute the hourly kinetic and transfer parameters used for one legacy day.
 )
     water = moisture_factor(liquid_saturation, frozen_saturation)
     turnover_modifier = clamp(
-        sqrt(annual_npp / parameters.turnover_npp_denominator),
+        sqrt(
+            max(zero(annual_npp), annual_npp) /
+            parameters.turnover_npp_denominator,
+        ),
         parameters.turnover_modifier_minimum,
         parameters.turnover_modifier_maximum,
     )

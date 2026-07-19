@@ -133,6 +133,20 @@ for FT in (Float32, Float64)
             FT(300),
             FT(0.2),
         )
+        negative_npp_environment = @inferred MIMICS.environmental_parameters(
+            parameters,
+            FT(10),
+            FT(0.3),
+            FT(0.1),
+            FT(0.5),
+            FT(-1),
+            FT(0.2),
+        )
+        @test negative_npp_environment.r_turnover ≈
+              parameters.r_turnover[1] *
+              exp(parameters.r_turnover[2] * FT(0.5)) *
+              parameters.turnover_modifier_minimum *
+              negative_npp_environment.moisture
         state = FT.((1, 2, 0.03, 0.04, 3, 4, 5))
         inputs = FT.((0.01, 0.02))
         mapped = @inferred MIMICS.daily_carbon_map(

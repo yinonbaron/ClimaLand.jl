@@ -428,12 +428,15 @@ function gridded_initial_state(model, grid, parameters)
     return (; casa_plant = plant, mimics_soil = mimics)
 end
 
-mutable struct AnnualNPPTracker
+mutable struct AnnualNPPTracker{F}
     active_stage::Union{Nothing, Symbol}
-    accumulated::Vector{Float64}
+    accumulated::F
 end
 
-AnnualNPPTracker(points) = AnnualNPPTracker(nothing, zeros(points))
+AnnualNPPTracker(domain) = AnnualNPPTracker(
+    nothing,
+    ClimaCore.Fields.zeros(Float64, domain.space.surface),
+)
 
 function prepare_annual_npp!(tracker, forcing, stage, index)
     year, day = casa().forcing_year_day(stage, index)
@@ -443,18 +446,43 @@ function prepare_annual_npp!(tracker, forcing, stage, index)
         tracker.active_stage = stage.name
         values .= forced_annual_npp!(forcing, year)
     else
-        values .= tracker.accumulated
+        forcing.buffers.annual_npp .= tracker.accumulated
     end
-    fill!(tracker.accumulated, 0.0)
+    tracker.accumulated .= 0.0
     return nothing
 end
 
 function accumulate_annual_npp!(tracker, p)
-    fluxes = vec(parent(p.casa_plant.carbon_fluxes))
-    for index in eachindex(tracker.accumulated)
-        tracker.accumulated[index] += DAY_SECONDS * fluxes[index][15]
-    end
+    @. tracker.accumulated +=
+        DAY_SECONDS * getindex(p.casa_plant.carbon_fluxes, 15)
     return nothing
+end
+
+@inline function litter_quality_value(
+    point,
+    plant_fluxes,
+    soil_fluxes,
+    fmet_scale,
+    fmet_intercept,
+    fmet_slope,
+)
+    point.inactive && return 0.0
+    leaf_ratio = inv(point.plant_nitrogen_ratio[1]) * point.lignin_leaf
+    root_ratio = inv(point.plant_nitrogen_ratio[3]) * point.lignin_root
+    wood_ratio = inv(point.plant_nitrogen_ratio[2]) * point.lignin_wood
+    leaf_turnover = plant_fluxes[8]
+    root_turnover = plant_fluxes[10]
+    cwd_transfer = soil_fluxes[17]
+    total = leaf_turnover + root_turnover + cwd_transfer
+    average = min(
+        40.0,
+        (
+            leaf_ratio * leaf_turnover +
+            root_ratio * root_turnover +
+            wood_ratio * cwd_transfer
+        ) / max(0.001 / 1000 / DAY_SECONDS, total),
+    )
+    return fmet_scale * (fmet_intercept - fmet_slope * average)
 end
 
 function update_litter_quality!(
@@ -468,32 +496,19 @@ function update_litter_quality!(
 )
     set_initial_cache!(p, Y, time)
     fmet_scale, fmet_intercept, fmet_slope = fmet_coefficients
-    plant_fluxes = vec(parent(p.casa_plant.carbon_fluxes))
-    soil_fluxes = vec(parent(p.mimics_soil.carbon_fluxes))
-    quality = vec(parent(buffers.litter_quality))
-    for index in eachindex(quality)
-        point = parameters[index]
-        if point.inactive
-            quality[index] = 0.0
-            continue
-        end
-        leaf_ratio = inv(point.plant_nitrogen_ratio[1]) * point.lignin_leaf
-        root_ratio = inv(point.plant_nitrogen_ratio[3]) * point.lignin_root
-        wood_ratio = inv(point.plant_nitrogen_ratio[2]) * point.lignin_wood
-        leaf_turnover = plant_fluxes[index][8]
-        root_turnover = plant_fluxes[index][10]
-        cwd_transfer = soil_fluxes[index][17]
-        total = leaf_turnover + root_turnover + cwd_transfer
-        average = min(
-            40.0,
-            (
-                leaf_ratio * leaf_turnover +
-                root_ratio * root_turnover +
-                wood_ratio * cwd_transfer
-            ) / max(0.001 / 1000 / DAY_SECONDS, total),
-        )
-        quality[index] = fmet_scale * (fmet_intercept - fmet_slope * average)
-    end
+    compute(point, plant_fluxes, soil_fluxes) = litter_quality_value(
+        point,
+        plant_fluxes,
+        soil_fluxes,
+        fmet_scale,
+        fmet_intercept,
+        fmet_slope,
+    )
+    @. buffers.litter_quality = compute(
+        parameters,
+        p.casa_plant.carbon_fluxes,
+        p.mimics_soil.carbon_fluxes,
+    )
     return nothing
 end
 
@@ -798,34 +813,52 @@ function process_comparison()
     )
 end
 
-mutable struct CarbonBudgetAccumulator
+mutable struct CarbonBudgetAccumulator{F}
     area_m2::Vector{Float64}
+    area::F
+    input_rate::F
+    output_rate::F
     input_kg::Dict{Symbol, Float64}
     output_kg::Dict{Symbol, Float64}
 end
 
-CarbonBudgetAccumulator(grid) = CarbonBudgetAccumulator(
-    getproperty.(grid, :area_m2),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
-)
+function CarbonBudgetAccumulator(grid)
+    area = getproperty.(grid, :area_m2)
+    return CarbonBudgetAccumulator(
+        area,
+        area,
+        zeros(length(area)),
+        zeros(length(area)),
+        Dict{Symbol, Float64}(),
+        Dict{Symbol, Float64}(),
+    )
+end
+
+function CarbonBudgetAccumulator(grid, domain)
+    area_m2 = getproperty.(grid, :area_m2)
+    area = casa().scalar_field(domain, area_m2)
+    return CarbonBudgetAccumulator(
+        area_m2,
+        area,
+        zero(area),
+        zero(area),
+        Dict{Symbol, Float64}(),
+        Dict{Symbol, Float64}(),
+    )
+end
 
 function accumulate_budget!(budget, stage, p)
     name = stage.name
-    area = budget.area_m2
-    plant = p.casa_plant.carbon_fluxes
-    soil = p.mimics_soil.carbon_fluxes
-    plant_fluxes = vec(parent(plant))
-    soil_fluxes = vec(parent(soil))
-    input = 0.0
-    output = 0.0
-    for index in eachindex(area)
-        plant_point = plant_fluxes[index]
-        input += area[index] * plant_point[14]
-        output +=
-            area[index] *
-            (plant_point[16] + plant_point[21] + soil_fluxes[index][9])
-    end
+    @. budget.input_rate =
+        budget.area * getindex(p.casa_plant.carbon_fluxes, 14)
+    @. budget.output_rate =
+        budget.area * (
+            getindex(p.casa_plant.carbon_fluxes, 16) +
+            getindex(p.casa_plant.carbon_fluxes, 21) +
+            getindex(p.mimics_soil.carbon_fluxes, 9)
+        )
+    input = sum(parent(budget.input_rate))
+    output = sum(parent(budget.output_rate))
     budget.input_kg[name] =
         get(budget.input_kg, name, 0.0) + input * DAY_SECONDS
     budget.output_kg[name] =
@@ -1064,9 +1097,12 @@ function run_gridded_case(
         atol = boundary_atol,
         rtol = boundary_rtol,
     )
-    budget = CarbonBudgetAccumulator(grid)
-    npp = AnnualNPPTracker(length(grid))
-    plant_points = [built.parameters[point.pft] for point in grid]
+    budget = CarbonBudgetAccumulator(grid, domain)
+    npp = AnnualNPPTracker(domain)
+    plant_points = casa().point_field(
+        domain,
+        [built.parameters[point.pft] for point in grid],
+    )
     fmet_coefficients = (
         built.mimics["fmet_p(1)"],
         built.mimics["fmet_p(2)"],
