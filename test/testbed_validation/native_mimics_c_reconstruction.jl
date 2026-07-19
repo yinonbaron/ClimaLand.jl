@@ -581,6 +581,8 @@ function reference_values(dataset, name, grid, days = Colon())
     return casa().reference_points(dataset[name], grid, days)
 end
 
+annual_point_mean(values) = vec(sum(values; dims = 2)) ./ size(values, 2)
+
 function compare_reference_files(
     native_output,
     casa_path,
@@ -601,8 +603,8 @@ function compare_reference_files(
                     actual = native[native_name][:, native_days]
                     expected = reference_values(reference, name, grid, Colon())
                     if annual
-                        actual = sum(actual; dims = 2) ./ size(actual, 2)
-                        expected = sum(expected; dims = 2) ./ size(expected, 2)
+                        actual = annual_point_mean(actual)
+                        expected = annual_point_mean(expected)
                     end
                     report[name] = casa().error_metrics(
                         scale .* actual,
@@ -678,8 +680,7 @@ function compare_archive_annual(native_output, grid, archive_root; atol, rtol)
                     expected = reference_values(reference, name, grid, Colon())
                     for year_index in axes(expected, 2)
                         days = ((year_index - 1) * 365 + 1):(year_index * 365)
-                        actual =
-                            sum(native[native_name][:, days]; dims = 2) ./ 365
+                        actual = annual_point_mean(native[native_name][:, days])
                         metric = casa().error_metrics(
                             scale .* actual,
                             view(expected, :, year_index);

@@ -42,6 +42,8 @@ import TOML
     boundary_scale = TestbedNativeMIMICSCReconstruction.boundary_reference_scale
     @test boundary_scale(:casa) == 1000.0
     @test boundary_scale(:mimics) == 1.0
+    annual_mean = TestbedNativeMIMICSCReconstruction.annual_point_mean
+    @test annual_mean(reshape(1.0:6.0, 2, 3)) == [3.0, 4.0]
 end
 
 @testset "native MIMICS-C reconstruction run-case seam" begin
