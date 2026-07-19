@@ -206,16 +206,10 @@ function multiply_decimal_by_ten(token)
     return leading * sign * value * trailing
 end
 
-function restore_casa_passive_carbon(
-    source,
-    destination;
-    include_nitrogen = false,
-)
+function restore_casa_passive_pools(source, destination, passive_fields)
     lines = readlines(source; keep = true)
     isempty(lines) && error("CASA restart file is empty: $source")
     header = split(lines[1], ',')
-    passive_fields = ["casapool%csoil(PASS)"]
-    include_nitrogen && push!(passive_fields, "casapool%nsoil(PASS)")
     passive_columns = map(passive_fields) do field
         matching = findall(value -> strip(value) == field, header)
         length(matching) == 1 || error(
@@ -245,8 +239,15 @@ function restore_casa_passive_carbon(
     return destination
 end
 
+restore_casa_passive_carbon(source, destination) =
+    restore_casa_passive_pools(source, destination, ("casapool%csoil(PASS)",))
+
 restore_casa_passive_carbon_nitrogen(source, destination) =
-    restore_casa_passive_carbon(source, destination; include_nitrogen = true)
+    restore_casa_passive_pools(
+        source,
+        destination,
+        ("casapool%csoil(PASS)", "casapool%nsoil(PASS)"),
+    )
 
 # ============================================================================
 # Resumable workflow orchestration
@@ -352,13 +353,12 @@ function materialize_stage_input(input, spec_dir, stage_dir, stage_dirs)
     mkpath(dirname(destination))
     transform = get(input, "transform", "none")
     mode = get(input, "mode", "copy")
+    transform != "none" &&
+        mode != "copy" &&
+        error("Transformed workflow inputs must use copy mode")
     if transform == "casa_passive_carbon_x10"
-        mode == "copy" ||
-            error("Transformed workflow inputs must use copy mode")
         restore_casa_passive_carbon(source, destination)
     elseif transform == "casa_passive_carbon_nitrogen_x10"
-        mode == "copy" ||
-            error("Transformed workflow inputs must use copy mode")
         restore_casa_passive_carbon_nitrogen(source, destination)
     elseif transform == "none"
         if mode == "copy"

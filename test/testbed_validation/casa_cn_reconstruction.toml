@@ -52,6 +52,7 @@ nitrogen_multiplier = 10
 unaffected_columns_rule = "byte-for-byte unchanged"
 
 [postprocessing]
+spin_checkpoint_interval = 9960
 annual_reduction = "ncra -O each daily year to one annual mean"
 annual_concatenation = "ncrcat -O annual means in 1901-2014 order"
 stream_completion = "the next year's file closes 1901-2013; process completion closes 2014"
