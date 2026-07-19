@@ -72,6 +72,7 @@ end
         )
         @test report["carbon_budget"]["all_close"]
         NCDatasets.NCDataset(result.output) do output
+            @test eltype(output["mimics_soil__c_soil_physical"]) == Float32
             @test all(
                 haskey(output, name) for name in (
                     "mimics_soil__c_litter_metabolic",

@@ -890,6 +890,8 @@ function run_case(
     before_step! = (_, _, _, _, _) -> nothing,
     after_step! = (_, _, _, _, _) -> nothing,
     diagnostics = mimics_diagnostics(),
+    output_eltype = Float64,
+    deflatelevel = 0,
     provenance,
     compare_boundary,
     compare_historical,
@@ -917,6 +919,8 @@ function run_case(
             before_step!,
             after_step!,
             diagnostics,
+            output_eltype,
+            deflatelevel,
             provenance = provenance(stage),
         )
         checkpoint = only(result.checkpoints)
@@ -1106,6 +1110,8 @@ function run_gridded_case(
             update_forcing! = update_drivers!,
             before_step!,
             after_step!,
+            output_eltype = Float32,
+            deflatelevel = 1,
             provenance = stage -> gridded_provenance(
                 stage,
                 plant_path,
@@ -1261,6 +1267,8 @@ function run_synthetic_case(output_root)
         stages,
         output_root;
         model,
+        output_eltype = Float32,
+        deflatelevel = 1,
         before_step! = (_, _, _, _, _) -> (before_step_calls[] += 1),
         provenance,
         compare_boundary,

@@ -238,7 +238,14 @@ function state_units(variable)
     return "native SI"
 end
 
-function define_output!(output, model, Y, diagnostics)
+function define_output!(
+    output,
+    model,
+    Y,
+    diagnostics;
+    output_eltype = Float64,
+    deflatelevel = 0,
+)
     variables = state_variables(model)
     first_component, first_variable = first(variables)
     points = length(
@@ -251,9 +258,17 @@ function define_output!(output, model, Y, diagnostics)
     time.attrib["calendar"] = "365_day"
     stage_index = NCDatasets.defVar(output, "stage_index", Int32, ("time",))
     forcing = NCDatasets.defVar(output, "forcing_index", Int32, ("time",))
+    storage_options =
+        (; chunksizes = (points, 1), deflatelevel, shuffle = deflatelevel > 0)
     for (component, variable) in variables
         name = output_name(component, variable)
-        state = NCDatasets.defVar(output, name, Float64, ("point", "time"))
+        state = NCDatasets.defVar(
+            output,
+            name,
+            output_eltype,
+            ("point", "time");
+            storage_options...,
+        )
         state.attrib["long_name"] = "$component $variable"
         state.attrib["units"] = state_units(variable)
     end
@@ -261,8 +276,10 @@ function define_output!(output, model, Y, diagnostics)
         state = NCDatasets.defVar(
             output,
             diagnostic.name,
-            Float64,
+            output_eltype,
             ("point", "time"),
+            ;
+            storage_options...,
         )
         state.attrib["long_name"] = diagnostic.long_name
         state.attrib["units"] = diagnostic.units
@@ -360,6 +377,8 @@ function run_workflow(
     before_step! = (_, _, _, _, _) -> nothing,
     after_step! = (_, _, _, _, _) -> nothing,
     diagnostics = (),
+    output_eltype = Float64,
+    deflatelevel = 0,
     provenance,
 )
     dt > 0 || throw(ArgumentError("dt must be positive"))
@@ -380,7 +399,14 @@ function run_workflow(
     recorded_steps = 0
 
     NCDatasets.NCDataset(output_path, "c") do output
-        variables = define_output!(output, model, Y, diagnostics)
+        variables = define_output!(
+            output,
+            model,
+            Y,
+            diagnostics;
+            output_eltype,
+            deflatelevel,
+        )
         output_record = 0
         for (stage_index, stage) in enumerate(stages)
             start_time = time
@@ -464,6 +490,8 @@ function run_workflow(
         "dt_seconds" => dt,
         "recorded_steps" => recorded_steps,
         "output" => basename(output_path),
+        "output_eltype" => string(output_eltype),
+        "output_deflatelevel" => deflatelevel,
         "output_sha256" => sha256sum(output_path),
         "provenance" => provenance,
         "stage" => stage_manifests,
