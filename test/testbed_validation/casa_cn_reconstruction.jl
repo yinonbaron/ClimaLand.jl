@@ -288,7 +288,12 @@ function write_full_workflow(
             stage,
         )
         destination = joinpath(controls_root, "$stage.lst")
-        report = write_staged_control(source, destination, common_overrides)
+        overrides = copy(common_overrides)
+        stage == "normal_spin" && (
+            overrides[:netcdf_interval] =
+                matrix["postprocessing"]["spin_checkpoint_interval"]
+        )
+        report = write_staged_control(source, destination, overrides)
         report["stage"] = stage
         push!(control_reports, report)
         control = harness().parse_control(destination)
@@ -1283,6 +1288,7 @@ function self_test()
         Test.@test matrix["history_years"] == [1901, 2014]
         Test.@test matrix["transformation"]["passive_restoration"]["nitrogen_multiplier"] ==
                    10
+        Test.@test matrix["postprocessing"]["spin_checkpoint_interval"] == 9960
         Test.@test final_spin_checkpoints() == (9960, 9980)
         Test.@test Set(keys(candidate_paths())) == Set(CANDIDATE_IDS)
         Test.@test "nlitcwd" in required_variables(matrix)

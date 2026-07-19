@@ -35,7 +35,10 @@ totals at every boundary. Its accelerated-spin transformation multiplies
 `casapool%csoil(PASS)` and `casapool%nsoil(PASS)` by 10, while verifying that
 every unaffected restart column is byte-for-byte unchanged. Both long spins
 report the documented carbon convergence metrics and the corresponding
-organic-plus-mineral nitrogen changes.
+organic-plus-mineral nitrogen changes. The normal spin writes only its initial,
+9,960-year, and terminal 9,980-year checkpoints; the last two preserve the
+documented convergence calculation without retaining unused intermediate
+NetCDF output.
 
 Exact scientific comparisons cover the annual 1901--2014 history and the
 published 1901--1905 and 2010--2014 daily windows. Named report groups require
@@ -90,10 +93,47 @@ passive carbon, despite documenting only passive-SOC restoration. Comparison
 tolerances remain exactly zero; the result is a scientific reconstruction,
 not a claim of bitwise identity.
 
+The canonical workflow rerun exercised the exact annual comparison and both
+retained daily windows. It reduced the report failure count from 284,242,354
+for carbon-only restoration to 132,978,805 for C+N restoration. The corrected
+count comprises 4,169,929 annual value mismatches, 128,808,875 daily value
+mismatches, and the unchanged accelerated-spin convergence failure. There are
+no metadata mismatches and no tolerance was introduced.
+
+| Exact annual comparison group | Failure count |
+|---|---:|
+| Plant states | 670,459 |
+| Organic pools | 1,453,341 |
+| Mineral nitrogen | 1,008,602 |
+| Major fluxes | 1,037,527 |
+| CWD nitrogen audit | 460,534 |
+
+The CWD-nitrogen group overlaps the organic-pool and major-flux groups and is
+therefore not added again when calculating the unique total. All ten retained
+daily years were also compared: 1901--1905 and 2010--2014.
+
+The corrected normal spin passes all three documented carbon convergence
+checks: its final-cycle global change is 0.000525011 Pg, 99.226% of active
+cells change by less than 1 g C m-2, and 98.733% change by less than 0.1%.
+Its corresponding nitrogen change is 0.0000345591 Pg. The accelerated spin is
+unchanged and still misses two carbon convergence thresholds.
+
+| Boundary | Restart SHA-256 | Carbon (Pg) | Nitrogen (Pg) |
+|---|---|---:|---:|
+| Prespin | `8e2d425d658ceaee81d717468eef99782bc8cdc9b926a1f57550ab14a887ab78` | 1.22721649 | 0.06148815 |
+| Accelerated spin | `1aeb30c064e59a80ea486a3f696ebca86ff3994e64e316e449aa2d32afda2275` | 1.02662923 | 0.04425553 |
+| Normal spin | `0dff9a0c37accff0580a3768ba65f5e3b7aa651667fee27aa9508e634b5197cc` | 1.23567468 | 0.05706307 |
+| Historical | `df49c09bc4f351db42549557c61e6f8a44478948eef31e8462930b3eb0896d5b` | 1.27068924 | 0.05807925 |
+
 The remaining exact-reproduction blocker is GNU Fortran 8.1.0, which is named
 by the legacy Makefile but unavailable on this macOS ARM host. The archive does
 not record its compiler. The runnable reconstruction uses source
 `82c57f8aa1179865d9752b617493ef06f45c3266` with GNU Fortran 16.1.0.
+
+The reconstruction report SHA-256 is
+`3139f93b7e43cd244f04f467dff774bf4c406260b37946a39d245dc847e73408`;
+the search report SHA-256 is
+`e40f7b077fe36887c30546a57180bcce0609f867a16487321ce877f238f81d3b`.
 
 The counterfactual restart, terminal spin checkpoint, per-pool comparison, and
 full annual global time series remain outside this repository under
