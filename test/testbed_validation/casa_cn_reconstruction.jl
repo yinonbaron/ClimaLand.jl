@@ -17,8 +17,7 @@ const STAGE_SPECS = (
     (name = "normal_spin", directory = "03-normal_spin"),
     (name = "historical", directory = "04-historical"),
 )
-const CANDIDATE_IDS =
-    ("casa_boreal_nfix", "mimics_ko6_fi30", "casa_cn_prespin")
+const CANDIDATE_IDS = ("casa_boreal_nfix", "mimics_ko6_fi30", "casa_cn_prespin")
 const SCIENTIFIC_GROUPS = (
     "plant_states",
     "organic_pools",
@@ -40,10 +39,9 @@ function load_matrix(path = MATRIX_PATH)
     get(matrix, "schema_version", 0) == 1 ||
         error("Unsupported CASA-CN reconstruction matrix schema")
     matrix["issue"] == 24 || error("CASA-CN matrix must identify issue 24")
-    matrix["points"] == 4263 ||
-        error("CASA-CN matrix must retain 4,263 points")
+    matrix["points"] == 4263 || error("CASA-CN matrix must retain 4,263 points")
     matrix["passive_carbon_multiplier"] == 10 ||
-        error("CASA-CN matrix must retain passive-carbon ×10 restoration")
+        error("CASA-CN matrix must retain passive-pool ×10 restoration")
     matrix["comparison_atol"] == 0.0 ||
         error("CASA-CN comparison must be exact")
     matrix["comparison_rtol"] == 0.0 ||
@@ -62,8 +60,9 @@ function load_matrix(path = MATRIX_PATH)
     transformation["carbon_multiplier"] ==
     matrix["passive_carbon_multiplier"] ||
         error("CASA-CN passive restoration matrix is inconsistent")
-    transformation["nitrogen_rule"] == "byte-for-byte unchanged" ||
-        error("CASA-CN passive nitrogen must remain unchanged")
+    transformation["nitrogen_multiplier"] ==
+    matrix["passive_carbon_multiplier"] ||
+        error("CASA-CN passive carbon and nitrogen restoration must match")
     comparison = matrix["scientific_comparison"]
     required_groups = Set(SCIENTIFIC_GROUPS)
     issubset(required_groups, Set(keys(comparison))) ||
@@ -169,8 +168,12 @@ end
 
 function retained_daily_years(matrix = load_matrix())
     return Set(
-        vcat((collect(first(window):last(window)) for window in
-              matrix["postprocessing"]["daily_windows"])...),
+        vcat(
+            (
+                collect(first(window):last(window)) for
+                window in matrix["postprocessing"]["daily_windows"]
+            )...,
+        ),
     )
 end
 
@@ -320,7 +323,7 @@ function write_full_workflow(
         harness().workflow_input(
             "stage:accelerated_spin/casa_final.csv",
             "casa_initial.csv";
-            transform = "casa_passive_carbon_x10",
+            transform = "casa_passive_carbon_nitrogen_x10",
         ),
     )
     push!(
@@ -332,10 +335,7 @@ function write_full_workflow(
     )
     push!(
         stage_inputs["historical"],
-        harness().workflow_input(
-            MATRIX_PATH,
-            "casa_cn_reconstruction.toml",
-        ),
+        harness().workflow_input(MATRIX_PATH, "casa_cn_reconstruction.toml"),
     )
     stages = [
         stage_definition(
@@ -361,8 +361,9 @@ function write_full_workflow(
             "evidence_matrix" => file_record(MATRIX_PATH),
             "candidate_derivation_report" => file_record(derivation_report),
             "candidate_input" => Dict(
-                id => file_record(joinpath(candidate_root, candidate_path_map[id]))
-                for id in CANDIDATE_IDS
+                id => file_record(
+                    joinpath(candidate_root, candidate_path_map[id]),
+                ) for id in CANDIDATE_IDS
             ),
             "stage_parameter" => Dict(
                 stage => file_record(path) for
@@ -427,14 +428,19 @@ function restart_diagnostic(path)
     area_column = findfirst(==("casamet%areacell"), header)
     isnothing(area_column) && error("Restart has no casamet%areacell")
     columns = Dict(
-        "carbon" =>
-            findall(name -> startswith(lowercase(name), "casapool%c"), header),
-        "nitrogen" =>
-            findall(name -> startswith(lowercase(name), "casapool%n"), header),
+        "carbon" => findall(
+            name -> startswith(lowercase(name), "casapool%c"),
+            header,
+        ),
+        "nitrogen" => findall(
+            name -> startswith(lowercase(name), "casapool%n"),
+            header,
+        ),
     )
     all(!isempty(value) for value in values(columns)) ||
         error("CASA-CN restart must contain carbon and nitrogen pools")
-    totals = Dict(name => zeros(Float64, length(value)) for (name, value) in columns)
+    totals =
+        Dict(name => zeros(Float64, length(value)) for (name, value) in columns)
     nonfinite = Dict(name => 0 for name in keys(columns))
     for line in lines[2:end]
         values = split(line, ','; keepempty = true)
@@ -452,11 +458,12 @@ function restart_diagnostic(path)
         "sha256" => sha256sum(path),
         "points" => length(lines) - 1,
         "nonfinite_count" => nonfinite,
-        "total_pg" => Dict(element => sum(value) for (element, value) in totals),
+        "total_pg" =>
+            Dict(element => sum(value) for (element, value) in totals),
         "pool_pg" => Dict(
             element => Dict(
-                header[column] => total for
-                (column, total) in zip(columns[element], totals[element])
+                header[column] => total for (column, total) in
+                zip(columns[element], totals[element])
             ) for element in keys(columns)
         ),
     )
@@ -496,7 +503,8 @@ function passive_restoration_report(source, destination)
                 expected = harness().multiply_decimal_by_ten(before[column])
                 carbon_mismatches += expected != after[column]
             elseif column == passive_nitrogen
-                nitrogen_mismatches += before[column] != after[column]
+                expected = harness().multiply_decimal_by_ten(before[column])
+                nitrogen_mismatches += expected != after[column]
             else
                 unaffected_mismatches += before[column] != after[column]
             end
@@ -517,7 +525,7 @@ function passive_restoration_report(source, destination)
         ),
         "passive_nitrogen" => Dict(
             "field" => rule["nitrogen_field"],
-            "rule" => rule["nitrogen_rule"],
+            "multiplier" => rule["nitrogen_multiplier"],
             "mismatch_count" => nitrogen_mismatches,
         ),
         "unaffected_columns" => Dict(
@@ -631,7 +639,8 @@ end
 function exudation_audit(path)
     rows = [split(line, ','; keepempty = true) for line in readlines(path)]
     header_row = findfirst(row -> "fracRootExudate" in strip.(row), rows)
-    isnothing(header_row) && error("CASA parameter table has no exudation field")
+    isnothing(header_row) &&
+        error("CASA parameter table has no exudation field")
     header = strip.(rows[header_row])
     column = findfirst(==("fracRootExudate"), header)
     values = Float64[]
@@ -745,9 +754,11 @@ function annual_year_record(reference_path, candidate_path, year)
                 push!(metadata_mismatches, "variable names differ in $year")
             issubset(required_variables(matrix), reference_names) ||
                 error("CASA-CN archive is missing required variables")
-            issubset(required_variables(matrix), candidate_names) ||
-                error("CASA-CN candidate is missing required variables in $year")
-            for name in sort!(collect(intersect(reference_names, candidate_names)))
+            issubset(required_variables(matrix), candidate_names) || error(
+                "CASA-CN candidate is missing required variables in $year",
+            )
+            for name in
+                sort!(collect(intersect(reference_names, candidate_names)))
                 reference_variable = reference[name]
                 candidate_variable = candidate[name]
                 reference_dimensions = NCDatasets.dimnames(reference_variable)
@@ -779,9 +790,10 @@ function annual_year_record(reference_path, candidate_path, year)
                 time_dimension = findfirst(==("time"), candidate_dimensions)
                 isnothing(time_dimension) && year != first_year && continue
                 candidate_values = if isnothing(time_dimension)
-                    candidate_variable.var[
-                        ntuple(_ -> Colon(), ndims(candidate_variable))...,
-                    ]
+                    candidate_variable.var[ntuple(
+                        _ -> Colon(),
+                        ndims(candidate_variable),
+                    )...,]
                 else
                     casa().annual_mean(candidate_variable, time_dimension)
                 end
@@ -802,7 +814,8 @@ function annual_year_record(reference_path, candidate_path, year)
                 )
                 records[name] = Dict(
                     "failure_count" => result.failure_count,
-                    "missing_mismatch_count" => result.missing_mismatch_count,
+                    "missing_mismatch_count" =>
+                        result.missing_mismatch_count,
                     "nonfinite_count" => result.nonfinite_count,
                     "sign_change_count" => result.sign_change_count,
                     "max_abs_error" => result.max_abs_error,
@@ -905,14 +918,16 @@ function stream_historical_outputs!(
     finished,
     matrix = load_matrix(),
 )
-    years = collect(first(matrix["history_years"]):last(matrix["history_years"]))
+    years =
+        collect(first(matrix["history_years"]):last(matrix["history_years"]))
     retained = retained_daily_years(matrix)
     fragments = joinpath(stage_dir, "annual_comparison")
     mkpath(fragments)
     for (index, year) in enumerate(years)
         daily_path = joinpath(stage_dir, netcdf_name(year; daily = true))
-        next_path = index == length(years) ? "" :
-                    joinpath(stage_dir, netcdf_name(years[index + 1]; daily = true))
+        next_path =
+            index == length(years) ? "" :
+            joinpath(stage_dir, netcdf_name(years[index + 1]; daily = true))
         while !isfile(daily_path) && !finished[]
             sleep(1)
         end
@@ -924,7 +939,10 @@ function stream_historical_outputs!(
             finished,
         ) || return nothing
         record = annual_year_record(reference_path, daily_path, year)
-        harness().write_toml_atomic(joinpath(stage_dir, annual_fragment(year)), record)
+        harness().write_toml_atomic(
+            joinpath(stage_dir, annual_fragment(year)),
+            record,
+        )
         year in retained || rm(daily_path; force = true)
     end
     return nothing
@@ -976,13 +994,16 @@ function daily_comparison(
             report = comparator().compare_netcdf(
                 reference,
                 joinpath(historical, netcdf_name(year; daily = true));
-                reference_selectors =
-                    Dict("time" => first_day:(first_day + 364)),
+                reference_selectors = Dict(
+                    "time" => first_day:(first_day + 364),
+                ),
             )
             record = casa().comparison_record(report)
-            missing = setdiff(required_variables(), Set(keys(record["variable"])))
-            isempty(missing) ||
-                error("Daily CASA-CN comparison is missing: $(join(missing, ", "))")
+            missing =
+                setdiff(required_variables(), Set(keys(record["variable"])))
+            isempty(missing) || error(
+                "Daily CASA-CN comparison is missing: $(join(missing, ", "))",
+            )
             record["scientific_group"] = comparison_groups(record["variable"])
             comparisons[string(year)] = record
         end
@@ -1035,18 +1056,10 @@ function write_case_report(data_root, case_root)
     )
     restoration_verified = boundaries["passive_restoration"]["verified"]
     matrix = load_matrix()
-    normal_parameters = joinpath(
-        case_root,
-        "configuration",
-        "controls",
-        "normal_spin.lst",
-    )
-    accelerated_parameters = joinpath(
-        case_root,
-        "configuration",
-        "controls",
-        "accelerated_spin.lst",
-    )
+    normal_parameters =
+        joinpath(case_root, "configuration", "controls", "normal_spin.lst")
+    accelerated_parameters =
+        joinpath(case_root, "configuration", "controls", "accelerated_spin.lst")
     normal_control = harness().parse_control(normal_parameters)
     accelerated_control = harness().parse_control(accelerated_parameters)
     normal_parameter_path = joinpath(
@@ -1101,12 +1114,14 @@ function write_case_report(data_root, case_root)
                     ) for filename in reference_filenames
                 ),
             ),
-            "workflow" => file_record(joinpath(configuration, "workflow.toml")),
+            "workflow" =>
+                file_record(joinpath(configuration, "workflow.toml")),
             "control_diff_report" => file_record(
                 joinpath(configuration, "control_diff_report.toml"),
             ),
-            "build_metadata" =>
-                file_record(joinpath(case_root, "build", "build_metadata.toml")),
+            "build_metadata" => file_record(
+                joinpath(case_root, "build", "build_metadata.toml"),
+            ),
             "stage_metadata" => Dict(
                 stage.name => file_record(
                     joinpath(
@@ -1209,7 +1224,10 @@ function run_search(source_root, data_root, run_root)
             )
         end
     end
-    runnable = filter(attempt -> attempt["status"] != "blocked_unavailable_toolchain", attempts)
+    runnable = filter(
+        attempt -> attempt["status"] != "blocked_unavailable_toolchain",
+        attempts,
+    )
     tested_compilers = unique([
         attempt["compiler_version"] for
         attempt in runnable if haskey(attempt, "compiler_version")
@@ -1221,7 +1239,10 @@ function run_search(source_root, data_root, run_root)
         (
             "blocked",
             join(
-                ["$(attempt["case"]): $(attempt["blocker"])" for attempt in blocked],
+                [
+                    "$(attempt["case"]): $(attempt["blocker"])" for
+                    attempt in blocked
+                ],
                 "; ",
             ),
         )
@@ -1230,7 +1251,10 @@ function run_search(source_root, data_root, run_root)
             "evidence_backed_matrix_exhausted",
             "No evidence-backed source case exactly reconstructs the archive. " *
             "The archive compiler is not recorded; tested compiler(s): " *
-            (isempty(tested_compilers) ? "none" : join(tested_compilers, "; ")) *
+            (
+                isempty(tested_compilers) ? "none" :
+                join(tested_compilers, "; ")
+            ) *
             ". The documented GNU Fortran 8.1.0 candidate is unavailable.",
         )
     end
@@ -1257,6 +1281,8 @@ function self_test()
         Test.@test matrix["prespin_loops"] == 100
         Test.@test matrix["spin_loops"] == 499
         Test.@test matrix["history_years"] == [1901, 2014]
+        Test.@test matrix["transformation"]["passive_restoration"]["nitrogen_multiplier"] ==
+                   10
         Test.@test final_spin_checkpoints() == (9960, 9980)
         Test.@test Set(keys(candidate_paths())) == Set(CANDIDATE_IDS)
         Test.@test "nlitcwd" in required_variables(matrix)
@@ -1320,16 +1346,17 @@ function self_test()
                 "2000000,4,0.4,5.5,0.5,0.06\n",
             )
             restored = joinpath(root, "restored.csv")
-            harness().restore_casa_passive_carbon(restart, restored)
+            harness().restore_casa_passive_carbon_nitrogen(restart, restored)
             restoration = passive_restoration_report(restart, restored)
             Test.@test restoration["verified"]
             Test.@test restoration["passive_carbon"]["mismatch_count"] == 0
             Test.@test restoration["passive_nitrogen"]["mismatch_count"] == 0
+            Test.@test restoration["passive_nitrogen"]["multiplier"] == 10
             Test.@test restoration["unaffected_columns"]["mismatch_count"] == 0
             diagnostic = restart_diagnostic(restored)
             Test.@test diagnostic["points"] == 2
             Test.@test diagnostic["total_pg"]["carbon"] ≈ 0.1525
-            Test.@test diagnostic["total_pg"]["nitrogen"] ≈ 0.00246
+            Test.@test diagnostic["total_pg"]["nitrogen"] ≈ 0.01416
 
             parameter = joinpath(root, "parameters.csv")
             rows = [

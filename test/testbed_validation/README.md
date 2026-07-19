@@ -443,8 +443,9 @@ A workflow TOML has `schema_version = 1`, a unique `name`, the pinned
 file, its expected output paths, and `[[stage.input]]` tables with `source` and
 `destination`. A source such as `stage:prespin/casa_final.csv` creates an
 explicit dependency on an earlier stage. Input `mode` is `copy` (default) or
-`symlink`; `transform = "casa_passive_carbon_x10"` performs the documented
-post-accelerated-spin correction by finding `casapool%csoil(PASS)` from the
+`symlink`; `transform = "casa_passive_carbon_x10"` restores passive carbon for
+CASA-C, while `transform = "casa_passive_carbon_nitrogen_x10"` restores both
+passive pools for CASA-CN. Both transformations locate their fields from the
 restart header. Output and destination paths must remain inside their stage
 directory.
 

@@ -48,7 +48,7 @@ boundary = "accelerated_spin -> normal_spin"
 carbon_field = "casapool%csoil(PASS)"
 carbon_multiplier = 10
 nitrogen_field = "casapool%nsoil(PASS)"
-nitrogen_rule = "byte-for-byte unchanged"
+nitrogen_multiplier = 10
 unaffected_columns_rule = "byte-for-byte unchanged"
 
 [postprocessing]
@@ -82,8 +82,9 @@ reason = "The documented source-Makefile compiler is not installed on the curren
 controls = "Committed CASA-CN CLM5/GSWP3 JAMES controls plus the hash-pinned boreal-N-fix prespin candidate"
 parameters = "Prespin uses the high-confidence boreal-N-fix and KO6/FI30 candidates; spin and history use the archive-named exudate0 tables"
 source = "Archive daily output was created 2022-05-10; 82c57f8 is the latest public source revision before creation"
-spin = "The committed controls and README document prespin, accelerated spin, passive-carbon restoration, normal spin, and history"
+spin = "The controls and README document prespin, accelerated spin, passive-SOC restoration, normal spin, and history; the archive comparison demonstrates that the undocumented restart also restored passive nitrogen"
 postprocessing = "Archive history records ncra annual means, ncrcat concatenation, and retained 1901-1905/2010-2014 daily windows"
+counterfactual = "A controlled passive-C+N x10 restart rerun reduced every annual global pool-stock gap to below 0.028% without changing the executable, scientific controls, or comparison tolerances"
 
 [[case]]
 id = "archive_predecessor"

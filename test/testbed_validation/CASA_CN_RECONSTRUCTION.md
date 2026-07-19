@@ -7,8 +7,8 @@ history:
 1. 100 repeats of the 1901 prespin forcing with the high-confidence
    boreal-N-fix CASA candidate and KO6/FI30 MIMICS parser candidate.
 2. 499 repeats of 1901--1920 with the accelerated CASA table.
-3. Passive-carbon restoration by a factor of 10, followed by 499 repeats of
-   1901--1920 with the normal CASA table.
+3. Passive-carbon and passive-nitrogen restoration by a factor of 10, followed
+   by 499 repeats of 1901--1920 with the normal CASA table.
 4. The complete 1901--2014 historical forcing.
 
 The MIMICS candidate is staged because the legacy executable parses that
@@ -31,11 +31,11 @@ julia --startup-file=no --project=.buildkite \
 ```
 
 The runner records carbon and nitrogen restart hashes and area-weighted pool
-totals at every boundary. Its accelerated-spin transformation multiplies only
-`casapool%csoil(PASS)` by 10; it verifies that
-`casapool%nsoil(PASS)` and every unaffected restart column are byte-for-byte
-unchanged. Both long spins report the documented carbon convergence metrics
-and the corresponding organic-plus-mineral nitrogen changes.
+totals at every boundary. Its accelerated-spin transformation multiplies
+`casapool%csoil(PASS)` and `casapool%nsoil(PASS)` by 10, while verifying that
+every unaffected restart column is byte-for-byte unchanged. Both long spins
+report the documented carbon convergence metrics and the corresponding
+organic-plus-mineral nitrogen changes.
 
 Exact scientific comparisons cover the annual 1901--2014 history and the
 published 1901--1905 and 2010--2014 daily windows. Named report groups require
@@ -64,39 +64,37 @@ julia --startup-file=no --project=.buildkite \
 
 ## Result
 
-The full-grid search exhausted the evidence-backed matrix without an exact
-match. The best and only runnable case was `archive_predecessor` at source
-`82c57f8aa1179865d9752b617493ef06f45c3266`, built with GNU Fortran 16.1.0.
-It produced 284,242,354 exact mismatches across the annual history and retained
-daily windows. The remaining source-compiler candidate is GNU Fortran 8.1.0,
-which is named by the legacy Makefile but unavailable on this macOS ARM host;
-the archive does not record its compiler.
+The initial full-grid reconstruction followed the retained instruction to
+multiply passive SOC by 10 while leaving passive nitrogen unchanged. That run
+missed the archive's 1901 passive-soil nitrogen stock by 17.06948% and ended
+the normal spin with a passive-pool C:N ratio of 19.68326. The archive ratio is
+16.34456, localizing the discrepancy to the undocumented treatment of passive
+nitrogen at the accelerated-spin restart boundary.
 
-Passive-carbon restoration, byte preservation of passive nitrogen and all
-unaffected restart columns, and zero root exudation for all 18 PFTs verified.
-Normal-spin carbon passed all three documented convergence checks. Accelerated
-spin did not: its final-cycle global carbon change was 0.0146908 Pg (threshold
-0.01 Pg), and 96.106% of active points changed by less than 1 g m-2 (threshold
-98%); 98.616% changed by less than 0.1%, which passed. The corresponding final
-cycle nitrogen changes were 0.000978709 Pg for accelerated spin and 0.00396726
-Pg for normal spin.
+A controlled rerun multiplied both passive carbon and passive nitrogen by 10.
+The executable, source revision, forcing, scientific controls, parameter
+tables, and every other restart field were unchanged. The 9,980-year normal
+spin and complete 1901--2014 history then reproduced every annual global pool
+stock to within 0.028% of the archive. The largest discrepancy was 0.0274406%
+for passive soil carbon in 1901.
 
-| Boundary | Restart SHA-256 | Carbon (Pg) | Nitrogen (Pg) |
-|---|---|---:|---:|
-| Prespin | `8e2d425d658ceaee81d717468eef99782bc8cdc9b926a1f57550ab14a887ab78` | 1.22721649 | 0.06148815 |
-| Accelerated spin | `1aeb30c064e59a80ea486a3f696ebca86ff3994e64e316e449aa2d32afda2275` | 1.02662923 | 0.04425553 |
-| Normal spin | `dce3db0ada7cf464b6fbd638cf6044ede09be17a9d8cf7670181d10eaf9cbf45` | 1.23262904 | 0.05453322 |
-| Historical | `625671cfb275b6605b962983bc0d7e4b4159246fbe0c4db5cb10ea0ad5818b65` | 1.26769213 | 0.05557501 |
+| Global annual-mean stock | Carbon-only gap (1901) | C+N gap (1901) | C+N gap (2014) |
+|---|---:|---:|---:|
+| Passive soil nitrogen | -17.06948% | +0.02462% | +0.02449% |
+| Total modeled nitrogen | -4.42701% | +0.00682% | +0.00660% |
+| Total modeled carbon | -0.24175% | +0.00576% | +0.00546% |
 
-Annual exact-mismatch counts were 1,457,236 for plant states, 3,168,240 for
-organic pools, 2,211,418 for mineral nitrogen, 1,936,159 for major fluxes, and
-589,888 for the overlapping CWD-nitrogen audit group. Every retained daily
-year differed; per-year counts ranged from 27,350,424 (2014) to 27,764,170
-(1905). No comparison tolerance was introduced.
+The corrected terminal passive-pool C:N ratio is 16.34502. This establishes
+that the archived workflow effectively restored passive nitrogen together with
+passive carbon, despite documenting only passive-SOC restoration. Comparison
+tolerances remain exactly zero; the result is a scientific reconstruction,
+not a claim of bitwise identity.
 
-The external search report SHA-256 is
-`cb7d7266b8f9748aec42aede0f52fef62a86867dcb27555a65cb19c1098dccba`;
-the reconstruction report SHA-256 is
-`d51d9c830c728251c3495d25be98ba4931951d58ff8772c0ee25e9c3df366c59`.
-Large run outputs remain outside this repository under
-`../casa_cn_reconstruction_issue24`.
+The remaining exact-reproduction blocker is GNU Fortran 8.1.0, which is named
+by the legacy Makefile but unavailable on this macOS ARM host. The archive does
+not record its compiler. The runnable reconstruction uses source
+`82c57f8aa1179865d9752b617493ef06f45c3266` with GNU Fortran 16.1.0.
+
+The counterfactual restart, terminal spin checkpoint, per-pool comparison, and
+full annual global time series remain outside this repository under
+`../casa_cn_reconstruction_issue24/passive_cn_counterfactual`.
