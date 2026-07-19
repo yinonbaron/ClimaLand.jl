@@ -206,17 +206,24 @@ function multiply_decimal_by_ten(token)
     return leading * sign * value * trailing
 end
 
-function restore_casa_passive_carbon(source, destination)
+function restore_casa_passive_carbon(
+    source,
+    destination;
+    include_nitrogen = false,
+)
     lines = readlines(source; keep = true)
     isempty(lines) && error("CASA restart file is empty: $source")
     header = split(lines[1], ',')
-    passive_columns =
-        findall(value -> strip(value) == "casapool%csoil(PASS)", header)
-    length(passive_columns) == 1 || error(
-        "Expected one casapool%csoil(PASS) column in $source; found " *
-        string(length(passive_columns)),
-    )
-    passive_column = only(passive_columns)
+    passive_fields = ["casapool%csoil(PASS)"]
+    include_nitrogen && push!(passive_fields, "casapool%nsoil(PASS)")
+    passive_columns = map(passive_fields) do field
+        matching = findall(value -> strip(value) == field, header)
+        length(matching) == 1 || error(
+            "Expected one $field column in $source; found " *
+            string(length(matching)),
+        )
+        only(matching)
+    end
     transformed = String[lines[1]]
     for (line_number, line) in zip(2:length(lines), lines[2:end])
         columns = split(line, ','; keepempty = true)
@@ -227,14 +234,19 @@ function restore_casa_passive_carbon(source, destination)
             "Restart row $line_number has $(length(columns)) columns; " *
             "expected $(length(header)) plus an optional trailing comma",
         )
-        columns[passive_column] =
-            multiply_decimal_by_ten(columns[passive_column])
+        for passive_column in passive_columns
+            columns[passive_column] =
+                multiply_decimal_by_ten(columns[passive_column])
+        end
         push!(transformed, join(columns, ','))
     end
     mkpath(dirname(abspath(destination)))
     write(destination, join(transformed))
     return destination
 end
+
+restore_casa_passive_carbon_nitrogen(source, destination) =
+    restore_casa_passive_carbon(source, destination; include_nitrogen = true)
 
 # ============================================================================
 # Resumable workflow orchestration
@@ -344,6 +356,10 @@ function materialize_stage_input(input, spec_dir, stage_dir, stage_dirs)
         mode == "copy" ||
             error("Transformed workflow inputs must use copy mode")
         restore_casa_passive_carbon(source, destination)
+    elseif transform == "casa_passive_carbon_nitrogen_x10"
+        mode == "copy" ||
+            error("Transformed workflow inputs must use copy mode")
+        restore_casa_passive_carbon_nitrogen(source, destination)
     elseif transform == "none"
         if mode == "copy"
             cp(source, destination; force = true)
