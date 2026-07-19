@@ -87,6 +87,38 @@ function daily_cn_map_allocations(arguments...)
     return @allocated MIMICS.daily_carbon_nitrogen_map(arguments...)
 end
 
+function combined_carbon_allocations(
+    parameters,
+    state,
+    temperature,
+    liquid,
+    frozen,
+    inputs,
+    metabolic_fraction,
+    annual_npp,
+)
+    MIMICS.combined_carbon_fluxes(
+        parameters,
+        state...,
+        temperature,
+        liquid,
+        frozen,
+        inputs...,
+        metabolic_fraction,
+        annual_npp,
+    )
+    return @allocated MIMICS.combined_carbon_fluxes(
+        parameters,
+        state...,
+        temperature,
+        liquid,
+        frozen,
+        inputs...,
+        metabolic_fraction,
+        annual_npp,
+    )
+end
+
 for FT in (Float32, Float64)
     @testset "MIMICS carbon kernels, FT = $FT" begin
         parameters = mimics_carbon_parameters(FT)
@@ -108,6 +140,37 @@ for FT in (Float32, Float64)
             state,
             inputs,
             environment,
+        )
+        hourly = @inferred MIMICS.hourly_carbon_map(
+            parameters,
+            state,
+            inputs,
+            environment,
+        )
+        r_loss = state[3] * environment.r_turnover
+        k_loss = state[4] * environment.k_turnover
+        expected_processes =
+            FT.((
+                r_loss,
+                k_loss,
+                inputs[1] / 24 * parameters.input_protection[1] +
+                r_loss * environment.r_partition[1] +
+                k_loss * environment.k_partition[1],
+                inputs[2] / 24 * parameters.input_protection[2] +
+                r_loss * environment.r_partition[2] +
+                k_loss * environment.k_partition[2],
+                state[7] * environment.desorption,
+                state[4] * environment.vmax[5] * state[6] / (
+                    parameters.oxidation_modifier[2] * environment.km[5] +
+                    state[4]
+                ) +
+                state[3] * environment.vmax[2] * state[6] / (
+                    parameters.oxidation_modifier[1] * environment.km[2] +
+                    state[3]
+                ),
+            ))
+        @test all(
+            isapprox.(hourly.processes, expected_processes; rtol = 8eps(FT)),
         )
         @test daily_map_allocations(parameters, state, inputs, environment) == 0
         budget_tolerance =
@@ -166,8 +229,7 @@ for FT in (Float32, Float64)
             128eps(FT) * (sum(nitrogen) + mineral_nitrogen),
         )
         @test sum(mapped.nitrogen .- nitrogen) + mapped.mineral_nitrogen -
-              mineral_nitrogen ≈ sum(nitrogen_inputs) atol =
-            nitrogen_tolerance
+              mineral_nitrogen ≈ sum(nitrogen_inputs) atol = nitrogen_tolerance
     end
 end
 
@@ -200,11 +262,79 @@ end
         dY = similar(Y)
         tendency!(dY, Y, p, zero(FT))
         fluxes = p.mimics_soil.carbon_fluxes[]
+        direct_fluxes = @inferred MIMICS.combined_carbon_fluxes(
+            parameters,
+            initial...,
+            FT(283.15),
+            FT(0.3),
+            FT(0.1),
+            inputs...,
+            FT(0.5),
+            FT(0.3),
+        )
+        @test fluxes == direct_fluxes
+        @test combined_carbon_allocations(
+            parameters,
+            initial,
+            FT(283.15),
+            FT(0.3),
+            FT(0.1),
+            inputs,
+            FT(0.5),
+            FT(0.3),
+        ) == 0
+        day = FT(86400)
+        concentration_factor = FT(100) / parameters.carbon.depth_cm
+        temperature = Biogeochemistry.CASA.temperature_factor(
+            parameters.cwd_q10,
+            FT(283.15),
+            parameters.freezing_temperature,
+        )
+        cwd_moisture = Biogeochemistry.CASA.moisture_factor(FT(0.3), false)
+        cwd_fraction =
+            parameters.cwd_base_rate *
+            day *
+            parameters.cwd_litter_optimum *
+            temperature *
+            cwd_moisture
+        cwd_loss = cwd_fraction * initial[3]
+        cwd_transfer =
+            (one(FT) - parameters.cwd_respiration_fraction) * cwd_loss
+        environment = MIMICS.environmental_parameters(
+            parameters.carbon,
+            FT(10),
+            FT(0.3),
+            FT(0.1),
+            FT(0.5),
+            FT(300),
+            parameters.clay,
+        )
+        mapped = MIMICS.daily_carbon_map(
+            parameters.carbon,
+            (
+                initial[1],
+                initial[2],
+                initial[4],
+                initial[5],
+                initial[6],
+                initial[7],
+                initial[8],
+            ),
+            (
+                inputs[1] * day * concentration_factor,
+                (inputs[2] * day + cwd_transfer) * concentration_factor,
+            ),
+            environment,
+        )
+        expected_processes = mapped.processes ./ (concentration_factor * day)
+        @test all(
+            isapprox.(fluxes[11:16], expected_processes; rtol = 16eps(FT)),
+        )
+        @test fluxes[17] ≈ cwd_transfer / day rtol = 16eps(FT)
         tendencies = map(ClimaLand.prognostic_vars(model)) do name
             Array(parent(getproperty(dY.mimics_soil, name)))[1]
         end
         @test tendencies == Tuple(fluxes[1:8])
-        day = FT(86400)
         budget_tolerance =
             max(FT(2e-5) * sum(inputs), 32eps(FT) * sum(abs, initial) / day)
         @test sum(tendencies) + fluxes[9] ≈ sum(inputs) atol = budget_tolerance
@@ -338,25 +468,26 @@ end
         )
         @test length(ClimaLand.prognostic_vars(model)) == 17
         Y, p, _ = ClimaLand.initialize(model)
-        initial = FT.((
-            1,
-            2,
-            0.5,
-            0.03,
-            0.04,
-            3,
-            4,
-            5,
-            0.05,
-            0.04,
-            0.005,
-            0.004,
-            0.2,
-            0.1,
-            0.3,
-            0.002,
-            0.01,
-        ))
+        initial =
+            FT.((
+                1,
+                2,
+                0.5,
+                0.03,
+                0.04,
+                3,
+                4,
+                5,
+                0.05,
+                0.04,
+                0.005,
+                0.004,
+                0.2,
+                0.1,
+                0.3,
+                0.002,
+                0.01,
+            ))
         for (name, value) in zip(ClimaLand.prognostic_vars(model), initial)
             getproperty(Y.mimics_soil, name) .= value
         end
@@ -368,17 +499,17 @@ end
             getproperty(dY.mimics_soil, name)[]
         end
         nitrogen_names = ClimaLand.prognostic_vars(model)[9:17]
-        nitrogen_tendency = sum(
-            getproperty(dY.mimics_soil, name)[] for name in nitrogen_names
-        )
+        nitrogen_tendency =
+            sum(getproperty(dY.mimics_soil, name)[] for name in nitrogen_names)
         nitrogen_fluxes = p.mimics_soil.nitrogen_fluxes[]
         conservation_tolerance = max(
             FT(256) * eps(FT) * sum(nitrogen_inputs),
             FT(256) * eps(FT) * sum(initial[9:17]) / FT(86400),
         )
-        @test nitrogen_tendency + nitrogen_fluxes[10] +
-              nitrogen_fluxes[11] + uptake ≈
-              sum(nitrogen_inputs) + deposition + fixation atol =
+        @test nitrogen_tendency +
+              nitrogen_fluxes[10] +
+              nitrogen_fluxes[11] +
+              uptake ≈ sum(nitrogen_inputs) + deposition + fixation atol =
             conservation_tolerance
 
         day = FT(86400)
@@ -425,17 +556,12 @@ end
 
             x = ClimaCore.Fields.coordinate_field(plane.space.surface).x
             nitrogen_variant = MIMICS.NitrogenParameters{FT}(;
-                nitrogen_use_efficiency =
-                    nitrogen_parameters.nitrogen_use_efficiency,
-                microbial_carbon_nitrogen_ratio =
-                    nitrogen_parameters.microbial_carbon_nitrogen_ratio,
-                carbon_nitrogen_modifier =
-                    nitrogen_parameters.carbon_nitrogen_modifier,
+                nitrogen_use_efficiency = nitrogen_parameters.nitrogen_use_efficiency,
+                microbial_carbon_nitrogen_ratio = nitrogen_parameters.microbial_carbon_nitrogen_ratio,
+                carbon_nitrogen_modifier = nitrogen_parameters.carbon_nitrogen_modifier,
                 mineral_nitrogen_available_fraction = FT(0.25),
-                microbial_turnover_density_exponent =
-                    nitrogen_parameters.microbial_turnover_density_exponent,
-                maximum_fine_litter =
-                    nitrogen_parameters.maximum_fine_litter,
+                microbial_turnover_density_exponent = nitrogen_parameters.microbial_turnover_density_exponent,
+                maximum_fine_litter = nitrogen_parameters.maximum_fine_litter,
                 maximum_cwd = nitrogen_parameters.maximum_cwd,
                 loss_threshold = nitrogen_parameters.loss_threshold,
                 loss_fraction = nitrogen_parameters.loss_fraction,
@@ -472,8 +598,7 @@ end
                 zero(FT),
             )
             x_values = Array(parent(x))
-            mineral_tendency =
-                Array(parent(spatial_dY.mimics_soil.n_mineral))
+            mineral_tendency = Array(parent(spatial_dY.mimics_soil.n_mineral))
             left = mineral_tendency[x_values .< FT(1)]
             right = mineral_tendency[x_values .>= FT(1)]
             @test all(left .≈ first(left))
@@ -510,10 +635,8 @@ function fixture_cn_litter_quality(mimics, casa, day)
     root_carbon = value(casa, "cfroot", previous)
     leaf_nitrogen = value(casa, "nleaf", previous)
     root_nitrogen = value(casa, "nfroot", previous)
-    leaf_ratio =
-        min(leaf_carbon / max(1e-10, leaf_nitrogen), 50.0) / 0.5 * 0.2
-    root_ratio =
-        min(root_carbon / max(1e-10, root_nitrogen), 41.0) / 0.9 * 0.2
+    leaf_ratio = min(leaf_carbon / max(1e-10, leaf_nitrogen), 50.0) / 0.5 * 0.2
+    root_ratio = min(root_carbon / max(1e-10, root_nitrogen), 41.0) / 0.9 * 0.2
     temperature = value(casa, "tsoilC", day) + 273.15
     liquid = value(mimics, "thetaLiq", day)
     temperature_factor = 1.72^(0.1 * (temperature - 273.15 - 35))
@@ -524,15 +647,15 @@ function fixture_cn_litter_quality(mimics, casa, day)
     cwd_to_structural = 0.52 * cwd_loss
     total_fine_litter =
         value(mimics, "cLitInput_metb", day) +
-        value(mimics, "cLitInput_struc", day) -
-        cwd_to_structural
+        value(mimics, "cLitInput_struc", day) - cwd_to_structural
     root_turnover = root_carbon / (5 * 365)
     leaf_turnover = total_fine_litter - root_turnover
     total = leaf_turnover + root_turnover + cwd_to_structural
     average_ratio = min(
         40.0,
         (
-            leaf_ratio * leaf_turnover + root_ratio * root_turnover +
+            leaf_ratio * leaf_turnover +
+            root_ratio * root_turnover +
             60 * cwd_to_structural
         ) / max(0.001, total),
     )
@@ -707,32 +830,36 @@ end
                     nitrogen_inputs,
                     environment,
                 )
-                expected_carbon = ntuple(
-                    index -> concentration(carbon_names[index], day),
-                    7,
-                )
+                expected_carbon =
+                    ntuple(index -> concentration(carbon_names[index], day), 7)
                 expected_nitrogen = ntuple(
                     index -> concentration(nitrogen_names[index], day),
                     7,
                 )
                 maximum_carbon_error = max(
                     maximum_carbon_error,
-                    maximum(abs.((mapped.carbon .- expected_carbon) ./ expected_carbon)),
+                    maximum(
+                        abs.(
+                            (mapped.carbon .- expected_carbon) ./
+                            expected_carbon
+                        ),
+                    ),
                 )
                 maximum_nitrogen_error = max(
                     maximum_nitrogen_error,
-                    maximum(abs.((mapped.nitrogen .- expected_nitrogen) ./ expected_nitrogen)),
+                    maximum(
+                        abs.(
+                            (mapped.nitrogen .- expected_nitrogen) ./
+                            expected_nitrogen
+                        ),
+                    ),
                 )
                 maximum_din_error = max(
                     maximum_din_error,
-                    abs(
-                        mapped.mineral_nitrogen -
-                        concentration("DIN", day),
-                    ),
+                    abs(mapped.mineral_nitrogen - concentration("DIN", day)),
                 )
-                temperature_factor = 1.72^(
-                    0.1 * (value(casa, "tsoilC", day) - 35)
-                )
+                temperature_factor =
+                    1.72^(0.1 * (value(casa, "tsoilC", day) - 35))
                 cwd_moisture = Biogeochemistry.CASA.moisture_factor(
                     value(mimics, "thetaLiq", day),
                     false,
@@ -749,14 +876,8 @@ end
                 )
                 maximum_overflow_error = max(
                     maximum_overflow_error,
-                    abs(
-                        mapped.overflow_r -
-                        concentration("cOverflow_r", day),
-                    ),
-                    abs(
-                        mapped.overflow_k -
-                        concentration("cOverflow_k", day),
-                    ),
+                    abs(mapped.overflow_r - concentration("cOverflow_r", day)),
+                    abs(mapped.overflow_k - concentration("cOverflow_k", day)),
                 )
                 nitrogen_fluxes = (
                     mapped.litter_mineralization,

@@ -154,10 +154,13 @@ function read_soils(path)
     )
 end
 
-function parameter_section(path, header)
+function parameter_section(path, header; required = true)
     lines = readlines(path)
     header_index = findfirst(line -> startswith(strip(line), header), lines)
-    isnothing(header_index) && error("Parameter section $header was not found")
+    if isnothing(header_index)
+        required && error("Parameter section $header was not found")
+        return nothing
+    end
     rows = Dict{Int, Vector{Float64}}()
     for line in lines[(header_index + 2):(header_index + 19)]
         fields = strip.(split(line, ','; keepempty = true))
@@ -189,7 +192,7 @@ function read_pft_parameters(path)
     plant_stoichiometry = parameter_section(path, ",N/Pleafmin")
     phenology = parameter_section(path, "IGBP:,Tkshed")
     kinetics = parameter_section(path, ",xnpmax,q01soil")
-    efficiencies = parameter_section(path, ",xkNlimit_min")
+    efficiencies = parameter_section(path, ",xkNlimit_min"; required = false)
     categories = pft_categories(path)
     return Dict(
         pft => (;
@@ -237,7 +240,9 @@ function read_pft_parameters(path)
             lignin_wood = chemistry[pft][8],
             lignin_root = chemistry[pft][9],
             nitrogen_fraction_to_litter = Tuple(chemistry[pft][4:6]),
-            cues = Tuple(efficiencies[pft][4:11]),
+            cues = isnothing(efficiencies) ?
+                   (0.45, 0.45, 0.7, 0.4, 0.7, 1.0, 1.0, 0.45) :
+                   Tuple(efficiencies[pft][4:11]),
             initial_carbon = Tuple(initial_carbon[pft][1:9]) ./ 1000,
             inactive = categories[pft].inactive,
             nonwoody = categories[pft].nonwoody,

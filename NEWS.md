@@ -2,6 +2,9 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add the native 4,263-cell MIMICS-C prespin, long-spin,
+  and historical reconstruction with native checkpoints, process diagnostics,
+  stage carbon budgets, and separate fresh-Fortran and archive comparisons.
 - ![][badge-🐛bugfix] Preserve complete checkpoint state by field name and add
   singleton vertical-domain fallbacks for `ColumnGrid` and rectilinear
   latitude-longitude grids that ClimaCore cannot reconstruct.

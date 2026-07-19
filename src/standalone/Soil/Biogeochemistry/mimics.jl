@@ -231,9 +231,7 @@ ClimaLand.prognostic_vars(::MIMICSSoilModel{FT, CarbonOnly}) where {FT} = (
     :c_soil_chemical,
     :c_soil_physical,
 )
-ClimaLand.prognostic_vars(
-    ::MIMICSSoilModel{FT, CarbonNitrogen},
-) where {FT} = (
+ClimaLand.prognostic_vars(::MIMICSSoilModel{FT, CarbonNitrogen}) where {FT} = (
     :c_litter_metabolic,
     :c_litter_structural,
     :c_litter_cwd,
@@ -252,20 +250,14 @@ ClimaLand.prognostic_vars(
     :n_litter_cwd,
     :n_mineral,
 )
-ClimaLand.prognostic_types(
-    ::MIMICSSoilModel{FT, CarbonOnly},
-) where {FT} =
+ClimaLand.prognostic_types(::MIMICSSoilModel{FT, CarbonOnly}) where {FT} =
     (FT, FT, FT, FT, FT, FT, FT, FT)
-ClimaLand.prognostic_types(
-    ::MIMICSSoilModel{FT, CarbonNitrogen},
-) where {FT} = ntuple(_ -> FT, 17)
-ClimaLand.prognostic_domain_names(
-    model::MIMICSSoilModel,
-) = ntuple(_ -> :surface, length(ClimaLand.prognostic_vars(model)))
+ClimaLand.prognostic_types(::MIMICSSoilModel{FT, CarbonNitrogen}) where {FT} =
+    ntuple(_ -> FT, 17)
+ClimaLand.prognostic_domain_names(model::MIMICSSoilModel) =
+    ntuple(_ -> :surface, length(ClimaLand.prognostic_vars(model)))
 
-ClimaLand.auxiliary_vars(
-    ::MIMICSSoilModel{FT, CarbonOnly},
-) where {FT} = (
+ClimaLand.auxiliary_vars(::MIMICSSoilModel{FT, CarbonOnly}) where {FT} = (
     :soil_temperature,
     :liquid_saturation,
     :frozen_saturation,
@@ -276,9 +268,7 @@ ClimaLand.auxiliary_vars(
     :annual_npp,
     :carbon_fluxes,
 )
-ClimaLand.auxiliary_vars(
-    ::MIMICSSoilModel{FT, CarbonNitrogen},
-) where {FT} = (
+ClimaLand.auxiliary_vars(::MIMICSSoilModel{FT, CarbonNitrogen}) where {FT} = (
     :soil_temperature,
     :liquid_saturation,
     :frozen_saturation,
@@ -297,13 +287,9 @@ ClimaLand.auxiliary_vars(
     :carbon_fluxes,
     :nitrogen_fluxes,
 )
-ClimaLand.auxiliary_types(
-    ::MIMICSSoilModel{FT, CarbonOnly},
-) where {FT} =
-    (FT, FT, FT, FT, FT, FT, FT, FT, StaticArrays.SVector{10, FT})
-ClimaLand.auxiliary_types(
-    ::MIMICSSoilModel{FT, CarbonNitrogen},
-) where {FT} = (
+ClimaLand.auxiliary_types(::MIMICSSoilModel{FT, CarbonOnly}) where {FT} =
+    (FT, FT, FT, FT, FT, FT, FT, FT, StaticArrays.SVector{17, FT})
+ClimaLand.auxiliary_types(::MIMICSSoilModel{FT, CarbonNitrogen}) where {FT} = (
     ntuple(_ -> FT, 14)...,
     StaticArrays.SVector{24, FT},
     StaticArrays.SVector{10, FT},
@@ -485,7 +471,19 @@ order is LITm, LITs, MICr, MICk, SOMa, SOMc, SOMp.
         (one(mge[2]) - mge[2]) * litter_r_s +
         (one(mge[3]) - mge[3]) * (litter_k_m + soil_k) +
         (one(mge[4]) - mge[4]) * litter_k_s
-    return (state = next_state, respiration = respiration)
+    processes = StaticArrays.SVector(
+        r_loss,
+        k_loss,
+        daily_inputs[1] * hourly * parameters.input_protection[1] +
+        r_to_p +
+        k_to_p,
+        daily_inputs[2] * hourly * parameters.input_protection[2] +
+        r_to_c +
+        k_to_c,
+        desorption,
+        oxidation,
+    )
+    return (; state = next_state, respiration, processes)
 end
 
 
@@ -517,8 +515,7 @@ ecosystem prognostic pool.
     environment,
 )
     lit_m, lit_s, mic_r, mic_k, som_a, som_c, som_p = carbon
-    lit_m_n, lit_s_n, mic_r_n, mic_k_n, som_a_n, som_c_n, som_p_n =
-        nitrogen
+    lit_m_n, lit_s_n, mic_r_n, mic_k_n, som_a_n, som_c_n, som_p_n = nitrogen
     vmax = environment.vmax
     km = environment.km
     small = oftype(lit_m, 1e-10)
@@ -574,14 +571,16 @@ ecosystem prognostic pool.
     uptake_k_c = mge[3] * (litter_k_m + soil_k) + mge[4] * litter_k_s
     uptake_k_n =
         nue[3] * (litter_k_m_n + soil_k_n) + nue[4] * litter_k_s_n + din_k
-    target_r = nitrogen_parameters.microbial_carbon_nitrogen_ratio[1] * sqrt(
-        nitrogen_parameters.carbon_nitrogen_modifier /
-        environment.litter_metabolic_fraction,
-    )
-    target_k = nitrogen_parameters.microbial_carbon_nitrogen_ratio[2] * sqrt(
-        nitrogen_parameters.carbon_nitrogen_modifier /
-        environment.litter_metabolic_fraction,
-    )
+    target_r =
+        nitrogen_parameters.microbial_carbon_nitrogen_ratio[1] * sqrt(
+            nitrogen_parameters.carbon_nitrogen_modifier /
+            environment.litter_metabolic_fraction,
+        )
+    target_k =
+        nitrogen_parameters.microbial_carbon_nitrogen_ratio[2] * sqrt(
+            nitrogen_parameters.carbon_nitrogen_modifier /
+            environment.litter_metabolic_fraction,
+        )
     uptake_ratio_r = uptake_r_c / (uptake_r_n + small)
     uptake_ratio_k = uptake_k_c / (uptake_k_n + small)
     overflow_r = uptake_r_c - uptake_r_n * min(target_r, uptake_ratio_r)
@@ -592,52 +591,40 @@ ecosystem prognostic pool.
     hourly = inv(oftype(lit_m, 24))
     protection = carbon_parameters.input_protection
     next_carbon = StaticArrays.SVector(
-        lit_m +
-        daily_carbon_inputs[1] * hourly * (one(lit_m) - protection[1]) -
-        litter_r_m -
-        litter_k_m,
-        lit_s +
-        daily_carbon_inputs[2] * hourly * (one(lit_s) - protection[2]) -
-        litter_r_s -
-        litter_k_s,
+        lit_m + daily_carbon_inputs[1] * hourly * (one(lit_m) - protection[1]) -
+        litter_r_m - litter_k_m,
+        lit_s + daily_carbon_inputs[2] * hourly * (one(lit_s) - protection[2]) -
+        litter_r_s - litter_k_s,
         mic_r + uptake_r_c - r_loss - overflow_r,
         mic_k + uptake_k_c - k_loss - overflow_k,
         som_a + r_to_a + k_to_a + desorption + oxidation - soil_r - soil_k,
         som_c +
         daily_carbon_inputs[2] * hourly * protection[2] +
         r_to_c +
-        k_to_c -
-        oxidation,
+        k_to_c - oxidation,
         som_p +
         daily_carbon_inputs[1] * hourly * protection[1] +
         r_to_p +
-        k_to_p -
-        desorption,
+        k_to_p - desorption,
     )
     next_nitrogen = StaticArrays.SVector(
         lit_m_n +
         daily_nitrogen_inputs[1] * hourly * (one(lit_m_n) - protection[1]) -
-        litter_r_m_n -
-        litter_k_m_n,
+        litter_r_m_n - litter_k_m_n,
         lit_s_n +
         daily_nitrogen_inputs[2] * hourly * (one(lit_s_n) - protection[2]) -
-        litter_r_s_n -
-        litter_k_s_n,
+        litter_r_s_n - litter_k_s_n,
         mic_r_n + uptake_r_n - r_loss_n - spill_r,
         mic_k_n + uptake_k_n - k_loss_n - spill_k,
-        som_a_n + r_to_a_n + k_to_a_n + desorption_n + oxidation_n -
-        soil_r_n -
-        soil_k_n,
+        som_a_n + r_to_a_n + k_to_a_n + desorption_n + oxidation_n - soil_r_n - soil_k_n,
         som_c_n +
         daily_nitrogen_inputs[2] * hourly * protection[2] +
         r_to_c_n +
-        k_to_c_n -
-        oxidation_n,
+        k_to_c_n - oxidation_n,
         som_p_n +
         daily_nitrogen_inputs[1] * hourly * protection[1] +
         r_to_p_n +
-        k_to_p_n -
-        desorption_n,
+        k_to_p_n - desorption_n,
     )
     next_mineral_nitrogen =
         mineral_nitrogen +
@@ -645,21 +632,22 @@ ecosystem prognostic pool.
         (one(nue[2]) - nue[2]) * litter_r_s_n +
         (one(nue[3]) - nue[3]) * (litter_k_m_n + soil_k_n) +
         (one(nue[4]) - nue[4]) * litter_k_s_n +
-        spill_r + spill_k - din_r - din_k
+        spill_r +
+        spill_k - din_r - din_k
     respiration =
         (one(mge[1]) - mge[1]) * (litter_r_m + soil_r) +
         (one(mge[2]) - mge[2]) * litter_r_s +
         (one(mge[3]) - mge[3]) * (litter_k_m + soil_k) +
         (one(mge[4]) - mge[4]) * litter_k_s +
-        overflow_r + overflow_k
+        overflow_r +
+        overflow_k
     litter_mineralization =
         (one(nue[1]) - nue[1]) * litter_r_m_n +
         (one(nue[2]) - nue[2]) * litter_r_s_n +
         (one(nue[3]) - nue[3]) * litter_k_m_n +
         (one(nue[4]) - nue[4]) * litter_k_s_n
     soil_mineralization =
-        (one(nue[1]) - nue[1]) * soil_r_n +
-        (one(nue[3]) - nue[3]) * soil_k_n
+        (one(nue[1]) - nue[1]) * soil_r_n + (one(nue[3]) - nue[3]) * soil_k_n
     immobilization = -(din_r + din_k - spill_r - spill_k)
     return (;
         carbon = next_carbon,
@@ -752,13 +740,15 @@ heterotrophic respiration in the same concentration units as `state`.
 @inline function daily_carbon_map(parameters, state, daily_inputs, environment)
     next_state = StaticArrays.SVector{7}(state)
     respiration = zero(eltype(next_state))
+    processes = zero(StaticArrays.SVector{6, eltype(next_state)})
     for _ in 1:24
         step =
             hourly_carbon_map(parameters, next_state, daily_inputs, environment)
         next_state = step.state
         respiration += step.respiration
+        processes += step.processes
     end
-    return (state = next_state, respiration = respiration)
+    return (; state = next_state, respiration, processes)
 end
 
 @inline function combined_carbon_fluxes(
@@ -840,7 +830,8 @@ end
     respiration =
         (mapped.respiration * inverse_factor + cwd_respiration) /
         seconds_per_day
-    return StaticArrays.SVector{10}(
+    processes = mapped.processes .* (inverse_factor / seconds_per_day)
+    return StaticArrays.SVector{17}(
         tendencies[1],
         tendencies[2],
         tendencies[3],
@@ -851,6 +842,13 @@ end
         tendencies[8],
         respiration,
         environment.moisture,
+        processes[1],
+        processes[2],
+        processes[3],
+        processes[4],
+        processes[5],
+        processes[6],
+        cwd_to_structural / seconds_per_day,
     )
 end
 
@@ -892,8 +890,8 @@ end
 )
     carbon_parameters = parameters.carbon
     seconds_per_day = oftype(c_litter_cwd, 86400)
-    concentration_factor = oftype(c_litter_cwd, 100) /
-                           carbon_parameters.depth_cm
+    concentration_factor =
+        oftype(c_litter_cwd, 100) / carbon_parameters.depth_cm
     inverse_factor = inv(concentration_factor)
     temperature = CASA.temperature_factor(
         parameters.cwd_q10,
@@ -954,7 +952,8 @@ end
         ) * concentration_factor,
     )
     leaching =
-        nitrogen_parameters.leach_rate * seconds_per_day *
+        nitrogen_parameters.leach_rate *
+        seconds_per_day *
         max(zero(n_mineral), n_mineral)
     mineral_after_leaching = n_mineral - leaching
     working_mineral_nitrogen =
@@ -980,16 +979,12 @@ end
         (mapped.carbon[2] * inverse_factor - c_litter_structural) /
         seconds_per_day,
         (next_cwd - c_litter_cwd) / seconds_per_day,
-        (mapped.carbon[3] * inverse_factor - c_microbe_r) /
-        seconds_per_day,
-        (mapped.carbon[4] * inverse_factor - c_microbe_k) /
-        seconds_per_day,
+        (mapped.carbon[3] * inverse_factor - c_microbe_r) / seconds_per_day,
+        (mapped.carbon[4] * inverse_factor - c_microbe_k) / seconds_per_day,
         (mapped.carbon[5] * inverse_factor - c_soil_available) /
         seconds_per_day,
-        (mapped.carbon[6] * inverse_factor - c_soil_chemical) /
-        seconds_per_day,
-        (mapped.carbon[7] * inverse_factor - c_soil_physical) /
-        seconds_per_day,
+        (mapped.carbon[6] * inverse_factor - c_soil_chemical) / seconds_per_day,
+        (mapped.carbon[7] * inverse_factor - c_soil_physical) / seconds_per_day,
     )
     respiration =
         (mapped.respiration * inverse_factor + cwd_respiration) /
@@ -1019,21 +1014,17 @@ end
     next_mineral_nitrogen =
         mineral_after_leaching +
         working_change +
-        (deposition + fixation - plant_uptake) * seconds_per_day -
-        gaseous_loss
+        (deposition + fixation - plant_uptake) * seconds_per_day - gaseous_loss
     next_cwd_nitrogen =
-        n_litter_cwd +
-        nitrogen_litter_cwd_input * seconds_per_day -
+        n_litter_cwd + nitrogen_litter_cwd_input * seconds_per_day -
         cwd_nitrogen_loss
     nitrogen_tendencies = StaticArrays.SVector(
         (mapped.nitrogen[1] * inverse_factor - n_litter_metabolic) /
         seconds_per_day,
         (mapped.nitrogen[2] * inverse_factor - n_litter_structural) /
         seconds_per_day,
-        (mapped.nitrogen[3] * inverse_factor - n_microbe_r) /
-        seconds_per_day,
-        (mapped.nitrogen[4] * inverse_factor - n_microbe_k) /
-        seconds_per_day,
+        (mapped.nitrogen[3] * inverse_factor - n_microbe_r) / seconds_per_day,
+        (mapped.nitrogen[4] * inverse_factor - n_microbe_k) / seconds_per_day,
         (mapped.nitrogen[5] * inverse_factor - n_soil_available) /
         seconds_per_day,
         (mapped.nitrogen[6] * inverse_factor - n_soil_chemical) /
@@ -1056,12 +1047,10 @@ end
     )
 end
 
-@inline carbon_flux_part(fluxes) = StaticArrays.SVector{10}(
-    ntuple(index -> fluxes[index], Val(10)),
-)
-@inline nitrogen_flux_part(fluxes) = StaticArrays.SVector{14}(
-    ntuple(index -> fluxes[index + 10], Val(14)),
-)
+@inline carbon_flux_part(fluxes) =
+    StaticArrays.SVector{10}(ntuple(index -> fluxes[index], Val(10)))
+@inline nitrogen_flux_part(fluxes) =
+    StaticArrays.SVector{14}(ntuple(index -> fluxes[index + 10], Val(14)))
 
 function ClimaLand.make_update_aux(
     model::MIMICSSoilModel{FT, CarbonOnly},
@@ -1213,8 +1202,7 @@ function update_carbon_nitrogen_fluxes!(
     @. p.mimics_soil.litter_metabolic_input = litter_metabolic
     @. p.mimics_soil.litter_structural_input = litter_structural
     @. p.mimics_soil.litter_cwd_input = litter_cwd
-    @. p.mimics_soil.nitrogen_litter_metabolic_input =
-        nitrogen_litter_metabolic
+    @. p.mimics_soil.nitrogen_litter_metabolic_input = nitrogen_litter_metabolic
     @. p.mimics_soil.nitrogen_litter_structural_input =
         nitrogen_litter_structural
     @. p.mimics_soil.nitrogen_litter_cwd_input = nitrogen_litter_cwd

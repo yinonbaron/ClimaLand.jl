@@ -8,6 +8,8 @@ include("native_workflow.jl")
 include("native_workflow_tests.jl")
 include("native_casa_c_reconstruction.jl")
 include("native_casa_c_reconstruction_tests.jl")
+include("native_mimics_c_reconstruction.jl")
+include("native_mimics_c_reconstruction_tests.jl")
 
 TestbedReferenceHarness.self_test()
 TestbedCandidateReconstruction.self_test()

@@ -357,6 +357,7 @@ function run_workflow(
     output_dir;
     dt = 86400.0,
     update_forcing! = (_, _, _) -> nothing,
+    before_step! = (_, _, _, _, _) -> nothing,
     after_step! = (_, _, _, _, _) -> nothing,
     diagnostics = (),
     provenance,
@@ -396,6 +397,13 @@ function run_workflow(
             for step in 1:step_count(stage)
                 index = forcing_index(stage, step)
                 update_forcing!(stage, index, integrator.t)
+                before_step!(
+                    stage,
+                    step,
+                    integrator.u,
+                    integrator.p,
+                    integrator.t,
+                )
                 CTS.step!(integrator)
                 after_step!(
                     stage,

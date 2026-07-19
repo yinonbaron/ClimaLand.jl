@@ -428,6 +428,13 @@ julia --startup-file=no --project=.buildkite \
   test/testbed_validation/casa_cn_reconstruction.jl search \
   <biogeochem-testbed-source-root> <data-root> <run-root>
 
+# Run the native three-stage, 4,263-cell MIMICS-C reconstruction and compare
+# its checkpoints and historical output with fresh Fortran and archive data.
+julia --startup-file=no --project=test \
+  test/testbed_validation/native_mimics_c_reconstruction.jl \
+  <biogeochem-testbed-source-root> <forcing-root> \
+  <mimics-c-reference-root> <run-root>
+
 # Validate the ordered MIMICS-CN map, working DIN, overflow, and N fluxes.
 julia --startup-file=no --project=test \
   test/testbed_validation/grid_transition_parity.jl mimics-cn \
