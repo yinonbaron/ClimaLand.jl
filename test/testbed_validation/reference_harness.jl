@@ -206,6 +206,14 @@ function multiply_decimal_by_ten(token)
     return leading * sign * value * trailing
 end
 
+"""
+    restore_casa_passive_pools(source, destination, passive_fields)
+
+Scale the named passive-pool fields by ten without changing other restart text.
+
+Called from [`restore_casa_passive_carbon`](@ref) and
+[`restore_casa_passive_carbon_nitrogen`](@ref).
+"""
 function restore_casa_passive_pools(source, destination, passive_fields)
     lines = readlines(source; keep = true)
     isempty(lines) && error("CASA restart file is empty: $source")

@@ -9,6 +9,10 @@ import Test
 
 import NCDatasets
 
+# ============================================================================
+# Evidence Matrix and Shared Harness
+# ============================================================================
+
 const MATRIX_PATH = joinpath(@__DIR__, "casa_cn_reconstruction.toml")
 const CANDIDATE_SPEC_PATH = joinpath(@__DIR__, "candidate_reconstruction.toml")
 const STAGE_SPECS = (
@@ -34,6 +38,11 @@ sha256sum(path) = casa().sha256sum(path)
 file_record(path) = casa().file_record(path)
 netcdf_name(year; daily = false) = casa().netcdf_name(year; daily)
 
+"""
+    load_matrix(path = MATRIX_PATH)
+
+Load and validate the bounded CASA-CN reconstruction evidence matrix.
+"""
 function load_matrix(path = MATRIX_PATH)
     matrix = TOML.parsefile(path)
     get(matrix, "schema_version", 0) == 1 ||
@@ -83,6 +92,11 @@ function case_spec(matrix, id)
     return only(matching)
 end
 
+"""
+    candidate_paths(spec_path = CANDIDATE_SPEC_PATH)
+
+Select the three derived inputs required by [`write_full_workflow`](@ref).
+"""
 function candidate_paths(spec_path = CANDIDATE_SPEC_PATH)
     selected = Dict{String, String}()
     for candidate in TOML.parsefile(spec_path)["candidate"]
@@ -94,6 +108,15 @@ function candidate_paths(spec_path = CANDIDATE_SPEC_PATH)
     return selected
 end
 
+# ============================================================================
+# Workflow Construction and Execution
+# ============================================================================
+
+"""
+    write_staged_control(source, destination, overrides)
+
+Write and audit one stage control file for [`write_full_workflow`](@ref).
+"""
 function write_staged_control(source, destination, overrides)
     lines = readlines(source; keep = true)
     diffs = Dict{String, Any}[]
@@ -128,6 +151,11 @@ function write_staged_control(source, destination, overrides)
     )
 end
 
+"""
+    common_inputs(source_root, data_root, years, casa_parameters, mimics_parameters)
+
+Build the shared staged-input records used by [`write_full_workflow`](@ref).
+"""
 function common_inputs(
     source_root,
     data_root,
@@ -179,6 +207,11 @@ end
 
 annual_fragment(year) = joinpath("annual_comparison", "$year.toml")
 
+"""
+    historical_stage_outputs(matrix = load_matrix())
+
+Declare the bounded annual and daily outputs retained by [`stage_definition`](@ref).
+"""
 function historical_stage_outputs(matrix = load_matrix())
     years = first(matrix["history_years"]):last(matrix["history_years"])
     retained = retained_daily_years(matrix)
@@ -189,6 +222,13 @@ function historical_stage_outputs(matrix = load_matrix())
     )
 end
 
+"""
+    stage_definition(name, control_path, inputs)
+
+Build a stage contract, including streaming retention for the historical stage.
+
+Called from [`write_full_workflow`](@ref).
+"""
 function stage_definition(name, control_path, inputs)
     name == "historical" ||
         return casa().stage_definition(name, control_path, inputs)
@@ -206,6 +246,11 @@ function stage_definition(name, control_path, inputs)
     )
 end
 
+"""
+    stage_control_source(matrix, source_root, candidate_root, candidate_path_map, stage)
+
+Select the evidence-backed control source for [`write_full_workflow`](@ref).
+"""
 function stage_control_source(
     matrix,
     source_root,
@@ -219,6 +264,13 @@ function stage_control_source(
     return joinpath(source_root, matrix["stages"][stage]["control"])
 end
 
+"""
+    write_full_workflow(source_root, data_root, candidate_root, run_root, case_id)
+
+Materialize the four-stage CASA-CN workflow and its configuration evidence.
+
+Called from [`run_case`](@ref).
+"""
 function write_full_workflow(
     source_root,
     data_root,
@@ -381,6 +433,13 @@ function write_full_workflow(
     return workflow_path
 end
 
+"""
+    run_case(source_root, data_root, run_root, case_id)
+
+Build, execute, retain, and report one evidence-matrix reconstruction case.
+
+Called from [`run_search`](@ref) and the command-line dispatcher.
+"""
 function run_case(source_root, data_root, run_root, case_id)
     source_root = abspath(source_root)
     data_root = abspath(data_root)
@@ -426,6 +485,17 @@ function run_case(source_root, data_root, run_root, case_id)
     return results
 end
 
+# ============================================================================
+# Restart and Convergence Diagnostics
+# ============================================================================
+
+"""
+    restart_diagnostic(path)
+
+Summarize area-weighted carbon and nitrogen pools at a restart boundary.
+
+Called from [`boundary_report`](@ref).
+"""
 function restart_diagnostic(path)
     lines = readlines(path)
     isempty(lines) && error("Empty CASA-CN restart: $path")
@@ -474,6 +544,13 @@ function restart_diagnostic(path)
     )
 end
 
+"""
+    passive_restoration_report(source, destination)
+
+Verify exact passive C and N scaling and byte-preservation of all other fields.
+
+Called from [`boundary_report`](@ref).
+"""
 function passive_restoration_report(source, destination)
     source_lines = readlines(source)
     destination_lines = readlines(destination)
@@ -541,6 +618,11 @@ function passive_restoration_report(source, destination)
     )
 end
 
+"""
+    pool_change(previous, final, pool_names)
+
+Measure global and pointwise pool changes for [`spin_convergence`](@ref).
+"""
 function pool_change(previous, final, pool_names)
     before_total = sum(previous[name][:, :, end] for name in pool_names)
     after_total = sum(final[name][:, :, end] for name in pool_names)
@@ -571,6 +653,13 @@ function pool_change(previous, final, pool_names)
     )
 end
 
+"""
+    spin_convergence(previous_path, final_path)
+
+Evaluate documented CASA-CN convergence checks between cycle endpoints.
+
+Called from [`boundary_report`](@ref).
+"""
 function spin_convergence(previous_path, final_path)
     NCDatasets.NCDataset(previous_path) do previous
         NCDatasets.NCDataset(final_path) do final
@@ -607,6 +696,13 @@ function final_spin_checkpoints()
     return final_year - cycle_years, final_year
 end
 
+"""
+    boundary_report(case_root)
+
+Record restart hashes, elemental totals, transform checks, and spin convergence.
+
+Called from [`write_case_report`](@ref).
+"""
 function boundary_report(case_root)
     stages_root = joinpath(case_root, "stages")
     boundaries = Dict{String, Any}()
@@ -641,6 +737,13 @@ function boundary_report(case_root)
     )
 end
 
+"""
+    exudation_audit(path)
+
+Verify that the historical CASA parameter table disables root exudation.
+
+Called from [`write_case_report`](@ref).
+"""
 function exudation_audit(path)
     rows = [split(line, ','; keepempty = true) for line in readlines(path)]
     header_row = findfirst(row -> "fracRootExudate" in strip.(row), rows)
@@ -666,6 +769,18 @@ function exudation_audit(path)
     )
 end
 
+# ============================================================================
+# Archive References and Scientific Comparisons
+# ============================================================================
+
+"""
+    archive_record(data_root)
+
+Verify and describe the immutable CASA-CN archive artifact.
+
+Called from [`run_case`](@ref), [`extract_archive_reference`](@ref), and
+[`write_case_report`](@ref).
+"""
 function archive_record(data_root)
     artifacts = filter(
         artifact -> artifact["id"] == "casa_cn_output",
@@ -679,6 +794,18 @@ function archive_record(data_root)
     )
 end
 
+"""
+    extract_archive_reference(
+        data_root,
+        case_root,
+        filename;
+        archive = archive_record(data_root),
+    )
+
+Extract and provenance-track one comparison member from the CASA-CN archive.
+
+Called from [`run_case`](@ref).
+"""
 function extract_archive_reference(
     data_root,
     case_root,
@@ -746,6 +873,13 @@ function comparison_groups(records, matrix = load_matrix())
     return output
 end
 
+"""
+    annual_year_record(reference_path, candidate_path, year)
+
+Compare one historical year exactly against the annual archive reference.
+
+Called from [`stream_historical_outputs!`](@ref).
+"""
 function annual_year_record(reference_path, candidate_path, year)
     matrix = load_matrix()
     first_year = first(matrix["history_years"])
@@ -845,6 +979,13 @@ function annual_year_record(reference_path, candidate_path, year)
     )
 end
 
+"""
+    combine_annual_records(year_records)
+
+Combine retained per-year fragments into the full annual comparison report.
+
+Called from [`annual_comparison`](@ref).
+"""
 function combine_annual_records(year_records)
     records = Dict{String, Any}()
     metadata_mismatches = String[]
@@ -886,6 +1027,11 @@ function combine_annual_records(year_records)
     )
 end
 
+"""
+    daily_file_complete(path)
+
+Check the 365-day NetCDF completion criterion used by [`wait_for_completed_year`](@ref).
+"""
 function daily_file_complete(path)
     isfile(path) || return false
     try
@@ -897,6 +1043,19 @@ function daily_file_complete(path)
     end
 end
 
+"""
+    wait_for_completed_year(
+        daily_path,
+        next_path;
+        final_year,
+        finished,
+        poll_seconds = 1,
+    )
+
+Wait until a daily file is complete and safe for streaming retention.
+
+Called from [`stream_historical_outputs!`](@ref).
+"""
 function wait_for_completed_year(
     daily_path,
     next_path;
@@ -917,6 +1076,13 @@ function wait_for_completed_year(
     return daily_file_complete(daily_path)
 end
 
+"""
+    stream_historical_outputs!(stage_dir, reference_path, finished, matrix = load_matrix())
+
+Compare annual output and retain only the two requested daily windows in place.
+
+Called from the hook returned by [`historical_retention_hook`](@ref).
+"""
 function stream_historical_outputs!(
     stage_dir,
     reference_path,
@@ -953,6 +1119,13 @@ function stream_historical_outputs!(
     return nothing
 end
 
+"""
+    historical_retention_hook(reference_path, matrix = load_matrix())
+
+Create the historical-stage hook that streams comparisons and bounded retention.
+
+Called from [`run_case`](@ref).
+"""
 function historical_retention_hook(reference_path, matrix = load_matrix())
     state = Dict{String, Any}()
     return function (stage, name, stage_dir, event)
@@ -979,6 +1152,13 @@ function historical_retention_hook(reference_path, matrix = load_matrix())
     end
 end
 
+"""
+    daily_comparison(data_root, case_root; archive = archive_record(data_root))
+
+Compare the retained daily windows exactly and group failures scientifically.
+
+Called from [`write_case_report`](@ref).
+"""
 function daily_comparison(
     data_root,
     case_root;
@@ -1021,6 +1201,13 @@ function daily_comparison(
     )
 end
 
+"""
+    annual_comparison(data_root, case_root; archive = archive_record(data_root))
+
+Load and combine the streamed annual comparison fragments.
+
+Called from [`write_case_report`](@ref).
+"""
 function annual_comparison(
     data_root,
     case_root;
@@ -1050,6 +1237,17 @@ function annual_comparison(
     )
 end
 
+# ============================================================================
+# Reconstruction and Search Reports
+# ============================================================================
+
+"""
+    write_case_report(data_root, case_root)
+
+Write the complete provenance, convergence, and exact-comparison case report.
+
+Called from [`run_case`](@ref) and the command-line dispatcher.
+"""
 function write_case_report(data_root, case_root)
     boundaries = boundary_report(case_root)
     archive = archive_record(data_root)
@@ -1149,6 +1347,13 @@ function write_case_report(data_root, case_root)
     return path
 end
 
+"""
+    mismatch_count(report)
+
+Count exact comparison and invariant failures when ranking search cases.
+
+Called from [`run_search`](@ref).
+"""
 function mismatch_count(report)
     count = casa().comparison_mismatch_count(report["annual_comparison"])
     for year in values(report["daily_comparison"]["year"])
@@ -1166,6 +1371,13 @@ function prepare_search_report(run_root)
     return path
 end
 
+"""
+    run_search(source_root, data_root, run_root)
+
+Run the bounded evidence matrix and publish its best case or exact blocker.
+
+Called from the command-line dispatcher.
+"""
 function run_search(source_root, data_root, run_root)
     search_report = prepare_search_report(run_root)
     matrix = load_matrix()
@@ -1279,6 +1491,15 @@ function run_search(source_root, data_root, run_root)
     return search_report
 end
 
+# ============================================================================
+# Self-Test and Command-Line Interface
+# ============================================================================
+
+"""
+    self_test()
+
+Exercise the CASA-CN matrix, transforms, retention, and reporting helpers.
+"""
 function self_test()
     matrix = load_matrix()
     Test.@testset "CASA-CN reconstruction" begin
