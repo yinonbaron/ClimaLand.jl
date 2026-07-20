@@ -2,6 +2,10 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add the source-pinned, resumable 4,263-cell MIMICS-CN
+  prespin, two-stage long-spin, and 1901--2014 archive reconstruction workflow,
+  with paired CASA/MIMICS restart hashes, C/N convergence records, and exact
+  annual and retained-daily comparison groups.
 - ![][badge-🐛bugfix] Correct CASA-CN plant mineral-N supply limiting and
   selected-workflow P:N and structural-litter C:N parameters, and regenerate
   the 37-cell CASA references with the corrected Julia--Fortran tolerances.

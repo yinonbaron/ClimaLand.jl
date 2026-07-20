@@ -1,0 +1,116 @@
+schema_version = 1
+issue = 25
+controls_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+prespin_loops = 100
+spin_loops = 499
+spin_years = [1901, 1920]
+history_years = [1901, 2014]
+comparison_atol = 0.0
+comparison_rtol = 0.0
+
+[inputs]
+driver_directory = "INPUT_GSWP3_CLM5dev110_hist"
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+perturbation = "GRID_CN/co2delta_control.txt"
+prespin_control_candidate = "mimics_cn_prespin_fi30"
+prespin_casa_candidate = "casa_boreal_nfix"
+prespin_mimics_candidate = "mimics_ko6_fi30"
+normal_casa_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+normal_casa_parameters_sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+normal_mimics_parameters = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+normal_mimics_parameters_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+
+[stages.prespin]
+control_candidate = "mimics_cn_prespin_fi30"
+loops = 100
+years = [1901, 1901]
+
+[stages.spin]
+control = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_spin_1901-1920_x500_STEP_2of4.lst"
+loops = 499
+years = [1901, 1920]
+
+[stages.spin_continuation]
+control = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+loops = 499
+years = [1901, 1920]
+
+[stages.historical]
+control = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+loops = 1
+years = [1901, 2014]
+
+[postprocessing]
+spin_checkpoint_interval = 9960
+annual_reduction = "mean of non-fill daily values"
+daily_windows = [[1901, 1905], [2010, 2014]]
+nco_version_recorded_by_archive = "4.7.5"
+
+[[postprocessing.model]]
+id = "casa"
+prefix = "casaclm"
+annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
+
+[[postprocessing.model]]
+id = "mimics"
+prefix = "mimics"
+annual_reference = "ann_mimics_pool_flux_1901_2014.nc"
+
+[scientific_comparison.casa]
+plant_states = ["cleaf", "nleaf", "cwood", "nwood", "cfroot", "nfroot"]
+organic_pools = ["clitmetb", "nlitmetb", "clitstr", "nlitstr", "clitcwd", "nlitcwd", "csoilmic", "nsoilmic", "csoilslow", "nsoilslow", "csoilpass", "nsoilpass"]
+mineral_nitrogen = ["nMineral", "nMinDep", "nMinFix", "nMinUptake", "nMinLeach", "nMinLoss", "nLitMineralization", "nSoilMineralization", "nSoilImmob", "nNetMineralization"]
+major_fluxes = ["cgpp", "cnpp", "cresp", "cLitInptMet", "cLitInptStruc", "cpassInpt", "nLitInptMet", "nLitInptStruc"]
+archived_drivers = ["tairC", "tsoilC", "thetaLiq", "fT", "fW"]
+
+[scientific_comparison.mimics]
+organic_carbon = ["cLITm", "cLITs", "cMICr", "cMICk", "cSOMa", "cSOMc", "cSOMp"]
+organic_nitrogen = ["nLITm", "nLITs", "nMICr", "nMICk", "nSOMa", "nSOMc", "nSOMp"]
+working_din = ["DIN"]
+process_fluxes = ["cHresp", "cSOMpIn", "cLitInput_metb", "cLitInput_struc", "cOverflow_r", "cOverflow_k", "nLitInput_metb", "nLitInput_struc"]
+archived_drivers = ["thetaLiq", "thetaFrzn", "fW"]
+
+[scientific_comparison]
+exudation_rule = "fracRootExudate is zero for all 18 PFTs in the historical CASA parameter table"
+mineralization_scope = "The archive exposes working DIN and net ecosystem mineral-N diagnostics, but no separate MIMICS gross mineralization variable."
+
+[compiler]
+source_makefile_version = "GNU Fortran 8.1.0"
+source_makefile_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall"
+archive_compiler_status = "not recorded in archive metadata"
+
+[[compiler.blocked_candidate]]
+id = "gnu_fortran_8_1"
+version = "GNU Fortran 8.1.0"
+status = "blocked_unavailable_toolchain"
+reason = "The documented source-Makefile compiler is unavailable on the current macOS ARM host; GNU Fortran 16.1.0 is installed."
+
+[evidence]
+controls = "Committed MIMICS-CN CLM5/GSWP3 controls, with the hash-pinned high-confidence boreal-N-fix and KO6/FI30 prespin candidates"
+parameters = "The archive metadata names the exudate0 CASA and KO4/FI30 MIMICS tables; the reader-compatible KO4 table adds disabled desorption-Q10 fields only"
+source = "Archive daily output was created 2022-05-11; 82c57f8 is the latest public source revision before creation"
+spin = "The committed README and controls document prespin, two 499-cycle long spins, restart continuation, and history"
+postprocessing = "Archive history records NCO 4.7.5 concatenation and retained 1901-1905/2010-2014 daily windows"
+
+[[case]]
+id = "archive_predecessor_ko6_fi30"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+prespin_control_candidate = "mimics_cn_prespin_fi30"
+prespin_casa_candidate = "casa_boreal_nfix"
+prespin_mimics_candidate = "mimics_ko6_fi30"
+reason = "Latest public source before archive creation with the high-confidence reconstructed prespin candidates"
+
+[excluded.prespin_fi10]
+candidate = "mimics_cn_prespin_fi10"
+reason = "The archive records FI30 and the FI10 prespin alternative has only medium-confidence README support."
+
+[excluded.prespin_fi05]
+candidate = "mimics_cn_prespin_fi05"
+reason = "The archive records FI30 and the FI05 prespin alternative belongs to a legacy KO6 table."
+
+[excluded.post_archive_source]
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+reason = "Postdates the 2022-05-11 archive creation timestamp."

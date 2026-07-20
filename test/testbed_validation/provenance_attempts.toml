@@ -358,3 +358,21 @@ matrix_sha256 = "418bf4dba099c226774f9e63f59733f3ed22c6b4c0f4aef85425908eb0112fb
 reconstruction_report_sha256 = "0e34c90df103e08bcb49a5720647dcf560f66f6fb415f9af8b3484c5ace03ed1"
 search_report_sha256 = "b10428ed8ecdc9edc3bb80f667908a5f24c8127459e0bbf3062b57b628fd2a0f"
 blocker = "the archive compiler/toolchain is unpublished and the source-Makefile GNU Fortran 8.1.0 candidate is unavailable locally; the post-archive x500b continuation, post-archive Q10 source, and carbon-nitrogen KO6 histories are not evidence-backed substitutes"
+
+[[attempt]]
+id = "mimics_cn_archive_reconstruction_preflight"
+target = "MIMICS-CN CLM5/GSWP3 1901-2014 archive"
+status = "blocked_full_grid_runtime"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+configuration = "4,263 points; carbon-nitrogen; 100-year prespin; two 499-cycle 1901-1920 KO4/FI30 spins; 1901-2014 history"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+archive_compiler = "not recorded in archive metadata; source Makefile records unavailable GNU Fortran 8.1.0"
+matrix_sha256 = "7530609070f8c890f236e1342ef94cd0e6415e70814e15b0120f1f5b57a7cf02"
+prespin_elapsed_seconds = 517.047700917
+prespin_casa_restart_sha256 = "656a341ce5ff16f3119458ce55226e457e36e744b3a82a88cbfff354e2325a55"
+prespin_mimics_restart_sha256 = "7f56eb039bd81d1cb0d5553b94ec9ef1eafada20d89046f4f450c49ed489ef22"
+serial_twenty_year_elapsed_seconds = 137.695
+projected_two_spin_hours = 38.2
+rejected_optimization = "-O3 was not faster; compiler automatic loop parallelization was slower; explicit eight-thread grid parallelism changed carbon-balance and respiration diagnostics despite an exact prognostic MIMICS restart"
+comparison = "runner pins zero absolute and relative tolerance for both CASA and MIMICS annual 1901-2014 histories and daily 1901-1905/2010-2014 windows"
+blocker = "the bounded production matrix has not completed because its two source-exact serial spins project to approximately 38 hours on the current host; no archive match or exhausted-matrix result is claimed"
