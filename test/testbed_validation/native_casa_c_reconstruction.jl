@@ -334,8 +334,19 @@ function reset_stoichiometry!(stoichiometry)
     return nothing
 end
 
+function restore_stoichiometry!(stoichiometry, initial_state)
+    leaf_carbon = vec(parent(initial_state.casa_plant.c_leaf))
+    for index in eachindex(leaf_carbon)
+        stoichiometry.nitrogen[index] =
+            max(0.0, leaf_carbon[index]) *
+            stoichiometry.nitrogen_per_carbon[index]
+    end
+    reset_stoichiometry!(stoichiometry)
+    return nothing
+end
+
 function update_stoichiometry!(stoichiometry, Y)
-    leaf_carbon = vec(Array(parent(Y.casa_plant.c_leaf)))
+    leaf_carbon = vec(parent(Y.casa_plant.c_leaf))
     for index in eachindex(leaf_carbon)
         nitrogen =
             max(0.0, leaf_carbon[index]) *
@@ -355,7 +366,7 @@ function apply_stoichiometry!(stoichiometry, model)
     return nothing
 end
 
-function soil_parameters(values, soil, pft)
+function soil_parameters(values, soil, pft; passive_rate_multiplier = 1)
     cues = values.cues
     transfers = SoilCASA.CarbonTransferParameters{Float64}(;
         lignin_leaf = values.lignin_leaf,
@@ -378,7 +389,11 @@ function soil_parameters(values, soil, pft)
         silt = soil.silt,
         freezing_temperature = 273.15,
         litter_base_rates = values.litter_rates,
-        soil_base_rates = values.soil_rates,
+        soil_base_rates = Base.setindex(
+            values.soil_rates,
+            passive_rate_multiplier * values.soil_rates[3],
+            3,
+        ),
         transfers,
         is_cropland = pft == 12,
         constant_moisture = values.constant_moisture,
@@ -391,7 +406,10 @@ function build_gridded_model(
     parameter_path,
     buffers;
     domain = gridded_domain(length(grid)),
+    passive_rate_multiplier = 1,
 )
+    passive_rate_multiplier > 0 ||
+        throw(ArgumentError("passive_rate_multiplier must be positive"))
     parameters = read_pft_parameters(parameter_path)
     plant_points = map(grid) do point
         values = parameters[point.pft]
@@ -431,7 +449,7 @@ function build_gridded_model(
     soil_points = map(grid) do point
         values = parameters[point.pft]
         soil = soils[point.cell_id]
-        soil_parameters(values, soil, point.pft)
+        soil_parameters(values, soil, point.pft; passive_rate_multiplier)
     end
     soil = SoilCASA.CASASoilModel{Float64}(;
         parameters = point_field(domain, soil_points),
@@ -1449,22 +1467,17 @@ function write_report(
     path;
     stage_results,
     historical_output,
-    before_passive,
-    after_passive,
-    passive_multiplier,
+    passive_restoration,
     stage_budgets,
+    nitrogen_stage_budgets,
+    workflow_budgets,
     boundary_comparison,
     historical_comparison,
+    initialization_comparison,
 )
     report = Dict(
         "schema_version" => 1,
-        "passive_restoration" => Dict(
-            "multiplier" => passive_multiplier,
-            "before" => before_passive,
-            "after" => after_passive,
-            "verified" =>
-                after_passive == passive_multiplier .* before_passive,
-        ),
+        "passive_restoration" => passive_restoration,
         "historical_output" => historical_output,
         "boundary_comparison" => boundary_comparison,
         "historical_comparison" => historical_comparison,
@@ -1475,10 +1488,91 @@ function write_report(
             ),
         ),
     )
+    isnothing(initialization_comparison) ||
+        (report["initialization_comparison"] = initialization_comparison)
+    if !isnothing(workflow_budgets)
+        carbon_workflow = workflow_budgets["carbon"]
+        report["carbon_budget"]["workflow"] = carbon_workflow
+        report["carbon_budget"]["all_close"] &=
+            get(carbon_workflow, "close", false)
+    end
+    if !isnothing(nitrogen_stage_budgets)
+        report["nitrogen_budget"] = Dict(
+            "stage" => nitrogen_stage_budgets,
+            "all_close" => all(
+                get(budget, "close", false) for
+                budget in values(nitrogen_stage_budgets)
+            ),
+        )
+        if !isnothing(workflow_budgets)
+            nitrogen_workflow = workflow_budgets["nitrogen"]
+            report["nitrogen_budget"]["workflow"] = nitrogen_workflow
+            report["nitrogen_budget"]["all_close"] &=
+                get(nitrogen_workflow, "close", false)
+        end
+    end
     open(path, "w") do io
         TOML.print(io, report; sorted = true)
     end
     return path
+end
+
+function state_snapshot(Y)
+    snapshot = Dict{String, Vector{Float64}}()
+    for component_name in propertynames(Y)
+        component = getproperty(Y, component_name)
+        for variable in propertynames(component)
+            snapshot[string(component_name, '.', variable)] =
+                vec(Array(parent(getproperty(component, variable))))
+        end
+    end
+    return snapshot
+end
+
+function restore_passive_carbon!(Y, multiplier)
+    before_state = state_snapshot(Y)
+    before = before_state["casa_soil.c_soil_passive"]
+    Y.casa_soil.c_soil_passive .*= multiplier
+    after = vec(Array(parent(Y.casa_soil.c_soil_passive)))
+    unaffected = sort!(collect(keys(before_state)))
+    deleteat!(unaffected, findfirst(==("casa_soil.c_soil_passive"), unaffected))
+    verified = after == multiplier .* before
+    return Dict(
+        "multiplier" => multiplier,
+        "before" => before,
+        "after" => after,
+        "verified" => verified,
+        "carbon" =>
+            Dict("before" => before, "after" => after, "verified" => verified),
+        "unaffected_fields" => unaffected,
+        "unaffected_verified" => all(unaffected) do name
+            component_name, variable = Symbol.(split(name, '.'))
+            before_state[name] == vec(
+                Array(
+                    parent(
+                        getproperty(getproperty(Y, component_name), variable),
+                    ),
+                ),
+            )
+        end,
+    )
+end
+
+function states_match(first_state, second_state)
+    propertynames(first_state) == propertynames(second_state) || return false
+    for component_name in propertynames(first_state)
+        first_component = getproperty(first_state, component_name)
+        second_component = getproperty(second_state, component_name)
+        propertynames(first_component) == propertynames(second_component) ||
+            return false
+        for variable in propertynames(first_component)
+            first_values = Array(parent(getproperty(first_component, variable)))
+            second_values =
+                Array(parent(getproperty(second_component, variable)))
+            first_values == second_values || return false
+        end
+    end
+    return true
 end
 
 """
@@ -1504,6 +1598,11 @@ function run_case(
     compare_boundary,
     compare_historical,
     carbon_budget,
+    initialization_comparison = nothing,
+    nitrogen_budget = nothing,
+    workflow_budget = nothing,
+    prepare_stage! = (_, _, _) -> nothing,
+    restore_passive! = restore_passive_carbon!,
     passive_multiplier = 10,
 )
     expected_names = (:prespin, :accelerated_spin, :normal_spin, :historical)
@@ -1518,14 +1617,16 @@ function run_case(
     stages = (stages...,)
     stage_results = NamedTuple[]
     stage_budgets = Dict{String, Any}()
+    nitrogen_stage_budgets =
+        isnothing(nitrogen_budget) ? nothing : Dict{String, Any}()
     boundary_comparison = Dict{String, Any}()
-    before_passive = Float64[]
-    after_passive = Float64[]
+    passive_restoration = Dict{String, Any}()
     current_state = initial_state
     historical_output = ""
 
     for stage in stages
         model = model_for_stage(stage)
+        prepare_stage!(stage, current_state, model)
         stage_root = joinpath(output_root, "stages", String(stage.name))
         start_carbon = sum(
             sum(Array(parent(getproperty(component, variable)))) for
@@ -1538,8 +1639,7 @@ function run_case(
             current_state,
             [stage],
             stage_root;
-            update_forcing! = (active_stage, index, time) ->
-                update_forcing!(active_stage, index, time),
+            update_forcing!,
             after_step!,
             diagnostics,
             provenance = provenance(stage),
@@ -1554,20 +1654,23 @@ function run_case(
             current_state,
             model,
         )
+        if !isnothing(nitrogen_budget)
+            nitrogen_stage_budgets[String(stage.name)] =
+                nitrogen_budget(stage, result, current_state, model)
+        end
         boundary_comparison[String(stage.name)] =
             compare_boundary(stage, result, model)
-        push!(
-            stage_results,
-            (; name = stage.name, checkpoint, output = result.output, model),
-        )
-        current_state = state_as_initial_state(result.state, model)
+        expected_checkpoint_state = state_as_initial_state(result.state, model)
+        checkpoint_state, _ = ClimaLand.read_checkpoint(checkpoint; model)
+        current_state = state_as_initial_state(checkpoint_state, model)
+        checkpoint_roundtrip_verified =
+            states_match(expected_checkpoint_state, current_state)
+        handoff_checkpoint = checkpoint
 
         if stage.name == :accelerated_spin
-            before_passive =
-                vec(Array(parent(result.state.casa_soil.c_soil_passive)))
-            result.state.casa_soil.c_soil_passive .*= passive_multiplier
-            after_passive =
-                vec(Array(parent(result.state.casa_soil.c_soil_passive)))
+            passive_restoration =
+                restore_passive!(result.state, passive_multiplier)
+            expected_restored = state_as_initial_state(result.state, model)
             restored = save_restored_checkpoint(
                 result.state,
                 result.time,
@@ -1576,9 +1679,24 @@ function run_case(
             )
             restored_state, _ = ClimaLand.read_checkpoint(restored; model)
             current_state = state_as_initial_state(restored_state, model)
+            handoff_checkpoint = restored
+            passive_restoration["checkpoint_roundtrip_verified"] =
+                states_match(expected_restored, current_state)
         elseif stage.name == :historical
             historical_output = result.output
         end
+        push!(
+            stage_results,
+            (;
+                name = stage.name,
+                checkpoint,
+                handoff_checkpoint,
+                checkpoint_roundtrip_verified,
+                manifest = result.manifest,
+                output = result.output,
+                model,
+            ),
+        )
     end
 
     historical_comparison =
@@ -1588,22 +1706,40 @@ function run_case(
         get(historical_comparison, "output", Dict{String, Any}()),
     )
     pop!(historical_comparison, "output", nothing)
+    workflow_budgets =
+        isnothing(workflow_budget) ? nothing :
+        workflow_budget(
+            stage_budgets,
+            nitrogen_stage_budgets,
+            passive_restoration,
+        )
     report = write_report(
         joinpath(output_root, "reconstruction_report.toml");
         stage_results,
         historical_output = historical_metadata,
-        before_passive,
-        after_passive,
-        passive_multiplier,
+        passive_restoration,
         stage_budgets,
+        nitrogen_stage_budgets,
+        workflow_budgets,
         boundary_comparison,
         historical_comparison,
+        initialization_comparison,
     )
     public_results = Tuple(
-        (; name = result.name, checkpoint = result.checkpoint) for
-        result in stage_results
+        (;
+            name = result.name,
+            checkpoint = result.checkpoint,
+            handoff_checkpoint = result.handoff_checkpoint,
+            checkpoint_roundtrip_verified = result.checkpoint_roundtrip_verified,
+            manifest = result.manifest,
+        ) for result in stage_results
     )
-    return (; stages = public_results, output = historical_output, report)
+    return (;
+        stages = public_results,
+        output = historical_output,
+        report,
+        initialization_comparison,
+    )
 end
 
 function synthetic_historical_comparison(historical_output)

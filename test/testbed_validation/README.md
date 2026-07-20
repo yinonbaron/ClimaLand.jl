@@ -684,6 +684,26 @@ recomputes selection statistics over all 114 years, independently audits
 selected source values before packing, and checks the packed fixture against
 every source year, coordinate, and mask.
 
+`selected_casa_workflow.jl` runs the carbon-only and carbon-nitrogen fixtures
+through the complete pinned prespin, accelerated-spin, passive-restoration,
+normal-spin, and 1901–2014 historical schedule. Every phase uses the public
+integrated CASA models, ClimaTimeSteppers Forward Euler, and native ClimaLand
+checkpoints. Each stage reloads its checkpoint before the next stage; the
+carbon-only leaf stoichiometry bookkeeping is deterministically rebuilt from
+the restored leaf-carbon state. The package regression uses the extended tier,
+compares the complete initialized state and every stage boundary with compact
+fresh-Fortran and native-Julia references in `complete_casa_workflow.toml`,
+checks early/middle/late historical dates, and reports both stage and
+complete-workflow C/N budgets. Regenerate one reference configuration only
+from completed native and fresh-Fortran runs:
+
+```sh
+julia --project=test \
+  test/testbed_validation/generate_selected_casa_workflow_reference.jl \
+  carbon_only extended /path/to/native-output /path/to/fresh-fortran \
+  test/testbed_validation/fixtures/selected_cells/complete_casa_workflow.toml
+```
+
 `Reproduces the Fortran` means the same pinned equations, ordering, daily map,
 parameters, drivers, initialization, restarts, and postprocessing; bitwise
 identity across languages is not required. An archive/source discrepancy must
