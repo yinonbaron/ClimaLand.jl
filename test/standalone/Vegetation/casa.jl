@@ -1,5 +1,7 @@
 using Test
 using NCDatasets
+import ForwardDiff
+
 import ClimaLand
 import ClimaComms
 import ClimaCore
@@ -51,6 +53,210 @@ function plant_parameters(
         root_exudate_fraction,
         nonwoody,
     )
+end
+
+@testset "CASA plant mineral-N supply" begin
+    for FT in (Float32, Float64)
+        nitrogen_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+            nitrogen_ratio_minimum = ntuple(_ -> FT(0.01), 3),
+            nitrogen_ratio_maximum = ntuple(_ -> FT(0.02), 3),
+            nitrogen_fraction_to_litter = ntuple(_ -> one(FT), 3),
+            lignin_fraction = ntuple(_ -> zero(FT), 3),
+            structural_litter_nitrogen_ratio = FT(0.01),
+            limitation_minimum = FT(0.5e-3),
+            limitation_maximum = FT(2e-3),
+            mineral_half_saturation = FT(2e-3),
+        )
+        arguments = (
+            nitrogen_parameters,
+            (FT(1), FT(1), FT(1)),
+            (zero(FT), zero(FT), zero(FT)),
+            FT(1e-6),
+            (FT(0.4), FT(0.15), FT(0.45)),
+            (zero(FT), zero(FT), zero(FT)),
+            FT(0.000432),
+            FT(2e-6),
+        )
+        supply = CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
+        available_fraction =
+            arguments[7] / (FT(86400) * arguments[4] * FT(0.01) + FT(1e-13))
+        expected_labile_fraction =
+            (one(FT) - available_fraction) * arguments[4] /
+            (arguments[8] + FT(1e-10 / 1000 / 86400))
+        expected_npp_scalar =
+            (arguments[4] - expected_labile_fraction * arguments[8]) /
+            arguments[4]
+        @test supply.npp_scalar ≈ expected_npp_scalar
+        @test supply.labile_fraction ≈ expected_labile_fraction
+
+        ample_arguments = Base.setindex(arguments, FT(1), 7)
+        ample = CASA.nitrogen_supply(CASA.LegacyDaily(), ample_arguments...)
+        @test ample == (npp_scalar = one(FT), labile_fraction = zero(FT))
+
+        continuous =
+            @inferred CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
+        CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
+        @test continuous == (npp_scalar = one(FT), labile_fraction = zero(FT))
+        @test @allocated(
+            CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
+        ) == 0
+
+        inferred =
+            @inferred CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
+        CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
+        @test inferred == supply
+        @test @allocated(
+            CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
+        ) == 0
+
+        zero_flux_arguments =
+            Base.setindex(Base.setindex(arguments, zero(FT), 4), zero(FT), 8)
+        zero_flux =
+            CASA.nitrogen_supply(CASA.LegacyDaily(), zero_flux_arguments...)
+        @test zero_flux == (npp_scalar = one(FT), labile_fraction = zero(FT))
+        @test all(isfinite, zero_flux)
+
+        zero_demand_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+            nitrogen_ratio_minimum = ntuple(_ -> zero(FT), 3),
+            nitrogen_ratio_maximum = ntuple(_ -> FT(0.02), 3),
+            nitrogen_fraction_to_litter = ntuple(_ -> one(FT), 3),
+            lignin_fraction = ntuple(_ -> zero(FT), 3),
+            structural_litter_nitrogen_ratio = FT(0.01),
+            limitation_minimum = FT(0.5e-3),
+            limitation_maximum = FT(2e-3),
+            mineral_half_saturation = FT(2e-3),
+        )
+        zero_demand_arguments =
+            Base.setindex(arguments, zero_demand_parameters, 1)
+        @test CASA.nitrogen_supply(
+            CASA.LegacyDaily(),
+            zero_demand_arguments...,
+        ) == (npp_scalar = one(FT), labile_fraction = zero(FT))
+        zero_supply_arguments =
+            Base.setindex(zero_demand_arguments, zero(FT), 7)
+        zero_supply =
+            CASA.nitrogen_supply(CASA.LegacyDaily(), zero_supply_arguments...)
+        expected_zero_labile =
+            arguments[4] / (arguments[8] + FT(1e-10 / 1000 / 86400))
+        expected_zero_scalar =
+            (arguments[4] - expected_zero_labile * arguments[8]) / arguments[4]
+        @test all(isfinite, zero_supply)
+        @test zero_supply.npp_scalar ≈ expected_zero_scalar
+        @test zero_supply.labile_fraction ≈ expected_zero_labile
+
+        if FT == Float64
+            response(mineral_nitrogen) =
+                CASA.nitrogen_supply(
+                    CASA.LegacyDaily(),
+                    arguments[1:6]...,
+                    mineral_nitrogen,
+                    arguments[8],
+                ).npp_scalar
+            derivative = ForwardDiff.derivative(response, arguments[7])
+            step = cbrt(eps(FT)) * arguments[7]
+            finite_difference =
+                (
+                    response(arguments[7] + step) -
+                    response(arguments[7] - step)
+                ) / (FT(2) * step)
+            @test derivative > zero(FT)
+            @test derivative ≈ finite_difference rtol = FT(1e-6)
+        end
+
+        carbon_parameters =
+            plant_parameters(FT; root_exudate_fraction = FT(0.2))
+        packed_arguments = (
+            CASA.LegacyDaily(),
+            carbon_parameters,
+            nitrogen_parameters,
+            FT(1),
+            FT(1),
+            FT(1),
+            zero(FT),
+            zero(FT),
+            zero(FT),
+            zero(FT),
+            FT(1e-8),
+            FT(2e-6),
+            FT(283.15),
+            FT(278.15),
+            one(FT),
+            FT(2),
+            one(FT),
+            zero(FT),
+        )
+        packed =
+            @inferred CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
+        CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
+        @test @allocated(
+            CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
+        ) == 0
+        continuous_packed_arguments =
+            Base.setindex(packed_arguments, CASA.ContinuousRate(), 1)
+        continuous_packed = @inferred CASA.packed_carbon_nitrogen_fluxes(
+            continuous_packed_arguments...,
+        )
+        CASA.packed_carbon_nitrogen_fluxes(continuous_packed_arguments...)
+        @test @allocated(
+            CASA.packed_carbon_nitrogen_fluxes(continuous_packed_arguments...)
+        ) == 0
+        unrestricted = CASA.packed_carbon_fluxes(
+            CASA.LegacyDaily(),
+            carbon_parameters,
+            packed_arguments[4:7]...,
+            packed_arguments[12:18]...,
+            packed_arguments[8:10]...,
+        )
+        @test unrestricted[15] - packed[15] ≈ packed[4] + packed[21] atol =
+            FT(64) * eps(FT)
+    end
+end
+
+@testset "CASA plant applies mineral-N supply" begin
+    FT = Float64
+    parameters = plant_parameters(FT)
+    nitrogen_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+        nitrogen_ratio_minimum = ntuple(_ -> FT(0.01), 3),
+        nitrogen_ratio_maximum = ntuple(_ -> FT(0.02), 3),
+        nitrogen_fraction_to_litter = ntuple(_ -> one(FT), 3),
+        lignin_fraction = ntuple(_ -> zero(FT), 3),
+        structural_litter_nitrogen_ratio = FT(0.01),
+        limitation_minimum = FT(0.5e-3),
+        limitation_maximum = FT(2e-3),
+        mineral_half_saturation = FT(2e-3),
+    )
+    drivers = CASA.PrescribedDrivers(
+        t -> FT(2e-6),
+        t -> FT(283.15),
+        t -> FT(278.15),
+        t -> one(FT),
+        t -> FT(2),
+        t -> one(FT),
+        t -> zero(FT),
+    )
+    nitrogen_drivers = CASA.NitrogenPrescribedDrivers(
+        t -> FT(1e-6),
+        t -> zero(FT),
+        t -> zero(FT),
+    )
+    model = CASA.CASAPlantModel{FT}(;
+        configuration = CASA.CarbonNitrogen(),
+        parameters,
+        nitrogen_parameters,
+        drivers,
+        nitrogen_drivers,
+        domain = Point(; z_sfc = zero(FT), context = ClimaComms.context()),
+    )
+    Y, p, _ = ClimaLand.initialize(model)
+    Y.casa_plant.c_leaf .= FT(1)
+    Y.casa_plant.c_wood .= FT(1)
+    Y.casa_plant.c_fine_root .= FT(1)
+    Y.casa_plant.c_labile .= zero(FT)
+    Y.casa_plant.n_leaf .= zero(FT)
+    Y.casa_plant.n_wood .= zero(FT)
+    Y.casa_plant.n_fine_root .= zero(FT)
+    ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
+    @test p.casa_plant.carbon_fluxes[][4] > zero(FT)
 end
 
 @testset "CASA plant temporal modes" begin

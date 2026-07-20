@@ -852,7 +852,8 @@ for FT in (Float32, Float64),
         carbon_input = p.casa_plant.carbon_fluxes[][14]
         carbon_tolerance = max(
             FT(2e-5) * carbon_input,
-            FT(64) * eps(FT) *
+            FT(64) *
+            eps(FT) *
             (sum(abs, plant_initial[1:4]) + sum(abs, soil_initial[1:8])) /
             FT(86400),
         )
@@ -860,8 +861,8 @@ for FT in (Float32, Float64),
               soil_carbon_tendency +
               p.casa_plant.carbon_fluxes[][16] +
               p.casa_plant.carbon_fluxes[][21] +
-              p.mimics_soil.carbon_fluxes[][9] ≈
-              carbon_input atol = carbon_tolerance
+              p.mimics_soil.carbon_fluxes[][9] ≈ carbon_input atol =
+            carbon_tolerance
         plant_nitrogen_tendency = sum(
             getproperty(dY.casa_plant, name)[] for
             name in (:n_leaf, :n_wood, :n_fine_root)
@@ -900,6 +901,24 @@ for FT in (Float32, Float64)
         @test p.nitrogen_plant_uptake[1] == FT(7)
         @test @allocated(ClimaLand.update_nitrogen_coupling!(p)) == 0
     end
+end
+
+@testset "Integrated CASA applies soil mineral-N supply" begin
+    FT = Float64
+    model = integrated_casa_cn_model(FT).model
+    Y, p, _ = ClimaLand.initialize(model)
+    for name in ClimaLand.prognostic_vars(model.casa_plant)
+        getproperty(Y.casa_plant, name) .= zero(FT)
+    end
+    Y.casa_plant.c_leaf .= one(FT)
+    Y.casa_plant.c_wood .= one(FT)
+    Y.casa_plant.c_fine_root .= one(FT)
+    for name in ClimaLand.prognostic_vars(model.casa_soil)
+        getproperty(Y.casa_soil, name) .= FT(0.01)
+    end
+    Y.casa_soil.n_mineral .= FT(1e-6)
+    ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
+    @test p.casa_plant.carbon_fluxes[][4] > zero(FT)
 end
 
 for FT in (Float32, Float64),
@@ -976,7 +995,8 @@ for FT in (Float32, Float64),
         carbon_input = p.casa_plant.carbon_fluxes[][14]
         carbon_tolerance = max(
             FT(64) * eps(FT) * carbon_input,
-            FT(64) * eps(FT) *
+            FT(64) *
+            eps(FT) *
             (sum(abs, plant_initial[1:4]) + sum(abs, soil_initial[1:6])) /
             FT(86400),
         )
@@ -984,8 +1004,8 @@ for FT in (Float32, Float64),
               soil_carbon_tendency +
               p.casa_plant.carbon_fluxes[][16] +
               p.casa_plant.carbon_fluxes[][21] +
-              p.casa_soil.carbon_fluxes[][7] ≈
-              carbon_input atol = carbon_tolerance
+              p.casa_soil.carbon_fluxes[][7] ≈ carbon_input atol =
+            carbon_tolerance
         plant_nitrogen_tendency = sum(
             getproperty(dY.casa_plant, name)[] for
             name in (:n_leaf, :n_wood, :n_fine_root)
@@ -1102,9 +1122,7 @@ for FT in (Float32, Float64),
         )
         carbon_tolerance = max(
             FT(2e-5) * carbon_fluxes[14],
-            FT(64) * eps(FT) *
-            (sum(abs, plant_initial) + soil_initial_total) /
-            FT(86400),
+            FT(64) * eps(FT) * (sum(abs, plant_initial) + soil_initial_total) / FT(86400),
         )
         @test plant_tendency +
               soil_tendency +

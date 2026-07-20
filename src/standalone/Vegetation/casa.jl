@@ -22,6 +22,7 @@ export CarbonNitrogen,
     mimics_litter_quality,
     mimics_plant_litter_fractions,
     nitrogen_fluxes,
+    nitrogen_supply,
     nitrogen_uptake,
     plant_litter_fractions,
     respiration_fluxes,
@@ -454,6 +455,120 @@ legacy lignin-to-nitrogen relationship. Wood turnover is routed to CWD.
 end
 
 """
+    nitrogen_supply(
+        temporal_mode,
+        parameters,
+        carbon,
+        nitrogen,
+        npp,
+        allocation,
+        turnover_rates,
+        mineral_nitrogen,
+        available_gpp,
+    )
+
+Return the legacy CASA mineral-N supply multiplier and labile-carbon fraction.
+
+# Arguments
+
+- `temporal_mode`: `LegacyDaily` applies the gate; `ContinuousRate` is neutral.
+- `parameters`: plant nitrogen stoichiometry and retranslocation parameters.
+- `carbon`, `nitrogen`: leaf, wood, and fine-root stocks [kg m⁻²].
+- `npp`, `available_gpp`: carbon fluxes [kg C m⁻² s⁻¹]; the latter is
+  gross production after root exudation.
+- `allocation`: leaf, wood, and fine-root NPP fractions [-].
+- `turnover_rates`: plant-pool turnover rates [s⁻¹].
+- `mineral_nitrogen`: available mineral-N stock [kg N m⁻²].
+
+# Returns
+
+A named tuple `(npp_scalar, labile_fraction)` [-]. The scalar multiplies NPP
+and the fraction diverts post-exudation GPP to labile carbon.
+
+# Examples
+
+```julia
+supply_parameters = (
+    nitrogen_ratio_minimum = (0.01, 0.01, 0.01),
+    nitrogen_ratio_maximum = (0.02, 0.02, 0.02),
+    nitrogen_fraction_to_litter = (1.0, 1.0, 1.0),
+    mineral_half_saturation = 0.002,
+)
+supply = nitrogen_supply(
+    LegacyDaily(), supply_parameters, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
+    1e-6, (0.4, 0.15, 0.45), (0.0, 0.0, 0.0), 0.000432, 2e-6,
+)
+limited_npp = supply.npp_scalar * 1e-6
+```
+
+See also [`nitrogen_uptake`](@ref) and [`carbon_fluxes`](@ref).
+"""
+@inline function nitrogen_supply(
+    ::LegacyDaily,
+    parameters,
+    carbon,
+    nitrogen,
+    npp,
+    allocation,
+    turnover_rates,
+    mineral_nitrogen,
+    available_gpp,
+)
+    zero_mineral = zero(mineral_nitrogen)
+    minimum_demand =
+        nitrogen_uptake(
+            parameters,
+            carbon,
+            nitrogen,
+            npp,
+            allocation,
+            turnover_rates,
+            zero_mineral,
+            zero_mineral,
+            zero_mineral,
+        ).minimum_demand
+    seconds_per_day = oftype(mineral_nitrogen, 86400)
+    nitrogen_epsilon = oftype(mineral_nitrogen, 1e-13)
+    available_fraction = clamp(
+        mineral_nitrogen /
+        (seconds_per_day * sum(minimum_demand) + nitrogen_epsilon),
+        zero_mineral,
+        one(mineral_nitrogen),
+    )
+    limited = (npp > zero(npp)) & (available_fraction < one(available_fraction))
+    gpp_epsilon = oftype(available_gpp, 1e-10 / 1000 / 86400)
+    labile_fraction = ifelse(
+        limited,
+        (one(available_fraction) - available_fraction) * max(zero(npp), npp) / (available_gpp + gpp_epsilon),
+        zero(available_gpp),
+    )
+    safe_npp = ifelse(limited, npp, one(npp))
+    npp_scalar = ifelse(
+        limited,
+        (npp - labile_fraction * available_gpp) / safe_npp,
+        one(npp),
+    )
+    return (; npp_scalar, labile_fraction)
+end
+
+@inline function nitrogen_supply(
+    ::ContinuousRate,
+    parameters,
+    carbon,
+    nitrogen,
+    npp,
+    allocation,
+    turnover_rates,
+    mineral_nitrogen,
+    available_gpp,
+)
+    return (;
+        npp_scalar = one(available_gpp),
+        labile_fraction = zero(available_gpp),
+    )
+end
+
+"""
     nitrogen_uptake(
         parameters,
         carbon,
@@ -843,6 +958,83 @@ end
     )
 end
 
+"""
+    packed_carbon_nitrogen_fluxes(temporal_mode, parameters,
+        nitrogen_parameters, ...)
+
+Compute the 21-entry packed plant-C flux vector, applying the legacy mineral-N
+supply gate between the unrestricted and final carbon calculations. Called by
+the standalone and coupled CN cache updates.
+"""
+@inline function packed_carbon_nitrogen_fluxes(
+    temporal_mode,
+    parameters,
+    nitrogen_parameters,
+    c_leaf,
+    c_wood,
+    c_fine_root,
+    c_labile,
+    n_leaf,
+    n_wood,
+    n_fine_root,
+    mineral_nitrogen,
+    gpp,
+    air_temperature,
+    soil_temperature,
+    water_stress,
+    phase,
+    npp_scalar,
+    labile_fraction,
+)
+    unrestricted = packed_carbon_fluxes(
+        temporal_mode,
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+        c_labile,
+        gpp,
+        air_temperature,
+        soil_temperature,
+        water_stress,
+        phase,
+        npp_scalar,
+        labile_fraction,
+        n_leaf,
+        n_wood,
+        n_fine_root,
+    )
+    supply = nitrogen_supply(
+        temporal_mode,
+        nitrogen_parameters,
+        (c_leaf, c_wood, c_fine_root),
+        (n_leaf, n_wood, n_fine_root),
+        unrestricted[15],
+        (unrestricted[5], unrestricted[6], unrestricted[7]),
+        (unrestricted[11], unrestricted[12], unrestricted[13]),
+        mineral_nitrogen,
+        gpp - unrestricted[20],
+    )
+    return packed_carbon_fluxes(
+        temporal_mode,
+        parameters,
+        c_leaf,
+        c_wood,
+        c_fine_root,
+        c_labile,
+        gpp,
+        air_temperature,
+        soil_temperature,
+        water_stress,
+        phase,
+        npp_scalar * supply.npp_scalar,
+        labile_fraction + supply.labile_fraction,
+        n_leaf,
+        n_wood,
+        n_fine_root,
+    )
+end
+
 @inline packed_carbon_fluxes(::ContinuousRate, args...) =
     packed_carbon_fluxes(args...)
 
@@ -1080,41 +1272,20 @@ function ClimaLand.make_update_aux(
         soil_temperature = model.drivers.soil_temperature(t)
         water_stress = model.drivers.water_stress(t)
         phase = model.drivers.phenology_phase(t)
-        npp_scalar = model.drivers.npp_scalar(t)
-        labile_fraction = model.drivers.labile_fraction(t)
         mineral_nitrogen = model.nitrogen_drivers.mineral_nitrogen(t)
         demand_fraction = model.nitrogen_drivers.demand_fraction(t)
         limitation = model.nitrogen_drivers.limitation(t)
-        parameters = model.parameters
-        temporal_mode = model.temporal_mode
 
         @. p.casa_plant.gross_primary_production = gpp
         @. p.casa_plant.air_temperature = air_temperature
         @. p.casa_plant.soil_temperature = soil_temperature
         @. p.casa_plant.water_stress = water_stress
         @. p.casa_plant.phenology_phase = phase
-        @. p.casa_plant.carbon_fluxes = packed_carbon_fluxes(
-            temporal_mode,
-            parameters,
-            Y.casa_plant.c_leaf,
-            Y.casa_plant.c_wood,
-            Y.casa_plant.c_fine_root,
-            Y.casa_plant.c_labile,
-            gpp,
-            air_temperature,
-            soil_temperature,
-            water_stress,
-            phase,
-            npp_scalar,
-            labile_fraction,
-            Y.casa_plant.n_leaf,
-            Y.casa_plant.n_wood,
-            Y.casa_plant.n_fine_root,
-        )
+        update_nitrogen_limited_carbon_fluxes!(p, Y, model, t, mineral_nitrogen)
         update_nitrogen_fluxes!(
             p,
             Y,
-            temporal_mode,
+            model.temporal_mode,
             model.nitrogen_parameters,
             mineral_nitrogen,
             demand_fraction,
@@ -1122,6 +1293,49 @@ function ClimaLand.make_update_aux(
         )
     end
     return update_aux!
+end
+
+"""
+    update_nitrogen_limited_carbon_fluxes!(p, Y, model, t, mineral_nitrogen)
+
+Recompute `p.casa_plant.carbon_fluxes` from cached environmental drivers and
+the supplied mineral-N stock. Reads plant C/N state from `Y` and returns
+`nothing`. Called by standalone and coupled CN updates.
+"""
+function update_nitrogen_limited_carbon_fluxes!(
+    p,
+    Y,
+    model,
+    t,
+    mineral_nitrogen,
+)
+    npp_scalar = model.drivers.npp_scalar(t)
+    labile_fraction = model.drivers.labile_fraction(t)
+    parameters = model.parameters
+    nitrogen_parameters = model.nitrogen_parameters
+    temporal_mode = model.temporal_mode
+
+    @. p.casa_plant.carbon_fluxes = packed_carbon_nitrogen_fluxes(
+        temporal_mode,
+        parameters,
+        nitrogen_parameters,
+        Y.casa_plant.c_leaf,
+        Y.casa_plant.c_wood,
+        Y.casa_plant.c_fine_root,
+        Y.casa_plant.c_labile,
+        Y.casa_plant.n_leaf,
+        Y.casa_plant.n_wood,
+        Y.casa_plant.n_fine_root,
+        mineral_nitrogen,
+        p.casa_plant.gross_primary_production,
+        p.casa_plant.air_temperature,
+        p.casa_plant.soil_temperature,
+        p.casa_plant.water_stress,
+        p.casa_plant.phenology_phase,
+        npp_scalar,
+        labile_fraction,
+    )
+    return nothing
 end
 
 function update_nitrogen_fluxes!(

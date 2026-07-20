@@ -31,8 +31,7 @@ function validate_litter_coupling(coupling, domain, ::Type{FT}) where {FT}
         eltype(coupling) <: LitterCouplingParameters{FT}
     ) "coupling must be point parameters or a Field of point parameters"
     @assert (
-        !(coupling isa Fields.Field) ||
-        axes(coupling) == domain.space.surface
+        !(coupling isa Fields.Field) || axes(coupling) == domain.space.surface
     ) "spatial coupling must use the model surface space"
     return nothing
 end
@@ -111,9 +110,8 @@ struct CASAPlantEnergyHydrologyCORPSESoilModel{FT, H, P, S, C, R} <:
 end
 
 function validate_rooting_depth(rooting_depth, domain, ::Type{FT}) where {FT}
-    @assert rooting_depth isa FT || (
-        rooting_depth isa Fields.Field && eltype(rooting_depth) == FT
-    ) "rooting_depth must be a scalar or surface Field"
+    @assert rooting_depth isa FT ||
+            (rooting_depth isa Fields.Field && eltype(rooting_depth) == FT) "rooting_depth must be a scalar or surface Field"
     @assert (
         !(rooting_depth isa Fields.Field) ||
         axes(rooting_depth) == domain.space.surface
@@ -258,13 +256,12 @@ end
     soil_temperature,
     liquid_saturation,
 )
-    cwd_to_structural =
-        Soil.Biogeochemistry.MIMICS.cwd_to_structural_flux(
-            soil_parameters,
-            c_litter_cwd,
-            soil_temperature,
-            liquid_saturation,
-        )
+    cwd_to_structural = Soil.Biogeochemistry.MIMICS.cwd_to_structural_flux(
+        soil_parameters,
+        c_litter_cwd,
+        soil_temperature,
+        liquid_saturation,
+    )
     return Vegetation.CASA.mimics_litter_quality(
         plant_parameters,
         (c_leaf, c_wood, c_fine_root),
@@ -349,8 +346,7 @@ const ROOT_WEIGHTED_SOIL_VARS = (
 )
 
 function coupling_aux_vars(model)
-    if model.casa_plant.configuration isa
-       Soil.Biogeochemistry.CarbonNitrogen
+    if model.casa_plant.configuration isa Soil.Biogeochemistry.CarbonNitrogen
         return (COUPLED_LITTER_VARS..., COUPLED_NITROGEN_VARS...)
     end
     return COUPLED_LITTER_VARS
@@ -393,11 +389,7 @@ function update_litter_coupling!(p, coupling)
     return nothing
 end
 
-function update_litter_coupling!(
-    p,
-    coupling,
-    ::Soil.Biogeochemistry.CarbonOnly,
-)
+function update_litter_coupling!(p, coupling, ::Soil.Biogeochemistry.CarbonOnly)
     return update_litter_coupling!(p, coupling)
 end
 
@@ -442,20 +434,18 @@ soil_biogeochemistry(model::CASAPlantEnergyHydrologyMIMICSSoilModel) =
 soil_biogeochemistry(model::CASAPlantEnergyHydrologyCORPSESoilModel) =
     model.corpse_soil
 
-coupled_biogeochemistry(model::CASAPlantEnergyHydrologyCASASoilModel{FT}) where {FT} =
+coupled_biogeochemistry(
+    model::CASAPlantEnergyHydrologyCASASoilModel{FT},
+) where {FT} =
     CASAPlantSoilModel{FT}(model.casa_plant, model.casa_soil, model.coupling)
-coupled_biogeochemistry(model::CASAPlantEnergyHydrologyMIMICSSoilModel{FT}) where {FT} =
-    CASAPlantSoilModel{FT}(
-        model.casa_plant,
-        model.mimics_soil,
-        model.coupling,
-    )
-coupled_biogeochemistry(model::CASAPlantEnergyHydrologyCORPSESoilModel{FT}) where {FT} =
-    CASAPlantSoilModel{FT}(
-        model.casa_plant,
-        model.corpse_soil,
-        model.coupling,
-    )
+coupled_biogeochemistry(
+    model::CASAPlantEnergyHydrologyMIMICSSoilModel{FT},
+) where {FT} =
+    CASAPlantSoilModel{FT}(model.casa_plant, model.mimics_soil, model.coupling)
+coupled_biogeochemistry(
+    model::CASAPlantEnergyHydrologyCORPSESoilModel{FT},
+) where {FT} =
+    CASAPlantSoilModel{FT}(model.casa_plant, model.corpse_soil, model.coupling)
 
 get_drivers(model::CASAPlantEnergyHydrologyModel) = get_drivers(model.soil)
 
@@ -463,16 +453,14 @@ function update_root_weighted_soil_drivers!(p, Y, model)
     z = ClimaCore.Fields.coordinate_field(axes(p.soil.T)).z
     rooting_depth = model.rooting_depth
     porosity = model.soil.parameters.ν
-    root_density =
-        @. lazy(Canopy.root_distribution(z, rooting_depth))
+    root_density = @. lazy(Canopy.root_distribution(z, rooting_depth))
     ClimaCore.Operators.column_integral_definite!(
         p.root_normalization,
         root_density,
     )
     root_weight = @. lazy(root_density / p.root_normalization)
-    liquid_saturation = @. lazy(
-        clamp(p.soil.θ_l / porosity, zero(p.soil.θ_l), one(p.soil.θ_l)),
-    )
+    liquid_saturation =
+        @. lazy(clamp(p.soil.θ_l / porosity, zero(p.soil.θ_l), one(p.soil.θ_l)))
     frozen_saturation = @. lazy(
         clamp(
             Y.soil.θ_i / porosity,
@@ -514,22 +502,21 @@ function update_native_plant_drivers!(
     labile_fraction = plant.drivers.labile_fraction(t)
     @. p.casa_plant.soil_temperature = p.root_weighted_soil_temperature
     @. p.casa_plant.water_stress = p.root_weighted_liquid_saturation
-    @. p.casa_plant.carbon_fluxes =
-        Vegetation.CASA.packed_carbon_fluxes(
-            plant.temporal_mode,
-            plant.parameters,
-            Y.casa_plant.c_leaf,
-            Y.casa_plant.c_wood,
-            Y.casa_plant.c_fine_root,
-            Y.casa_plant.c_labile,
-            p.casa_plant.gross_primary_production,
-            p.casa_plant.air_temperature,
-            p.casa_plant.soil_temperature,
-            p.casa_plant.water_stress,
-            p.casa_plant.phenology_phase,
-            npp_scalar,
-            labile_fraction,
-        )
+    @. p.casa_plant.carbon_fluxes = Vegetation.CASA.packed_carbon_fluxes(
+        plant.temporal_mode,
+        plant.parameters,
+        Y.casa_plant.c_leaf,
+        Y.casa_plant.c_wood,
+        Y.casa_plant.c_fine_root,
+        Y.casa_plant.c_labile,
+        p.casa_plant.gross_primary_production,
+        p.casa_plant.air_temperature,
+        p.casa_plant.soil_temperature,
+        p.casa_plant.water_stress,
+        p.casa_plant.phenology_phase,
+        npp_scalar,
+        labile_fraction,
+    )
     return nothing
 end
 
@@ -544,25 +531,24 @@ function update_native_plant_drivers!(
     labile_fraction = plant.drivers.labile_fraction(t)
     @. p.casa_plant.soil_temperature = p.root_weighted_soil_temperature
     @. p.casa_plant.water_stress = p.root_weighted_liquid_saturation
-    @. p.casa_plant.carbon_fluxes =
-        Vegetation.CASA.packed_carbon_fluxes(
-            plant.temporal_mode,
-            plant.parameters,
-            Y.casa_plant.c_leaf,
-            Y.casa_plant.c_wood,
-            Y.casa_plant.c_fine_root,
-            Y.casa_plant.c_labile,
-            p.casa_plant.gross_primary_production,
-            p.casa_plant.air_temperature,
-            p.casa_plant.soil_temperature,
-            p.casa_plant.water_stress,
-            p.casa_plant.phenology_phase,
-            npp_scalar,
-            labile_fraction,
-            Y.casa_plant.n_leaf,
-            Y.casa_plant.n_wood,
-            Y.casa_plant.n_fine_root,
-        )
+    @. p.casa_plant.carbon_fluxes = Vegetation.CASA.packed_carbon_fluxes(
+        plant.temporal_mode,
+        plant.parameters,
+        Y.casa_plant.c_leaf,
+        Y.casa_plant.c_wood,
+        Y.casa_plant.c_fine_root,
+        Y.casa_plant.c_labile,
+        p.casa_plant.gross_primary_production,
+        p.casa_plant.air_temperature,
+        p.casa_plant.soil_temperature,
+        p.casa_plant.water_stress,
+        p.casa_plant.phenology_phase,
+        npp_scalar,
+        labile_fraction,
+        Y.casa_plant.n_leaf,
+        Y.casa_plant.n_wood,
+        Y.casa_plant.n_fine_root,
+    )
     return nothing
 end
 
@@ -595,10 +581,8 @@ function update_native_biogeochemistry_drivers!(
     ::CASAPlantEnergyHydrologyMIMICSSoilModel,
 )
     @. p.mimics_soil.soil_temperature = p.root_weighted_soil_temperature
-    @. p.mimics_soil.liquid_saturation =
-        p.root_weighted_liquid_saturation
-    @. p.mimics_soil.frozen_saturation =
-        p.root_weighted_frozen_saturation
+    @. p.mimics_soil.liquid_saturation = p.root_weighted_liquid_saturation
+    @. p.mimics_soil.frozen_saturation = p.root_weighted_frozen_saturation
     return nothing
 end
 
@@ -607,10 +591,8 @@ function update_native_biogeochemistry_drivers!(
     ::CASAPlantEnergyHydrologyCORPSESoilModel,
 )
     @. p.corpse_soil.soil_temperature = p.root_weighted_soil_temperature
-    @. p.corpse_soil.liquid_saturation =
-        p.root_weighted_liquid_saturation
-    @. p.corpse_soil.frozen_saturation =
-        p.root_weighted_frozen_saturation
+    @. p.corpse_soil.liquid_saturation = p.root_weighted_liquid_saturation
+    @. p.corpse_soil.frozen_saturation = p.root_weighted_frozen_saturation
     return nothing
 end
 
@@ -654,11 +636,6 @@ function make_update_boundary_fluxes(model::CASAPlantCASASoilModel)
     function update_boundary_fluxes!(p, Y, t)
         plant_boundary!(p, Y, t)
         soil_boundary!(p, Y, t)
-        update_litter_coupling!(
-            p,
-            model.coupling,
-            model.casa_plant.configuration,
-        )
         if model.casa_plant.configuration isa
            Soil.Biogeochemistry.CarbonNitrogen
             soil_nitrogen_parameters = model.casa_soil.nitrogen_parameters
@@ -668,6 +645,13 @@ function make_update_boundary_fluxes(model::CASAPlantCASASoilModel)
                     soil_nitrogen_parameters.limitation_minimum,
                     soil_nitrogen_parameters.limitation_maximum,
                 )
+            Vegetation.CASA.update_nitrogen_limited_carbon_fluxes!(
+                p,
+                Y,
+                model.casa_plant,
+                t,
+                Y.casa_soil.n_mineral,
+            )
             Vegetation.CASA.update_nitrogen_fluxes!(
                 p,
                 Y,
@@ -677,6 +661,14 @@ function make_update_boundary_fluxes(model::CASAPlantCASASoilModel)
                 p.casa_plant.nitrogen_demand_fraction,
                 p.casa_soil.nitrogen_limitation,
             )
+        end
+        update_litter_coupling!(
+            p,
+            model.coupling,
+            model.casa_plant.configuration,
+        )
+        if model.casa_plant.configuration isa
+           Soil.Biogeochemistry.CarbonNitrogen
             update_nitrogen_coupling!(p)
             Soil.Biogeochemistry.CASA.update_carbon_fluxes!(
                 p,
@@ -729,15 +721,21 @@ function make_update_boundary_fluxes(model::CASAPlantMIMICSSoilModel)
                     plant_nitrogen_parameters.limitation_minimum,
                     plant_nitrogen_parameters.limitation_maximum,
                 )
-            @. p.casa_plant.nitrogen_limitation =
-                mimics_nitrogen_limitation(
-                    plant_nitrogen_parameters,
-                    soil_nitrogen_parameters,
-                    Y.mimics_soil.n_mineral,
-                    Y.mimics_soil.c_litter_metabolic,
-                    Y.mimics_soil.c_litter_structural,
-                    Y.mimics_soil.c_litter_cwd,
-                )
+            @. p.casa_plant.nitrogen_limitation = mimics_nitrogen_limitation(
+                plant_nitrogen_parameters,
+                soil_nitrogen_parameters,
+                Y.mimics_soil.n_mineral,
+                Y.mimics_soil.c_litter_metabolic,
+                Y.mimics_soil.c_litter_structural,
+                Y.mimics_soil.c_litter_cwd,
+            )
+            Vegetation.CASA.update_nitrogen_limited_carbon_fluxes!(
+                p,
+                Y,
+                model.casa_plant,
+                t,
+                Y.mimics_soil.n_mineral,
+            )
             Vegetation.CASA.update_mimics_nitrogen_fluxes!(
                 p,
                 Y,
@@ -754,22 +752,21 @@ function make_update_boundary_fluxes(model::CASAPlantMIMICSSoilModel)
             )
             update_nitrogen_coupling!(p)
             plant_carbon_fluxes = p.casa_plant.carbon_fluxes
-            @. p.mimics_soil.litter_metabolic_fraction =
-                mimics_litter_quality(
-                    plant_nitrogen_parameters,
-                    model.mimics_soil.parameters,
-                    Y.casa_plant.c_leaf,
-                    Y.casa_plant.c_wood,
-                    Y.casa_plant.c_fine_root,
-                    Y.casa_plant.n_leaf,
-                    Y.casa_plant.n_wood,
-                    Y.casa_plant.n_fine_root,
-                    getindex(plant_carbon_fluxes, 8),
-                    getindex(plant_carbon_fluxes, 10),
-                    Y.mimics_soil.c_litter_cwd,
-                    p.mimics_soil.soil_temperature,
-                    p.mimics_soil.liquid_saturation,
-                )
+            @. p.mimics_soil.litter_metabolic_fraction = mimics_litter_quality(
+                plant_nitrogen_parameters,
+                model.mimics_soil.parameters,
+                Y.casa_plant.c_leaf,
+                Y.casa_plant.c_wood,
+                Y.casa_plant.c_fine_root,
+                Y.casa_plant.n_leaf,
+                Y.casa_plant.n_wood,
+                Y.casa_plant.n_fine_root,
+                getindex(plant_carbon_fluxes, 8),
+                getindex(plant_carbon_fluxes, 10),
+                Y.mimics_soil.c_litter_cwd,
+                p.mimics_soil.soil_temperature,
+                p.mimics_soil.liquid_saturation,
+            )
             Soil.Biogeochemistry.MIMICS.update_carbon_nitrogen_fluxes!(
                 p,
                 Y,
