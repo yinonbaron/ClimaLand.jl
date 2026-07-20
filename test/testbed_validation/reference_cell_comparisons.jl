@@ -108,11 +108,11 @@ struct CellComparison{T}
     value::T
 end
 
-struct ReferenceComparison{E, R, O}
+struct ReferenceComparison{Eligibility, Runner, ResourceScope}
     name::String
-    eligible::E
-    run::R
-    with_resource::O
+    eligible::Eligibility
+    run::Runner
+    with_resource::ResourceScope
 end
 
 function ReferenceComparison(
@@ -141,17 +141,17 @@ struct CellFailure{T, E}
     seconds::Float64
 end
 
-struct ComparisonReport
+struct ComparisonReport{Results, Failures}
     name::String
-    results::Vector{Any}
+    results::Results
     skipped::Vector{SkippedCell}
-    failures::Vector{Any}
+    failures::Failures
     seconds::Float64
     workers::Int
 end
 
-struct ReferenceComparisonError <: Exception
-    report::ComparisonReport
+struct ReferenceComparisonError{Report} <: Exception
+    report::Report
 end
 
 function Base.showerror(io::IO, error::ReferenceComparisonError)
@@ -202,9 +202,23 @@ function run_comparison(
     started = time_ns()
     eligible = ReferenceCell[]
     skipped = SkippedCell[]
+    eligibility_failures = Any[]
     for cell in collection.cells
-        comparison.eligible(cell) ? push!(eligible, cell) :
-        push!(skipped, SkippedCell(cell))
+        cell_started = time_ns()
+        try
+            comparison.eligible(cell) ? push!(eligible, cell) :
+            push!(skipped, SkippedCell(cell))
+        catch error
+            push!(
+                eligibility_failures,
+                CellFailure(
+                    cell,
+                    nothing,
+                    error,
+                    (time_ns() - cell_started) / 1e9,
+                ),
+            )
+        end
     end
     worker_count = min(budget.workers, Threads.nthreads(), length(eligible))
     slots = Vector{Any}(undef, length(eligible))
@@ -226,7 +240,13 @@ function run_comparison(
         foreach(fetch, tasks)
     end
     results = filter(result -> result isa CellResult, slots)
-    failures = filter(result -> result isa CellFailure, slots)
+    failures = [
+        eligibility_failures;
+        filter(result -> result isa CellFailure, slots)
+    ]
+    cell_order =
+        Dict(cell.id => index for (index, cell) in enumerate(collection.cells))
+    sort!(failures; by = failure -> cell_order[failure.cell.id])
     report = ComparisonReport(
         comparison.name,
         results,

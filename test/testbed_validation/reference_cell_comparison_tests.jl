@@ -1,12 +1,12 @@
 using Test
 
-const ReferenceCells = TestbedReferenceCellComparisons
+const REFERENCE_CELLS = TestbedReferenceCellComparisons
 
 @testset "reference-cell comparison contract" begin
-    ordinary = ReferenceCells.ordinary_cell_collection()
-    extended = ReferenceCells.extended_cell_collection()
+    ordinary = REFERENCE_CELLS.ordinary_cell_collection()
+    extended = REFERENCE_CELLS.extended_cell_collection()
     subset =
-        ReferenceCells.subset(extended, getproperty.(ordinary.cells[1:2], :id))
+        REFERENCE_CELLS.subset(extended, getproperty.(ordinary.cells[1:2], :id))
 
     @test getproperty.(ordinary.cells, :id) ==
           Int.(ordinary.manifest["selection"]["core_cell_ids"])
@@ -16,17 +16,17 @@ const ReferenceCells = TestbedReferenceCellComparisons
           getproperty.(ordinary.cells[1:2], :id)
 
     active = cell -> cell.pft != 17
-    compare = ReferenceCells.ReferenceComparison(
+    compare = REFERENCE_CELLS.ReferenceComparison(
         "identity",
         (cell, _) ->
-            ReferenceCells.CellComparison(cell.id == cell.id, cell.id);
+            REFERENCE_CELLS.CellComparison(cell.id == cell.id, cell.id);
         eligible = active,
     )
     for collection in (ordinary, subset)
-        report = ReferenceCells.run_comparison(
+        report = REFERENCE_CELLS.run_comparison(
             collection,
             compare,
-            ReferenceCells.ConcurrencyBudget(1),
+            REFERENCE_CELLS.ConcurrencyBudget(1),
         )
         @test getproperty.(report.results, :cell) ==
               filter(active, collection.cells)
@@ -37,8 +37,8 @@ const ReferenceCells = TestbedReferenceCellComparisons
 end
 
 @testset "reference-cell deterministic bounded scheduling" begin
-    collection = ReferenceCells.subset(
-        ReferenceCells.extended_cell_collection(),
+    collection = REFERENCE_CELLS.subset(
+        REFERENCE_CELLS.extended_cell_collection(),
         [532, 618, 626, 1285],
     )
     active = Threads.Atomic{Int}(0)
@@ -52,21 +52,21 @@ end
         end
         callback(resource)
     end
-    compare = ReferenceCells.ReferenceComparison(
+    compare = REFERENCE_CELLS.ReferenceComparison(
         "out-of-order",
         function (cell, resource)
             current = Threads.atomic_add!(active, 1) + 1
             Threads.atomic_max!(maximum_active, current)
             sleep((700 - cell.id % 700) / 10_000)
             Threads.atomic_sub!(active, 1)
-            ReferenceCells.CellComparison(true, (cell.id, objectid(resource)))
+            REFERENCE_CELLS.CellComparison(true, (cell.id, objectid(resource)))
         end;
         with_resource,
     )
-    report = ReferenceCells.run_comparison(
+    report = REFERENCE_CELLS.run_comparison(
         collection,
         compare,
-        ReferenceCells.ConcurrencyBudget(2),
+        REFERENCE_CELLS.ConcurrencyBudget(2),
     )
 
     @test getproperty.(getproperty.(report.results, :value), 1) ==
@@ -75,38 +75,38 @@ end
     @test length(resources) == length(collection.cells)
     @test length(unique(objectid.(resources))) == length(collection.cells)
 
-    serial = ReferenceCells.run_comparison(
+    serial = REFERENCE_CELLS.run_comparison(
         collection,
         compare,
-        ReferenceCells.ConcurrencyBudget(1),
+        REFERENCE_CELLS.ConcurrencyBudget(1),
     )
     @test getproperty.(getproperty.(serial.results, :value), 1) ==
           getproperty.(collection.cells, :id)
 end
 
 @testset "reference-cell failure aggregation" begin
-    collection = ReferenceCells.subset(
-        ReferenceCells.extended_cell_collection(),
+    collection = REFERENCE_CELLS.subset(
+        REFERENCE_CELLS.extended_cell_collection(),
         [532, 618, 626],
     )
-    comparison = ReferenceCells.ReferenceComparison(
+    comparison = REFERENCE_CELLS.ReferenceComparison(
         "failure context",
         (cell, _) ->
             cell.id == 618 ? error("synthetic failure") :
-            ReferenceCells.CellComparison(cell.id != 626, cell.id),
+            REFERENCE_CELLS.CellComparison(cell.id != 626, cell.id),
     )
 
     failure = try
-        ReferenceCells.run_comparison(
+        REFERENCE_CELLS.run_comparison(
             collection,
             comparison,
-            ReferenceCells.ConcurrencyBudget(2),
+            REFERENCE_CELLS.ConcurrencyBudget(2),
         )
         nothing
     catch error
         error
     end
-    @test failure isa ReferenceCells.ReferenceComparisonError
+    @test failure isa REFERENCE_CELLS.ReferenceComparisonError
     @test getproperty.(failure.report.failures, :cell) == collection.cells[2:3]
     message = sprint(showerror, failure)
     for cell in collection.cells[2:3]
@@ -114,4 +114,32 @@ end
         @test occursin("PFT $(cell.pft)", message)
         @test all(reason -> occursin(reason, message), cell.reasons)
     end
+end
+
+@testset "reference-cell eligibility failure context" begin
+    collection = REFERENCE_CELLS.subset(
+        REFERENCE_CELLS.extended_cell_collection(),
+        [532, 618],
+    )
+    comparison = REFERENCE_CELLS.ReferenceComparison(
+        "eligibility context",
+        (cell, _) -> cell.id;
+        eligible = cell ->
+            cell.id == first(collection.cells).id ?
+            error("eligibility failure") : true,
+    )
+
+    failure = try
+        REFERENCE_CELLS.run_comparison(
+            collection,
+            comparison,
+            REFERENCE_CELLS.ConcurrencyBudget(1),
+        )
+        nothing
+    catch error
+        error
+    end
+    @test failure isa REFERENCE_CELLS.ReferenceComparisonError
+    @test only(failure.report.failures).cell == first(collection.cells)
+    @test occursin("eligibility failure", sprint(showerror, failure))
 end

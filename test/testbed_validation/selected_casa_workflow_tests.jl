@@ -242,4 +242,44 @@ end
         @test comparison["cell_ids"] == getproperty.(collection.cells, :id)
         @test comparison["provenance"] == reference.provenance
     end
+
+    setup = TestbedSelectedCASAWorkflow.load_setup(
+        :carbon_only;
+        collection = subset,
+    )
+    reference =
+        TestbedSelectedCASAWorkflow.workflow_reference(:carbon_only, subset)
+    actual = TestbedSelectedCASAWorkflow.state_snapshot(setup.initial_state)
+    malformed = copy(actual)
+    malformed["casa_soil.c_soil_passive"] =
+        malformed["casa_soil.c_soil_passive"][1:1]
+    malformed_report = TestbedSelectedCASAWorkflow.compare_snapshot(
+        malformed,
+        reference.configuration["native_julia"]["initialization"],
+        reference.configuration["tolerance"]["native_julia_initialization"],
+        subset,
+        reference.indices,
+        TestbedReferenceCellComparisons.ConcurrencyBudget(1),
+    )
+    @test !malformed_report["all_match"]
+    @test getindex.(malformed_report["cell_failures"], "cell_id") ==
+          getproperty.(subset.cells, :id)
+
+    reference_cell_count = length(reference.indices.by_id)
+    ordered_report = TestbedSelectedCASAWorkflow.compare_snapshot(
+        Dict(
+            "casa_soil.c_soil_passive" => [0.0, 1.0],
+            "casa_soil.n_soil_passive" => [1.0, 0.0],
+        ),
+        Dict(
+            "casa_soil.c_soil_passive" => zeros(reference_cell_count),
+            "casa_soil.n_soil_passive" => zeros(reference_cell_count),
+        ),
+        Dict("atol" => 0.0, "rtol" => 0.0),
+        subset,
+        reference.indices,
+        TestbedReferenceCellComparisons.ConcurrencyBudget(2),
+    )
+    @test getindex.(ordered_report["cell_failures"], "cell_id") ==
+          getproperty.(subset.cells, :id)
 end

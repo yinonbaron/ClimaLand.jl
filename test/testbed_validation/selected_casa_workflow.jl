@@ -398,15 +398,42 @@ function comparison_group(name)
     return "CASA other"
 end
 
-function failure_record(failure)
+function failure_record(failure, comparison)
     cell = failure.cell
     return Dict(
         "cell_id" => cell.id,
         "pft" => cell.pft,
         "selection_reasons" => cell.reasons,
+        "comparison" => comparison,
         "error" => sprint(showerror, failure.error),
     )
 end
+
+function aggregate_metrics(cell_metrics)
+    return Dict(
+        "compared_values" =>
+            sum(metric["compared_values"] for metric in cell_metrics),
+        "failed_values" =>
+            sum(metric["failed_values"] for metric in cell_metrics),
+        "maximum_absolute_error" => maximum(
+            metric["maximum_absolute_error"] for metric in cell_metrics
+        ),
+        "maximum_relative_error" => maximum(
+            metric["maximum_relative_error"] for metric in cell_metrics
+        ),
+        "atol" => first(cell_metrics)["atol"],
+        "rtol" => first(cell_metrics)["rtol"],
+        "all_match" => all(metric["all_match"] for metric in cell_metrics),
+    )
+end
+
+failed_metrics() = Dict(
+    "compared_values" => 0,
+    "failed_values" => 1,
+    "maximum_absolute_error" => Inf,
+    "maximum_relative_error" => Inf,
+    "all_match" => false,
+)
 
 function compare_snapshot(
     actual,
@@ -422,29 +449,6 @@ function compare_snapshot(
     metrics = Dict{String, Any}()
     grouped_names = Dict{String, Vector{String}}()
     for name in sort!(collect(String.(keys(expected))))
-        haskey(actual, name) || error("Reference state $name is not prognostic")
-        expected_values = expected[name]
-        variable_tolerance =
-            haskey(tolerance, name) ? tolerance[name] : tolerance
-        actual_values = reduce(vcat, map(eachindex(cells)) do index
-            cell_values(actual[name], index, cell_count)
-        end)
-        selected_expected = reduce(
-            vcat,
-            map(cells) do cell
-                cell_values(
-                    expected_values,
-                    reference_indices.by_id[cell.id],
-                    reference_cell_count,
-                )
-            end,
-        )
-        metrics[name] = native_casa().error_metrics(
-            actual_values,
-            selected_expected;
-            atol = variable_tolerance["atol"],
-            rtol = variable_tolerance["rtol"],
-        )
         push!(get!(grouped_names, comparison_group(name), String[]), name)
     end
 
@@ -485,7 +489,23 @@ function compare_snapshot(
             concurrency_budget;
             throw_on_failure = false,
         )
-        append!(failures, failure_record.(report.failures))
+        completed =
+            Any[getproperty(result, :value) for result in report.results]
+        append!(
+            completed,
+            Any[
+                failure.value for
+                failure in report.failures if !isnothing(failure.value)
+            ],
+        )
+        for name in names
+            cell_metrics =
+                Any[value[name] for value in completed if haskey(value, name)]
+            metrics[name] =
+                isempty(cell_metrics) ? failed_metrics() :
+                aggregate_metrics(cell_metrics)
+        end
+        append!(failures, failure_record.(report.failures, Ref(group)))
         group_reports[group] = Dict(
             "all_match" => isempty(report.failures),
             "cell_count" =>
@@ -494,6 +514,10 @@ function compare_snapshot(
             "workers" => report.workers,
         )
     end
+    sort!(
+        failures;
+        by = failure -> (positions[failure["cell_id"]], failure["comparison"]),
+    )
     return Dict(
         "variable" => metrics,
         "comparison" => group_reports,
