@@ -1100,6 +1100,8 @@ function run_gridded_case(
     )
     budget = CarbonBudgetAccumulator(grid, domain)
     npp = AnnualNPPTracker(domain)
+    stoichiometry =
+        casa().CarbonOnlyPlantStoichiometryTracker(grid, built.parameters)
     plant_points = casa().point_field(
         domain,
         [built.parameters[point.pft] for point in grid],
@@ -1112,6 +1114,7 @@ function run_gridded_case(
     set_initial_cache! = ClimaLand.make_set_initial_cache(built.model)
     function update_drivers!(stage, index, time)
         update_forcing!(forcing, stage, index, time)
+        casa().apply_stoichiometry!(stoichiometry, stage.name, built.model)
         prepare_annual_npp!(npp, forcing, stage, index)
     end
     function before_step!(stage, _, Y, p, time)
@@ -1125,9 +1128,10 @@ function run_gridded_case(
             time,
         )
     end
-    function after_step!(stage, _, _, p, _)
+    function after_step!(stage, _, Y, p, _)
         accumulate_annual_npp!(npp, p)
         accumulate_budget!(budget, stage, p)
+        casa().update_stoichiometry!(stoichiometry, Y)
     end
     function budget_report(stage, initial_state, final_state)
         return carbon_budget_report(

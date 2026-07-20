@@ -300,6 +300,11 @@ mutable struct CarbonOnlyPlantStoichiometry
     phosphorus_to_nitrogen::Vector{Float64}
 end
 
+mutable struct CarbonOnlyPlantStoichiometryTracker{S}
+    stoichiometry::S
+    active_stage::Union{Nothing, Symbol}
+end
+
 function CarbonOnlyPlantStoichiometry(grid, parameters)
     nitrogen_per_carbon =
         [parameters[point.pft].plant_nitrogen_ratio[1] for point in grid]
@@ -319,6 +324,13 @@ function CarbonOnlyPlantStoichiometry(grid, parameters)
         nitrogen_to_phosphorus,
         initial_phosphorus,
         phosphorus_to_nitrogen,
+    )
+end
+
+function CarbonOnlyPlantStoichiometryTracker(grid, parameters)
+    return CarbonOnlyPlantStoichiometryTracker(
+        CarbonOnlyPlantStoichiometry(grid, parameters),
+        nothing,
     )
 end
 
@@ -364,6 +376,23 @@ function apply_stoichiometry!(stoichiometry, model)
     field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
     vec(parent(field)) .= stoichiometry.phosphorus_to_nitrogen
     return nothing
+end
+
+function apply_stoichiometry!(
+    tracker::CarbonOnlyPlantStoichiometryTracker,
+    stage,
+    model,
+)
+    if tracker.active_stage != stage
+        reset_stoichiometry!(tracker.stoichiometry)
+        tracker.active_stage = stage
+    end
+    apply_stoichiometry!(tracker.stoichiometry, model)
+    return nothing
+end
+
+function update_stoichiometry!(tracker::CarbonOnlyPlantStoichiometryTracker, Y)
+    return update_stoichiometry!(tracker.stoichiometry, Y)
 end
 
 function soil_parameters(values, soil, pft; passive_rate_multiplier = 1)
@@ -1217,8 +1246,8 @@ function run_gridded_case(
         rtol = boundary_rtol,
     )
     budget = CarbonBudgetAccumulator(grid)
-    stoichiometry = CarbonOnlyPlantStoichiometry(grid, normal.parameters)
-    active_stage = Ref{Union{Nothing, Symbol}}(nothing)
+    stoichiometry =
+        CarbonOnlyPlantStoichiometryTracker(grid, normal.parameters)
     function carbon_budget(stage, result, _, _, initial_state, _)
         name = String(stage.name)
         start_stock = area_weighted_carbon(initial_state, budget.area_m2)
@@ -1249,11 +1278,11 @@ function run_gridded_case(
             model_for_stage,
             update_forcing! = function (stage, index, time)
                 update_forcing!(forcing, stage, index, time)
-                if active_stage[] != stage.name
-                    reset_stoichiometry!(stoichiometry)
-                    active_stage[] = stage.name
-                end
-                apply_stoichiometry!(stoichiometry, model_for_stage(stage))
+                apply_stoichiometry!(
+                    stoichiometry,
+                    stage.name,
+                    model_for_stage(stage),
+                )
             end,
             after_step! = function (stage, step, Y, p, time)
                 accumulate_budget!(budget, stage, step, Y, p, time)

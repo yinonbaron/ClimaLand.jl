@@ -241,6 +241,29 @@ end
                 ),
             ),
         ) == 50
+        tracker =
+            TestbedNativeCASACReconstruction.CarbonOnlyPlantStoichiometryTracker(
+                grid,
+                built.parameters,
+            )
+        TestbedNativeCASACReconstruction.apply_stoichiometry!(
+            tracker,
+            :prespin,
+            built.model,
+        )
+        TestbedNativeCASACReconstruction.update_stoichiometry!(tracker, initial)
+        TestbedNativeCASACReconstruction.apply_stoichiometry!(
+            tracker,
+            :prespin,
+            built.model,
+        )
+        @test tracker.stoichiometry.phosphorus_to_nitrogen[1] == 0.1
+        TestbedNativeCASACReconstruction.apply_stoichiometry!(
+            tracker,
+            :spin,
+            built.model,
+        )
+        @test tracker.stoichiometry.phosphorus_to_nitrogen[1] == 50
         @test !TestbedNativeCASACReconstruction.soil_parameters(
             built.parameters[1],
             soils[1],
