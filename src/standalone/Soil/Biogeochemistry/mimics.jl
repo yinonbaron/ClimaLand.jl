@@ -8,7 +8,6 @@ import ..CASA
 import ....ClimaLand
 
 export CarbonParameters,
-    AbstractTemporalMode,
     CarbonNitrogen,
     CarbonOnly,
     ContinuousRate,
@@ -18,6 +17,7 @@ export CarbonParameters,
     NitrogenParameters,
     NitrogenPrescribedDrivers,
     PrescribedDrivers,
+    TemporalMode,
     continuous_carbon_fluxes,
     cwd_to_structural_flux,
     daily_carbon_map,
@@ -27,16 +27,40 @@ export CarbonParameters,
     hourly_carbon_nitrogen_map,
     moisture_factor
 
-"Compile-time temporal formulation for the standalone MIMICS model."
-abstract type AbstractTemporalMode end
+"""
+    TemporalMode
 
-"Exact ordered one-day map used by the reference Fortran testbed."
-struct LegacyDaily <: AbstractTemporalMode end
+Compile-time strategy for evaluating standalone MIMICS carbon processes.
 
-"Timestep-independent, simultaneous MIMICS carbon ordinary differential equation."
-struct ContinuousRate <: AbstractTemporalMode end
+Concrete subtypes:
+- [`LegacyDaily`](@ref): Apply the ordered reference map.
+- [`ContinuousRate`](@ref): Evaluate the simultaneous carbon-only ODE.
+"""
+abstract type TemporalMode end
 
-Base.broadcastable(mode::AbstractTemporalMode) = tuple(mode)
+"""
+    LegacyDaily <: TemporalMode
+
+Select the exact ordered one-day map used by the reference Fortran testbed.
+
+# Examples
+```julia
+mode = LegacyDaily()
+```
+"""
+struct LegacyDaily <: TemporalMode end
+
+"""
+    ContinuousRate <: TemporalMode
+
+Select the timestep-independent, simultaneous MIMICS carbon ODE.
+
+# Examples
+```julia
+mode = ContinuousRate()
+```
+"""
+struct ContinuousRate <: TemporalMode end
 
 """
     CarbonParameters{FT}
@@ -206,7 +230,7 @@ function MIMICSSoilModel{FT}(;
     domain::ClimaLand.Domains.AbstractDomain{FT} = ClimaLand.Domains.Point(;
         z_sfc = zero(FT),
     ),
-    temporal_mode::AbstractTemporalMode = LegacyDaily(),
+    temporal_mode::TemporalMode = LegacyDaily(),
 ) where {FT}
     @assert parameters isa MIMICSSoilModelParameters{FT} || (
         parameters isa ClimaCore.Fields.Field &&
@@ -885,6 +909,29 @@ Return the eight prognostic tendencies, heterotrophic respiration, moisture
 factor, and process rates for the simultaneous carbon-only MIMICS ODE. The
 result is an instantaneous SI rate and does not depend on a numerical
 timestep.
+
+# Arguments
+- `parameters`: Point MIMICS parameters.
+- `state...`: Eight carbon stocks ordered as metabolic litter, structural
+  litter, CWD, r-selected microbes, K-selected microbes, available soil,
+  chemically protected soil, and physically protected soil [kg C m⁻²].
+- `drivers...`: Soil temperature [K], liquid and frozen saturation [-], three
+  litter inputs [kg C m⁻² s⁻¹], metabolic litter fraction [-], and annual NPP
+  [kg C m⁻² yr⁻¹].
+
+# Returns
+Return an `SVector{17}` containing the eight state tendencies, heterotrophic
+respiration [kg C m⁻² s⁻¹], moisture factor [-], r- and K-selected microbial
+turnover, physical and chemical formation, desorption, oxidation, and CWD
+transfer [kg C m⁻² s⁻¹], in that order.
+
+# Examples
+```julia
+fluxes = continuous_carbon_fluxes(parameters, state..., drivers...)
+carbon_tendencies = fluxes[1:8]
+```
+
+See also [`daily_carbon_map`](@ref) and [`MIMICSSoilModel`](@ref).
 """
 @inline function continuous_carbon_fluxes(
     parameters,
@@ -1330,7 +1377,7 @@ function update_carbon_fluxes!(
     @. p.mimics_soil.litter_structural_input = litter_structural
     @. p.mimics_soil.litter_cwd_input = litter_cwd
     @. p.mimics_soil.carbon_fluxes = carbon_fluxes(
-        temporal_mode,
+        $(tuple(temporal_mode)),
         parameters,
         Y.mimics_soil.c_litter_metabolic,
         Y.mimics_soil.c_litter_structural,

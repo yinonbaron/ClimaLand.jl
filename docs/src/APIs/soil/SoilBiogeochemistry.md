@@ -45,7 +45,7 @@ ClimaLand.Soil.Biogeochemistry.CASA.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.CASA.NitrogenPrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.MIMICS.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.MIMICS.NitrogenPrescribedDrivers
-ClimaLand.Soil.Biogeochemistry.MIMICS.AbstractTemporalMode
+ClimaLand.Soil.Biogeochemistry.MIMICS.TemporalMode
 ClimaLand.Soil.Biogeochemistry.MIMICS.LegacyDaily
 ClimaLand.Soil.Biogeochemistry.MIMICS.ContinuousRate
 ClimaLand.Soil.Biogeochemistry.CORPSE.PrescribedDrivers

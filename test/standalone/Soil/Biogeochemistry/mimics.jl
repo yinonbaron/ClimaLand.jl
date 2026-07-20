@@ -3,6 +3,7 @@ using NCDatasets
 import ClimaLand
 import ClimaComms
 import ClimaCore
+import ForwardDiff
 ClimaComms.@import_required_backends
 using ClimaLand.Soil.Biogeochemistry
 using ClimaLand.Domains: Plane, Point
@@ -325,6 +326,38 @@ end
     end
     ClimaLand.make_set_initial_cache(continuous)(p, Y, zero(FT))
     @test p.mimics_soil.carbon_fluxes[] == fluxes
+end
+
+for FT in (Float32, Float64)
+    @testset "MIMICS ContinuousRate AD compatibility, FT = $FT" begin
+        parameters = mimics_model_parameters(FT)
+        initial = FT.((1, 2, 0.5, 0.03, 0.04, 3, 4, 5))
+        inputs = FT.((1e-8, 2e-8, 3e-8))
+        function metabolic_litter_tendency(c_litter_metabolic)
+            return MIMICS.continuous_carbon_fluxes(
+                parameters,
+                c_litter_metabolic,
+                initial[2:end]...,
+                FT(283.15),
+                FT(0.3),
+                FT(0.1),
+                inputs...,
+                FT(0.5),
+                FT(0.3),
+            )[1]
+        end
+
+        derivative =
+            ForwardDiff.derivative(metabolic_litter_tendency, initial[1])
+        step = cbrt(eps(FT)) * max(one(FT), abs(initial[1]))
+        finite_difference =
+            (
+                metabolic_litter_tendency(initial[1] + step) -
+                metabolic_litter_tendency(initial[1] - step)
+            ) / (FT(2) * step)
+        @test isfinite(derivative)
+        @test derivative ≈ finite_difference rtol = FT(2e-3)
+    end
 end
 
 @testset "MIMICS standalone soil model" begin
