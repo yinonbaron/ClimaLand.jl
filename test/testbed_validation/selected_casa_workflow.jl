@@ -7,6 +7,9 @@ end
 if !isdefined(@__MODULE__, :TestbedSelectedCellFixtures)
     include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
 end
+if !isdefined(@__MODULE__, :TestbedReferenceCellComparisons)
+    include(joinpath(@__DIR__, "reference_cell_comparisons.jl"))
+end
 
 module TestbedSelectedCASAWorkflow
 
@@ -21,11 +24,9 @@ const SoilCASA = ClimaLand.Soil.Biogeochemistry.CASA
 native_workflow() = getfield(parentmodule(@__MODULE__), :TestbedNativeWorkflow)
 native_casa() =
     getfield(parentmodule(@__MODULE__), :TestbedNativeCASACReconstruction)
-selected_fixtures() =
-    getfield(parentmodule(@__MODULE__), :TestbedSelectedCellFixtures)
+reference_cells() =
+    getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
 
-const FIXTURE_MANIFEST =
-    joinpath(@__DIR__, "fixtures", "selected_cells", "fixture.toml")
 const REFERENCE_PATH = joinpath(
     @__DIR__,
     "fixtures",
@@ -382,38 +383,165 @@ end
 
 state_snapshot(Y) = native_casa().state_snapshot(Y)
 
-function compare_snapshot(actual, expected, tolerance)
+function cell_values(values, index, cell_count)
+    length(values) % cell_count == 0 ||
+        throw(DimensionMismatch("reference values do not align with cells"))
+    return vec(values)[index:cell_count:end]
+end
+
+function comparison_group(name)
+    startswith(name, "casa_soil.c_") && return "CASA soil-carbon"
+    startswith(name, "casa_soil.n_") && return "CASA soil-nitrogen"
+    startswith(name, "casa_plant.n_") && return "CASA plant-nitrogen"
+    startswith(name, "diagnostic.") && return "CASA environmental-trajectory"
+    startswith(name, "casa_plant.c_") && return "CASA plant-carbon"
+    return "CASA other"
+end
+
+function failure_record(failure)
+    cell = failure.cell
+    return Dict(
+        "cell_id" => cell.id,
+        "pft" => cell.pft,
+        "selection_reasons" => cell.reasons,
+        "error" => sprint(showerror, failure.error),
+    )
+end
+
+function compare_snapshot(
+    actual,
+    expected,
+    tolerance,
+    collection,
+    reference_indices,
+    concurrency_budget,
+)
+    cells = collection.cells
+    cell_count = length(cells)
+    reference_cell_count = length(reference_indices.by_id)
     metrics = Dict{String, Any}()
-    for (name, expected_values) in expected
+    grouped_names = Dict{String, Vector{String}}()
+    for name in sort!(collect(String.(keys(expected))))
         haskey(actual, name) || error("Reference state $name is not prognostic")
+        expected_values = expected[name]
         variable_tolerance =
             haskey(tolerance, name) ? tolerance[name] : tolerance
+        actual_values = reduce(vcat, map(eachindex(cells)) do index
+            cell_values(actual[name], index, cell_count)
+        end)
+        selected_expected = reduce(
+            vcat,
+            map(cells) do cell
+                cell_values(
+                    expected_values,
+                    reference_indices.by_id[cell.id],
+                    reference_cell_count,
+                )
+            end,
+        )
         metrics[name] = native_casa().error_metrics(
-            actual[name],
-            expected_values;
+            actual_values,
+            selected_expected;
             atol = variable_tolerance["atol"],
             rtol = variable_tolerance["rtol"],
+        )
+        push!(get!(grouped_names, comparison_group(name), String[]), name)
+    end
+
+    positions = Dict(cell.id => index for (index, cell) in enumerate(cells))
+    group_reports = Dict{String, Any}()
+    failures = Dict{String, Any}[]
+    for group in sort!(collect(keys(grouped_names)))
+        names = grouped_names[group]
+        comparison = reference_cells().ReferenceComparison(
+            group,
+            function (cell, _)
+                actual_index = positions[cell.id]
+                expected_index = reference_indices.by_id[cell.id]
+                cell_metrics = Dict{String, Any}()
+                for name in names
+                    variable_tolerance =
+                        haskey(tolerance, name) ? tolerance[name] : tolerance
+                    cell_metrics[name] = native_casa().error_metrics(
+                        cell_values(actual[name], actual_index, cell_count),
+                        cell_values(
+                            expected[name],
+                            expected_index,
+                            reference_cell_count,
+                        );
+                        atol = variable_tolerance["atol"],
+                        rtol = variable_tolerance["rtol"],
+                    )
+                end
+                all_match = all(
+                    metric["all_match"] for metric in values(cell_metrics)
+                )
+                reference_cells().CellComparison(all_match, cell_metrics)
+            end,
+        )
+        report = reference_cells().run_comparison(
+            collection,
+            comparison,
+            concurrency_budget;
+            throw_on_failure = false,
+        )
+        append!(failures, failure_record.(report.failures))
+        group_reports[group] = Dict(
+            "all_match" => isempty(report.failures),
+            "cell_count" =>
+                length(report.results) + length(report.failures),
+            "seconds" => report.seconds,
+            "workers" => report.workers,
         )
     end
     return Dict(
         "variable" => metrics,
-        "all_match" => all(metric["all_match"] for metric in values(metrics)),
+        "comparison" => group_reports,
+        "cell_failures" => failures,
+        "cell_ids" => getproperty.(cells, :id),
+        "all_match" =>
+            isempty(failures) &&
+            all(metric["all_match"] for metric in values(metrics)),
     )
 end
 
-function workflow_reference(configuration, tier)
+function workflow_reference(configuration, collection)
     isfile(REFERENCE_PATH) ||
         error("Pinned selected-cell CASA reference is missing: $REFERENCE_PATH")
     reference = TOML.parsefile(REFERENCE_PATH)
     reference["schema_version"] == 1 ||
         error("Unsupported selected-cell CASA reference schema")
-    reference["tier"] == String(tier) ||
-        error("Pinned reference tier $(reference["tier"]) does not match $tier")
     configuration_reference = reference["configuration"][String(configuration)]
-    return (; reference, configuration = configuration_reference)
+    reference_ids = Int.(reference["cell_ids"])
+    by_id = Dict(id => index for (index, id) in enumerate(reference_ids))
+    for cell in collection.cells
+        haskey(by_id, cell.id) ||
+            error("Pinned CASA reference has no cell $(cell.id)")
+    end
+    provenance = configuration_reference["provenance"]
+    isempty(provenance) && error("Pinned CASA reference provenance is missing")
+    hashes = [
+        String(provenance["native_julia_report_sha256"]),
+        String.(values(provenance["fresh_fortran_boundary_sha256"]))...,
+    ]
+    all(hash -> length(hash) == 64 && all(isxdigit, hash), hashes) ||
+        error("Pinned CASA reference integrity hash is invalid")
+    return (;
+        reference,
+        configuration = configuration_reference,
+        indices = (; by_id),
+        path = REFERENCE_PATH,
+        provenance,
+    )
 end
 
-function compare_boundary_reference(reference, stage, Y)
+function compare_boundary_reference(
+    reference,
+    stage,
+    Y,
+    collection,
+    concurrency_budget,
+)
     actual = state_snapshot(Y)
     reports = Dict{String, Any}()
     for source in ("fresh_fortran", "native_julia")
@@ -422,26 +550,51 @@ function compare_boundary_reference(reference, stage, Y)
         tolerance = reference.configuration["tolerance"]["$(source)_boundary"]
         haskey(tolerance, String(stage.name)) &&
             (tolerance = tolerance[String(stage.name)])
-        reports[source] = compare_snapshot(actual, expected, tolerance)
+        reports[source] = compare_snapshot(
+            actual,
+            expected,
+            tolerance,
+            collection,
+            reference.indices,
+            concurrency_budget,
+        )
     end
     return Dict(
-        "reference" => REFERENCE_PATH,
+        "reference" => reference.path,
+        "provenance" => reference.provenance,
         "source" => reports,
         "all_match" => all(report["all_match"] for report in values(reports)),
     )
 end
 
-function compare_initialization_reference(reference, initial_state)
+function compare_initialization_reference(
+    reference,
+    initial_state,
+    collection,
+    concurrency_budget,
+)
     expected = reference.configuration["native_julia"]["initialization"]
     tolerance =
         reference.configuration["tolerance"]["native_julia_initialization"]
-    comparison =
-        compare_snapshot(state_snapshot(initial_state), expected, tolerance)
-    comparison["reference"] = REFERENCE_PATH
+    comparison = compare_snapshot(
+        state_snapshot(initial_state),
+        expected,
+        tolerance,
+        collection,
+        reference.indices,
+        concurrency_budget,
+    )
+    comparison["reference"] = reference.path
+    comparison["provenance"] = reference.provenance
     return comparison
 end
 
-function compare_historical_reference(reference, path)
+function compare_historical_reference(
+    reference,
+    path,
+    collection,
+    concurrency_budget,
+)
     expected = reference.configuration["native_julia"]["historical"]
     sample_days = Int.(expected["sample_days"])
     tolerance = reference.configuration["tolerance"]["native_julia_historical"]
@@ -455,15 +608,22 @@ function compare_historical_reference(reference, path)
             ) for name in keys(variables)
         )
     end
-    comparison = compare_snapshot(actual, variables, tolerance)
-    coverage = reference.reference["historical_coverage"]
+    comparison = compare_snapshot(
+        actual,
+        variables,
+        tolerance,
+        collection,
+        reference.indices,
+        concurrency_budget,
+    )
     comparison["sample_days"] = sample_days
-    comparison["cell_ids"] = reference.reference["cell_ids"]
-    comparison["pfts"] = coverage["pfts"]
-    comparison["forcing_regimes"] = coverage["forcing_regimes"]
+    comparison["pfts"] = sort!(unique(getproperty.(collection.cells, :pft)))
+    comparison["forcing_regimes"] =
+        sort!(unique(vcat(getproperty.(collection.cells, :reasons)...)))
     return Dict(
         "output" => Dict("records" => output_records(path)),
-        "reference" => REFERENCE_PATH,
+        "reference" => reference.path,
+        "provenance" => reference.provenance,
         "selected_dates" => comparison,
         "all_match" => comparison["all_match"],
     )
@@ -683,7 +843,7 @@ function stage_provenance(setup, stage)
     return Dict(
         "model" => "ClimaLand integrated CASA",
         "configuration" => String(setup.configuration),
-        "pft" => "selected-cell $(setup.tier) fixture",
+        "pft" => "selected-cell $(setup.collection.name) collection",
         "parameter_file" => Dict(
             "source" => abspath(parameter_path),
             "sha256" => native_workflow().sha256sum(parameter_path),
@@ -699,14 +859,14 @@ function stage_provenance(setup, stage)
     )
 end
 
-function load_setup(configuration; tier = :core)
+function load_setup(
+    configuration;
+    collection = reference_cells().ordinary_cell_collection(),
+)
     configuration in supported_configurations() || throw(
         ArgumentError("configuration must be :carbon_only or :carbon_nitrogen"),
     )
-    return selected_fixtures().load_selected_cell_fixture(
-        FIXTURE_MANIFEST;
-        tier,
-    ) do fixture
+    return reference_cells().with_fixture(collection) do fixture
         grid = selected_grid(fixture.files["grid"], fixture.cell_ids)
         soils = native_casa().read_soils(fixture.files["soil"])
         domain = native_casa().gridded_domain(length(grid))
@@ -780,7 +940,7 @@ function load_setup(configuration; tier = :core)
         )
         return (;
             configuration,
-            tier,
+            collection,
             cell_ids = fixture.cell_ids,
             grid,
             soils,
@@ -846,19 +1006,25 @@ end
 function run_selected_case(
     output_root;
     configuration = :carbon_only,
-    tier = :extended,
+    collection = reference_cells().ordinary_cell_collection(),
+    concurrency_budget = reference_cells().ConcurrencyBudget(1),
     stages = COMPLETE_STAGES,
     budget_rtol = 5e-12,
     compare_references = true,
 )
-    setup = load_setup(configuration; tier)
+    setup = load_setup(configuration; collection)
     reference =
         canonical_schedule(stages) && compare_references ?
-        workflow_reference(configuration, tier) : nothing
+        workflow_reference(configuration, collection) : nothing
     initialization_comparison =
         isnothing(reference) ?
         Dict("skipped" => "reference comparison disabled") :
-        compare_initialization_reference(reference, setup.initial_state)
+        compare_initialization_reference(
+            reference,
+            setup.initial_state,
+            collection,
+            concurrency_budget,
+        )
     model_for_stage = StageModelSelector(setup)
     budget = BudgetAccumulator(setup.grid)
     stoichiometry =
@@ -936,13 +1102,25 @@ function run_selected_case(
         compare_boundary = (stage, result, _) ->
             isnothing(reference) ?
             Dict("skipped" => "reference comparison disabled") :
-            compare_boundary_reference(reference, stage, result.state),
+            compare_boundary_reference(
+                reference,
+                stage,
+                result.state,
+                collection,
+                concurrency_budget,
+            ),
         compare_historical = (path, _) ->
             isnothing(reference) ?
             Dict(
                 "output" => Dict("records" => output_records(path)),
                 "skipped" => "reference comparison disabled",
-            ) : compare_historical_reference(reference, path),
+            ) :
+            compare_historical_reference(
+                reference,
+                path,
+                collection,
+                concurrency_budget,
+            ),
         carbon_budget,
         nitrogen_budget = configuration == :carbon_nitrogen ? nitrogen_budget :
                           nothing,

@@ -2,36 +2,22 @@ using Test
 import TOML
 
 @testset "complete selected-cell CASA regressions" begin
-    fixture = TOML.parsefile(TestbedSelectedCASAWorkflow.FIXTURE_MANIFEST)
-    expected_ids = Int.(fixture["selection"]["extended_cell_ids"])
-    expected_pfts = sort!(
-        unique(
-            Int(cell["pft"]) for
-            cell in fixture["cell"] if Int(cell["id"]) in expected_ids
-        ),
-    )
-    expected_regimes = sort!(
-        unique(
-            vcat(
-                (
-                    cell["reasons"] for cell in fixture["cell"] if
-                    Int(cell["id"]) in expected_ids
-                )...,
-            ),
-        ),
-    )
+    collection = TestbedReferenceCellComparisons.extended_cell_collection()
+    expected_ids = getproperty.(collection.cells, :id)
+    expected_pfts = sort!(unique(getproperty.(collection.cells, :pft)))
+    expected_regimes =
+        sort!(unique(vcat(getproperty.(collection.cells, :reasons)...)))
     for configuration in TestbedSelectedCASAWorkflow.supported_configurations()
         mktempdir() do output_root
             result = TestbedSelectedCASAWorkflow.run_selected_case(
                 output_root;
                 configuration,
-                tier = :extended,
+                collection,
             )
             report = TOML.parsefile(result.report)
 
             @test report["initialization_comparison"]["all_match"]
-            @test getproperty.(result.stages, :name) ==
-                  getproperty.(
+            @test getproperty.(result.stages, :name) == getproperty.(
                 TestbedSelectedCASAWorkflow.COMPLETE_STAGES,
                 :name,
             )
@@ -52,6 +38,10 @@ import TOML
             )
             @test report["historical_comparison"]["all_match"]
             @test report["historical_comparison"]["selected_dates"]["all_match"]
+            @test haskey(
+                report["historical_comparison"]["selected_dates"]["comparison"],
+                "CASA environmental-trajectory",
+            )
             @test report["historical_comparison"]["selected_dates"]["cell_ids"] ==
                   expected_ids
             @test report["historical_comparison"]["selected_dates"]["pfts"] ==
@@ -75,6 +65,11 @@ import TOML
             )
             @test all(isfile, getproperty.(result.stages, :handoff_checkpoint))
             if configuration == :carbon_nitrogen
+                initialization_groups =
+                    report["initialization_comparison"]["comparison"]
+                @test haskey(initialization_groups, "CASA soil-carbon")
+                @test haskey(initialization_groups, "CASA soil-nitrogen")
+                @test haskey(initialization_groups, "CASA plant-nitrogen")
                 @test report["nitrogen_budget"]["all_close"]
                 @test report["nitrogen_budget"]["workflow"]["close"]
                 @test report["passive_restoration"]["nitrogen"]["verified"]

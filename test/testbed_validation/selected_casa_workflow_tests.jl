@@ -16,13 +16,15 @@ import NCDatasets
 end
 
 @testset "selected-cell pinned reference contract" begin
-    reference = TOML.parsefile(TestbedSelectedCASAWorkflow.REFERENCE_PATH)
+    collection = TestbedReferenceCellComparisons.extended_cell_collection()
+    reference =
+        TestbedSelectedCASAWorkflow.workflow_reference(:carbon_only, collection).reference
     stage_names = collect(
         String.(
-            getproperty.(TestbedSelectedCASAWorkflow.COMPLETE_STAGES, :name)
+            getproperty.(TestbedSelectedCASAWorkflow.COMPLETE_STAGES, :name),
         ),
     )
-    @test reference["tier"] == "extended"
+    @test Int.(reference["cell_ids"]) == getproperty.(collection.cells, :id)
     @test reference["historical_coverage"]["dates"] ==
           ["1901-01-01", "1957-07-02", "2014-12-31"]
     for configuration in TestbedSelectedCASAWorkflow.supported_configurations()
@@ -65,7 +67,6 @@ end
             result = TestbedSelectedCASAWorkflow.run_selected_case(
                 output_root;
                 configuration,
-                tier = :core,
                 stages,
             )
             report = TOML.parsefile(result.report)
@@ -116,8 +117,7 @@ end
 end
 
 @testset "selected-cell CASA-CN setup" begin
-    setup =
-        TestbedSelectedCASAWorkflow.load_setup(:carbon_nitrogen; tier = :core)
+    setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_nitrogen)
 
     @test getproperty.(setup.grid, :cell_id) == setup.cell_ids
     @test propertynames(setup.initial_state.casa_plant) == (
@@ -173,11 +173,11 @@ end
 end
 
 @testset "selected-cell CASA-C setup" begin
-    setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_only; tier = :core)
+    collection = TestbedReferenceCellComparisons.ordinary_cell_collection()
+    setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_only; collection)
 
     @test getproperty.(setup.grid, :cell_id) == setup.cell_ids
-    @test setup.cell_ids ==
-          [51, 626, 923, 1285, 3613, 4273, 4397, 4453, 6325, 10644, 10997]
+    @test setup.cell_ids == getproperty.(collection.cells, :id)
     @test propertynames(setup.initial_state) == (:casa_plant, :casa_soil)
     @test propertynames(setup.initial_state.casa_plant) ==
           (:c_leaf, :c_wood, :c_fine_root, :c_labile)
@@ -217,4 +217,29 @@ end
         TestbedNativeCASACReconstruction.update_phenology!(setup.forcing, day)
     end
     @test setup.forcing.phase == initial_phase
+end
+
+@testset "CASA comparison accepts replaceable cell collections" begin
+    ordinary = TestbedReferenceCellComparisons.ordinary_cell_collection()
+    subset = TestbedReferenceCellComparisons.subset(
+        ordinary,
+        getproperty.(ordinary.cells[1:2], :id),
+    )
+    for collection in (ordinary, subset)
+        setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_only; collection)
+        reference = TestbedSelectedCASAWorkflow.workflow_reference(
+            :carbon_only,
+            collection,
+        )
+        comparison =
+            TestbedSelectedCASAWorkflow.compare_initialization_reference(
+                reference,
+                setup.initial_state,
+                collection,
+                TestbedReferenceCellComparisons.ConcurrencyBudget(2),
+            )
+        @test comparison["all_match"]
+        @test comparison["cell_ids"] == getproperty.(collection.cells, :id)
+        @test comparison["provenance"] == reference.provenance
+    end
 end

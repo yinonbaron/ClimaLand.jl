@@ -690,7 +690,12 @@ normal-spin, and 1901–2014 historical schedule. Every phase uses the public
 integrated CASA models, ClimaTimeSteppers Forward Euler, and native ClimaLand
 checkpoints. Each stage reloads its checkpoint before the next stage; the
 carbon-only leaf stoichiometry bookkeeping is deterministically rebuilt from
-the restored leaf-carbon state. The package regression uses the extended tier,
+the restored leaf-carbon state. Reference tests use
+`ordinary_cell_collection()` by default. The same CASA comparison accepts
+`extended_cell_collection()` or `subset(...)` and a `ConcurrencyBudget`.
+Fixture verification, eligibility, resource scopes, timing, deterministic
+ordering, and cell-context failure aggregation remain inside
+`reference_cell_comparisons.jl`. The package regression uses the extended collection,
 compares the complete initialized state and every stage boundary with compact
 fresh-Fortran and native-Julia references in `complete_casa_workflow.toml`,
 checks early/middle/late historical dates, and reports both stage and

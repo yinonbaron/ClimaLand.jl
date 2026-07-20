@@ -42,14 +42,12 @@ const STAGE_DIRECTORIES = Dict(
     "historical" => "04-historical",
 )
 
-function fixture_metadata(tier)
-    manifest = TOML.parsefile(Workflow.FIXTURE_MANIFEST)
-    ids = Int.(manifest["selection"]["$(tier)_cell_ids"])
-    cells = filter(cell -> Int(cell["id"]) in ids, manifest["cell"])
+function fixture_metadata(collection)
+    cells = collection.cells
     return (
-        ids = ids,
-        pfts = sort!(unique(Int(cell["pft"]) for cell in cells)),
-        regimes = sort!(unique(vcat(getindex.(cells, "reasons")...))),
+        ids = getproperty.(cells, :id),
+        pfts = sort!(unique(getproperty.(cells, :pft))),
+        regimes = sort!(unique(vcat(getproperty.(cells, :reasons)...))),
     )
 end
 
@@ -156,13 +154,13 @@ end
 
 function generate_reference(
     configuration,
-    tier,
+    collection,
     output_root,
     fortran_root,
     path,
 )
-    metadata = fixture_metadata(tier)
-    setup = Workflow.load_setup(configuration; tier)
+    metadata = fixture_metadata(collection)
+    setup = Workflow.load_setup(configuration; collection)
     fortran = fortran_boundaries(
         fortran_root,
         configuration,
@@ -172,7 +170,7 @@ function generate_reference(
     historical = julia_historical(output_root)
     reference = isfile(path) ? TOML.parsefile(path) : Dict{String, Any}()
     reference["schema_version"] = 1
-    reference["tier"] = String(tier)
+    reference["tier"] = collection.name
     reference["cell_ids"] = metadata.ids
     reference["historical_coverage"] = Dict(
         "pfts" => metadata.pfts,
@@ -236,4 +234,11 @@ length(ARGS) == 5 || error(
 )
 configuration = Symbol(ARGS[1])
 tier = Symbol(ARGS[2])
-println(generate_reference(configuration, tier, ARGS[3], ARGS[4], ARGS[5]))
+collection =
+    tier == :core ? TestbedReferenceCellComparisons.ordinary_cell_collection() :
+    tier == :extended ?
+    TestbedReferenceCellComparisons.extended_cell_collection() :
+    error("TIER must be core or extended")
+println(
+    generate_reference(configuration, collection, ARGS[3], ARGS[4], ARGS[5]),
+)
