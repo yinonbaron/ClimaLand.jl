@@ -795,6 +795,7 @@ function make_update_boundary_fluxes(model::CASAPlantMIMICSSoilModel)
             Soil.Biogeochemistry.MIMICS.update_carbon_fluxes!(
                 p,
                 Y,
+                model.mimics_soil.temporal_mode,
                 model.mimics_soil.parameters,
                 p.mimics_soil.soil_temperature,
                 p.mimics_soil.liquid_saturation,

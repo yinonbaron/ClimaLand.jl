@@ -45,6 +45,9 @@ ClimaLand.Soil.Biogeochemistry.CASA.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.CASA.NitrogenPrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.MIMICS.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.MIMICS.NitrogenPrescribedDrivers
+ClimaLand.Soil.Biogeochemistry.MIMICS.AbstractTemporalMode
+ClimaLand.Soil.Biogeochemistry.MIMICS.LegacyDaily
+ClimaLand.Soil.Biogeochemistry.MIMICS.ContinuousRate
 ClimaLand.Soil.Biogeochemistry.CORPSE.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.CORPSE.AbstractTemporalMode
 ClimaLand.Soil.Biogeochemistry.CORPSE.LegacyDaily
@@ -91,6 +94,7 @@ ClimaLand.Soil.Biogeochemistry.MIMICS.hourly_carbon_map
 ClimaLand.Soil.Biogeochemistry.MIMICS.daily_carbon_map
 ClimaLand.Soil.Biogeochemistry.MIMICS.hourly_carbon_nitrogen_map
 ClimaLand.Soil.Biogeochemistry.MIMICS.daily_carbon_nitrogen_map
+ClimaLand.Soil.Biogeochemistry.MIMICS.continuous_carbon_fluxes
 ```
 
 ## CORPSE Functions of State

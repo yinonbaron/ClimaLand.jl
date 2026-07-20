@@ -8,13 +8,17 @@ import ..CASA
 import ....ClimaLand
 
 export CarbonParameters,
+    AbstractTemporalMode,
     CarbonNitrogen,
     CarbonOnly,
+    ContinuousRate,
+    LegacyDaily,
     MIMICSSoilModel,
     MIMICSSoilModelParameters,
     NitrogenParameters,
     NitrogenPrescribedDrivers,
     PrescribedDrivers,
+    continuous_carbon_fluxes,
     cwd_to_structural_flux,
     daily_carbon_map,
     daily_carbon_nitrogen_map,
@@ -22,6 +26,17 @@ export CarbonParameters,
     hourly_carbon_map,
     hourly_carbon_nitrogen_map,
     moisture_factor
+
+"Compile-time temporal formulation for the standalone MIMICS model."
+abstract type AbstractTemporalMode end
+
+"Exact ordered one-day map used by the reference Fortran testbed."
+struct LegacyDaily <: AbstractTemporalMode end
+
+"Timestep-independent, simultaneous MIMICS carbon ordinary differential equation."
+struct ContinuousRate <: AbstractTemporalMode end
+
+Base.broadcastable(mode::AbstractTemporalMode) = tuple(mode)
 
 """
     CarbonParameters{FT}
@@ -163,13 +178,15 @@ const CarbonOnly = Biogeochemistry.CarbonOnly
 const CarbonNitrogen = Biogeochemistry.CarbonNitrogen
 
 """
-    MIMICSSoilModel{FT}(; parameters, drivers, domain)
+    MIMICSSoilModel{FT}(; parameters, drivers, domain, temporal_mode)
 
 Standalone MIMICS model with seven MIMICS pools and the coarse woody debris
 pool used by the testbed coupling. `CarbonNitrogen()` adds their nitrogen
-states and one mineral-N owner.
+states and one mineral-N owner. `temporal_mode = LegacyDaily()` preserves the
+ordered reference map; `ContinuousRate()` selects a simultaneous,
+timestep-independent carbon-only ODE.
 """
-struct MIMICSSoilModel{FT, C, PS, NP, D, DR, NR} <:
+struct MIMICSSoilModel{FT, C, PS, NP, D, DR, NR, TM} <:
        Biogeochemistry.AbstractSoilBiogeochemistryModel{FT}
     configuration::C
     parameters::PS
@@ -177,6 +194,7 @@ struct MIMICSSoilModel{FT, C, PS, NP, D, DR, NR} <:
     domain::D
     drivers::DR
     nitrogen_drivers::NR
+    temporal_mode::TM
 end
 
 function MIMICSSoilModel{FT}(;
@@ -188,6 +206,7 @@ function MIMICSSoilModel{FT}(;
     domain::ClimaLand.Domains.AbstractDomain{FT} = ClimaLand.Domains.Point(;
         z_sfc = zero(FT),
     ),
+    temporal_mode::AbstractTemporalMode = LegacyDaily(),
 ) where {FT}
     @assert parameters isa MIMICSSoilModelParameters{FT} || (
         parameters isa ClimaCore.Fields.Field &&
@@ -196,6 +215,8 @@ function MIMICSSoilModel{FT}(;
     @assert !(parameters isa ClimaCore.Fields.Field) ||
             axes(parameters) == domain.space.surface "spatial MIMICS parameters must use the model surface space"
     if configuration isa CarbonNitrogen
+        temporal_mode isa LegacyDaily ||
+            error("ContinuousRate is available only for carbon-only MIMICS")
         @assert nitrogen_parameters isa NitrogenParameters{FT} || (
             nitrogen_parameters isa ClimaCore.Fields.Field &&
             eltype(nitrogen_parameters) <: NitrogenParameters{FT}
@@ -215,6 +236,7 @@ function MIMICSSoilModel{FT}(;
         domain,
         drivers,
         nitrogen_drivers,
+        temporal_mode,
     )
     return MIMICSSoilModel{FT, typeof.(args)...}(args...)
 end
@@ -856,6 +878,151 @@ end
 end
 
 
+"""
+    continuous_carbon_fluxes(parameters, state..., drivers...)
+
+Return the eight prognostic tendencies, heterotrophic respiration, moisture
+factor, and process rates for the simultaneous carbon-only MIMICS ODE. The
+result is an instantaneous SI rate and does not depend on a numerical
+timestep.
+"""
+@inline function continuous_carbon_fluxes(
+    parameters,
+    c_litter_metabolic,
+    c_litter_structural,
+    c_litter_cwd,
+    c_microbe_r,
+    c_microbe_k,
+    c_soil_available,
+    c_soil_chemical,
+    c_soil_physical,
+    soil_temperature,
+    liquid_saturation,
+    frozen_saturation,
+    litter_metabolic_input,
+    litter_structural_input,
+    litter_cwd_input,
+    litter_metabolic_fraction,
+    annual_npp,
+)
+    carbon = parameters.carbon
+    concentration_factor = oftype(c_litter_cwd, 100) / carbon.depth_cm
+    environment = environmental_parameters(
+        carbon,
+        soil_temperature - parameters.freezing_temperature,
+        liquid_saturation,
+        frozen_saturation,
+        litter_metabolic_fraction,
+        annual_npp * oftype(annual_npp, 1000),
+        parameters.clay,
+    )
+    lit_m = c_litter_metabolic * concentration_factor
+    lit_s = c_litter_structural * concentration_factor
+    mic_r = c_microbe_r * concentration_factor
+    mic_k = c_microbe_k * concentration_factor
+    som_a = c_soil_available * concentration_factor
+    som_c = c_soil_chemical * concentration_factor
+    som_p = c_soil_physical * concentration_factor
+    vmax = environment.vmax
+    km = environment.km
+    concentration_per_hour_to_surface_rate =
+        inv(concentration_factor * oftype(concentration_factor, 3600))
+
+    litter_r_m =
+        mic_r * vmax[1] * lit_m / (km[1] + mic_r) *
+        concentration_per_hour_to_surface_rate
+    litter_r_s =
+        mic_r * vmax[2] * lit_s / (km[2] + mic_r) *
+        concentration_per_hour_to_surface_rate
+    soil_r =
+        mic_r * vmax[3] * som_a / (km[3] + mic_r) *
+        concentration_per_hour_to_surface_rate
+    litter_k_m =
+        mic_k * vmax[4] * lit_m / (km[4] + mic_k) *
+        concentration_per_hour_to_surface_rate
+    litter_k_s =
+        mic_k * vmax[5] * lit_s / (km[5] + mic_k) *
+        concentration_per_hour_to_surface_rate
+    soil_k =
+        mic_k * vmax[6] * som_a / (km[6] + mic_k) *
+        concentration_per_hour_to_surface_rate
+
+    r_loss =
+        mic_r * environment.r_turnover * concentration_per_hour_to_surface_rate
+    k_loss =
+        mic_k * environment.k_turnover * concentration_per_hour_to_surface_rate
+    r_to_p = r_loss * environment.r_partition[1]
+    r_to_c = r_loss * environment.r_partition[2]
+    r_to_a = r_loss * environment.r_partition[3]
+    k_to_p = k_loss * environment.k_partition[1]
+    k_to_c = k_loss * environment.k_partition[2]
+    k_to_a = k_loss * environment.k_partition[3]
+    desorption =
+        som_p * environment.desorption * concentration_per_hour_to_surface_rate
+    oxidation =
+        (
+            mic_k * vmax[5] * som_c /
+            (carbon.oxidation_modifier[2] * km[5] + mic_k) +
+            mic_r * vmax[2] * som_c /
+            (carbon.oxidation_modifier[1] * km[2] + mic_r)
+        ) * concentration_per_hour_to_surface_rate
+
+    cwd_loss =
+        parameters.cwd_base_rate *
+        parameters.cwd_litter_optimum *
+        CASA.temperature_factor(
+            parameters.cwd_q10,
+            soil_temperature,
+            parameters.freezing_temperature,
+        ) *
+        CASA.moisture_factor(liquid_saturation, false) *
+        c_litter_cwd
+    cwd_respiration = parameters.cwd_respiration_fraction * cwd_loss
+    cwd_to_structural = cwd_loss - cwd_respiration
+    structural_input = litter_structural_input + cwd_to_structural
+
+    mge = carbon.microbial_growth_efficiency
+    physical_formation =
+        litter_metabolic_input * carbon.input_protection[1] + r_to_p + k_to_p
+    chemical_formation =
+        structural_input * carbon.input_protection[2] + r_to_c + k_to_c
+    respiration =
+        (one(mge[1]) - mge[1]) * (litter_r_m + soil_r) +
+        (one(mge[2]) - mge[2]) * litter_r_s +
+        (one(mge[3]) - mge[3]) * (litter_k_m + soil_k) +
+        (one(mge[4]) - mge[4]) * litter_k_s +
+        cwd_respiration
+    return StaticArrays.SVector{17}(
+        litter_metabolic_input *
+        (one(litter_metabolic_input) - carbon.input_protection[1]) -
+        litter_r_m - litter_k_m,
+        structural_input *
+        (one(structural_input) - carbon.input_protection[2]) - litter_r_s -
+        litter_k_s,
+        litter_cwd_input - cwd_loss,
+        mge[1] * (litter_r_m + soil_r) + mge[2] * litter_r_s - r_loss,
+        mge[3] * (litter_k_m + soil_k) + mge[4] * litter_k_s - k_loss,
+        r_to_a + k_to_a + desorption + oxidation - soil_r - soil_k,
+        chemical_formation - oxidation,
+        physical_formation - desorption,
+        respiration,
+        environment.moisture,
+        r_loss,
+        k_loss,
+        physical_formation,
+        chemical_formation,
+        desorption,
+        oxidation,
+        cwd_to_structural,
+    )
+end
+
+
+@inline carbon_fluxes(::LegacyDaily, args...) = combined_carbon_fluxes(args...)
+@inline carbon_fluxes(::ContinuousRate, args...) =
+    continuous_carbon_fluxes(args...)
+
+
 @inline function combined_carbon_nitrogen_fluxes(
     parameters,
     nitrogen_parameters,
@@ -1061,6 +1228,7 @@ function ClimaLand.make_update_aux(
     function update_aux!(p, Y, t)
         drivers = model.drivers
         parameters = model.parameters
+        temporal_mode = model.temporal_mode
         soil_temperature = drivers.soil_temperature(t)
         liquid_saturation = drivers.liquid_saturation(t)
         frozen_saturation = drivers.frozen_saturation(t)
@@ -1078,6 +1246,7 @@ function ClimaLand.make_update_aux(
         update_carbon_fluxes!(
             p,
             Y,
+            temporal_mode,
             parameters,
             soil_temperature,
             liquid_saturation,
@@ -1146,6 +1315,7 @@ end
 function update_carbon_fluxes!(
     p,
     Y,
+    temporal_mode,
     parameters,
     soil_temperature,
     liquid_saturation,
@@ -1159,7 +1329,8 @@ function update_carbon_fluxes!(
     @. p.mimics_soil.litter_metabolic_input = litter_metabolic
     @. p.mimics_soil.litter_structural_input = litter_structural
     @. p.mimics_soil.litter_cwd_input = litter_cwd
-    @. p.mimics_soil.carbon_fluxes = combined_carbon_fluxes(
+    @. p.mimics_soil.carbon_fluxes = carbon_fluxes(
+        temporal_mode,
         parameters,
         Y.mimics_soil.c_litter_metabolic,
         Y.mimics_soil.c_litter_structural,

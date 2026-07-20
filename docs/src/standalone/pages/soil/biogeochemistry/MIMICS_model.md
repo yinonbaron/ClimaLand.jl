@@ -69,7 +69,25 @@ K_{m,j} = \frac{\exp(K_{s,j}T+K_{i,j})a_{k,j}}{K_{mod,j}}.
 Clay modifies the SOMa half-saturation terms, microbial partitioning, and
 desorption from SOMp.
 
-## Ordered hourly map
+## Temporal formulations
+
+The carbon-only model defaults to the exact ordered daily map:
+
+```julia
+model = MIMICSSoilModel{FT}(;
+    parameters,
+    drivers,
+    domain,
+    temporal_mode = LegacyDaily(),
+)
+```
+
+`ContinuousRate()` selects the timestep-independent simultaneous ODE. Both
+modes use the same eight carbon states, drivers, parameters, auxiliary fields,
+diagnostics, and restart layout. The carbon-nitrogen configuration currently
+supports only `LegacyDaily()`.
+
+### Ordered hourly map
 
 Exact parity uses the reverse Michaelis--Menten equations. For example,
 metabolic-litter uptake by r-selected microbes is
@@ -104,20 +122,57 @@ ClimaLand therefore exposes the daily tendency as
 A native forward-Euler step with `dt = 86400` seconds applies exactly one
 legacy MIMICS day.
 
+### Simultaneous carbon rates
+
+In `ContinuousRate`, decomposition, microbial turnover, litter protection,
+desorption, oxidation, litter input, and CWD transfer all use the same current
+state. Writing ``D_{rm}`` and ``D_{rs}`` for r-selected decomposition of
+metabolic and structural litter, ``D_{ra}`` for r-selected SOMa decomposition,
+and using analogous K-selected terms, the instantaneous pool equations are
+
+```math
+\begin{aligned}
+\dot L_m &= (1-p_m)I_m-D_{rm}-D_{km},\\
+\dot L_s &= (1-p_s)(I_s+F_{cwd})-D_{rs}-D_{ks},\\
+\dot C_{cwd} &= I_{cwd}-D_{cwd},\\
+\dot M_r &= \epsilon_{rm}(D_{rm}+D_{ra})+\epsilon_{rs}D_{rs}-T_r,\\
+\dot M_k &= \epsilon_{km}(D_{km}+D_{ka})+\epsilon_{ks}D_{ks}-T_k,\\
+\dot S_a &= T_{r,a}+T_{k,a}+F_d+F_o-D_{ra}-D_{ka},\\
+\dot S_c &= p_s(I_s+F_{cwd})+T_{r,c}+T_{k,c}-F_o,\\
+\dot S_p &= p_m I_m+T_{r,p}+T_{k,p}-F_d.
+\end{aligned}
+```
+
+CWD decay is an instantaneous first-order loss; its non-respired fraction is
+``F_{cwd}`` and enters structural litter in the same RHS evaluation. The
+legacy MIMICS kinetic parameters remain expressed per hour, so the continuous
+kernel converts their process fluxes to inverse seconds by dividing by 3600.
+This is a unit conversion, not an integration timestep. No daily or hourly map,
+partially updated pool, source-pool loss cap, or solver `dt` appears in the RHS.
+
+`ContinuousRate` is a genuine ODE, so choose `dt` for numerical accuracy and
+stability. No generic positivity limiter is applied. Forward Euler refinement
+from 3600 to 450 seconds shows first-order convergence for the committed
+representative state. Its refined one-day solution is
+``2.2978\times10^{-8}`` relative L1 from `LegacyDaily`; that distance measures
+the simultaneous-versus-ordered formulation and is gated independently of the
+refinement test.
+
 ## Spatial parameters and accelerators
 
 `MIMICSSoilModel` accepts either one `MIMICSSoilModelParameters` value or a
 surface `ClimaCore.Fields.Field` of those point values. A parameter field can
 therefore carry gridded clay, kinetic, CWD, and PFT-dependent settings. Its
-axes must equal `domain.space.surface`. The daily point map is broadcast over
+axes must equal `domain.space.surface`. The point kernels are broadcast over
 the field on ClimaLand's active CPU or GPU backend; no scalar field indexing is
-used in the tendency path.
+used in the tendency path. Both temporal formulations are compile-time
+dispatch choices and retain this broadcast path.
 
 ## Carbon conservation
 
 Microbial uptake losses are split between microbial growth and respiration.
 All microbial turnover, protection, oxidation, and desorption fluxes are
-internal. The combined daily budget is therefore
+internal. The carbon budget in either temporal formulation is therefore
 
 ```math
 \Delta C_{stocks} + R_h = I_{metabolic}+I_{structural}+I_{CWD}.
@@ -139,6 +194,13 @@ reproduced from its companion CASA output, and total respiration agrees within
 `2e-15` kg C m⁻² s⁻¹ absolute error. The remaining differences are the
 rounding envelope from using archived `Float32` states as the next step's
 inputs.
+
+The same productive-cell forcing also regression-gates `ContinuousRate`
+against the archived Fortran trajectory. With a 900-second Forward Euler step,
+the maximum difference across 364 transitions is `0.000991 g C m^-2` for the
+eight carbon pools and `3.59e-5 g C m^-2 day^-1` for daily heterotrophic
+respiration. These are expected formulation and integration differences, not
+parity tolerances; `LegacyDaily` remains the parity oracle.
 
 The external grid-transition workflow extends this comparison to 20 cells
 covering every productive archived PFT plus temperature, moisture, clay, and
@@ -177,4 +239,5 @@ seven organic-N pools is below ``1.2\times10^{-7}``; working-DIN and respiration
 absolute errors are below ``6.2\times10^{-10}`` kg m⁻². One additional
 ice/water cell records the Fortran driver-mask boundary but is not treated as a
 standalone MIMICS update. CUDA execution remains to be run on a CUDA host.
-Timestep-independent continuous rates remain a post-parity task.
+The carbon-nitrogen model retains the ordered daily formulation; simultaneous
+nitrogen rates are outside the carbon-only `ContinuousRate` scope.

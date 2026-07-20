@@ -247,6 +247,86 @@ for FT in (Float32, Float64)
     end
 end
 
+@testset "MIMICS temporal modes" begin
+    FT = Float64
+    parameters = mimics_model_parameters(FT)
+    drivers = MIMICS.PrescribedDrivers(
+        t -> FT(283.15),
+        t -> FT(0.3),
+        t -> FT(0.1),
+        t -> FT(1e-8),
+        t -> FT(2e-8),
+        t -> FT(3e-8),
+        t -> FT(0.5),
+        t -> FT(0.3),
+    )
+    domain = Point(; z_sfc = zero(FT), context = ClimaComms.context())
+    legacy = MIMICS.MIMICSSoilModel{FT}(; parameters, drivers, domain)
+    continuous = MIMICS.MIMICSSoilModel{FT}(;
+        parameters,
+        drivers,
+        domain,
+        temporal_mode = MIMICS.ContinuousRate(),
+    )
+
+    @test legacy.temporal_mode isa MIMICS.LegacyDaily
+    @test continuous.temporal_mode isa MIMICS.ContinuousRate
+    @test ClimaLand.prognostic_vars(continuous) ==
+          ClimaLand.prognostic_vars(legacy)
+    @test ClimaLand.auxiliary_vars(continuous) ==
+          ClimaLand.auxiliary_vars(legacy)
+    nitrogen_drivers = MIMICS.NitrogenPrescribedDrivers(
+        t -> zero(FT),
+        t -> zero(FT),
+        t -> zero(FT),
+        t -> zero(FT),
+        t -> zero(FT),
+        t -> zero(FT),
+    )
+    @test_throws ErrorException MIMICS.MIMICSSoilModel{FT}(;
+        configuration = MIMICS.CarbonNitrogen(),
+        parameters,
+        nitrogen_parameters = mimics_nitrogen_parameters(FT),
+        drivers,
+        nitrogen_drivers,
+        domain,
+        temporal_mode = MIMICS.ContinuousRate(),
+    )
+
+    initial = FT.((1, 2, 0.5, 0.03, 0.04, 3, 4, 5))
+    inputs = FT.((1e-8, 2e-8, 3e-8))
+    fluxes = @inferred MIMICS.continuous_carbon_fluxes(
+        parameters,
+        initial...,
+        FT(283.15),
+        FT(0.3),
+        FT(0.1),
+        inputs...,
+        FT(0.5),
+        FT(0.3),
+    )
+    @test @allocated(
+        MIMICS.continuous_carbon_fluxes(
+            parameters,
+            initial...,
+            FT(283.15),
+            FT(0.3),
+            FT(0.1),
+            inputs...,
+            FT(0.5),
+            FT(0.3),
+        )
+    ) == 0
+    @test sum(fluxes[1:8]) + fluxes[9] ≈ sum(inputs) rtol = 32eps(FT)
+
+    Y, p, _ = ClimaLand.initialize(continuous)
+    for (name, value) in zip(ClimaLand.prognostic_vars(continuous), initial)
+        getproperty(Y.mimics_soil, name) .= value
+    end
+    ClimaLand.make_set_initial_cache(continuous)(p, Y, zero(FT))
+    @test p.mimics_soil.carbon_fluxes[] == fluxes
+end
+
 @testset "MIMICS standalone soil model" begin
     for FT in (Float32, Float64)
         parameters = mimics_model_parameters(FT)
@@ -353,6 +433,36 @@ end
             max(FT(2e-5) * sum(inputs), 32eps(FT) * sum(abs, initial) / day)
         @test sum(tendencies) + fluxes[9] ≈ sum(inputs) atol = budget_tolerance
 
+        continuous_model = MIMICS.MIMICSSoilModel{FT}(;
+            parameters,
+            drivers,
+            domain,
+            temporal_mode = MIMICS.ContinuousRate(),
+        )
+        continuous_Y, continuous_p, _ = ClimaLand.initialize(continuous_model)
+        for (name, value) in
+            zip(ClimaLand.prognostic_vars(continuous_model), initial)
+            getproperty(continuous_Y.mimics_soil, name) .= value
+        end
+        ClimaLand.make_set_initial_cache(continuous_model)(
+            continuous_p,
+            continuous_Y,
+            zero(FT),
+        )
+        continuous_fluxes = @inferred MIMICS.continuous_carbon_fluxes(
+            parameters,
+            initial...,
+            FT(283.15),
+            FT(0.3),
+            FT(0.1),
+            inputs...,
+            FT(0.5),
+            FT(0.3),
+        )
+        @test continuous_p.mimics_soil.carbon_fluxes[] == continuous_fluxes
+        @test sum(continuous_fluxes[1:8]) + continuous_fluxes[9] ≈ sum(inputs) rtol =
+            FT(64) * eps(FT)
+
         expected = initial .+ day .* tendencies
         problem = CTS.ODEProblem(
             CTS.ClimaODEFunction((T_exp!) = tendency!),
@@ -373,6 +483,11 @@ end
         @test all(isapprox.(actual, expected; rtol = 16eps(FT)))
         if FT == Float32
             test_checkpoint_roundtrip(model, integrator.u, Float64(day))
+            test_checkpoint_roundtrip(
+                continuous_model,
+                continuous_Y,
+                Float64(day),
+            )
             plane = Plane(;
                 xlim = FT.((0, 2)),
                 ylim = FT.((0, 2)),
@@ -388,6 +503,19 @@ end
                 grid_model,
                 initial,
                 tendencies,
+                zero(FT),
+                16eps(FT),
+            )
+            continuous_grid_model = MIMICS.MIMICSSoilModel{FT}(;
+                parameters,
+                drivers,
+                domain = plane,
+                temporal_mode = MIMICS.ContinuousRate(),
+            )
+            test_gridded_tendency(
+                continuous_grid_model,
+                initial,
+                Tuple(continuous_fluxes[1:8]),
                 zero(FT),
                 16eps(FT),
             )
@@ -441,6 +569,73 @@ end
             @test all(spatial_tendency[right] .≈ right_fluxes[6])
         end
     end
+end
+
+
+function integrate_mimics(model, initial, stop_time, timestep)
+    Y, p, _ = ClimaLand.initialize(model)
+    for (name, value) in zip(ClimaLand.prognostic_vars(model), initial)
+        getproperty(Y.mimics_soil, name) .= value
+    end
+    tendency! = ClimaLand.make_exp_tendency(model)
+    problem = CTS.ODEProblem(
+        CTS.ClimaODEFunction((T_exp!) = tendency!),
+        Y,
+        (0.0, Float64(stop_time)),
+        p,
+    )
+    integrator = CTS.init(
+        problem,
+        FORWARD_EULER;
+        dt = Float64(timestep),
+        save_everystep = false,
+    )
+    for _ in 1:round(Int, stop_time / timestep)
+        CTS.step!(integrator)
+    end
+    return map(ClimaLand.prognostic_vars(model)) do name
+        getproperty(integrator.u.mimics_soil, name)[]
+    end
+end
+
+@testset "MIMICS ContinuousRate timestep refinement" begin
+    FT = Float64
+    day = FT(86400)
+    parameters = mimics_model_parameters(FT)
+    inputs = FT.((1e-8, 2e-8, 3e-8))
+    drivers = MIMICS.PrescribedDrivers(
+        t -> FT(283.15),
+        t -> FT(0.3),
+        t -> FT(0.1),
+        t -> inputs[1],
+        t -> inputs[2],
+        t -> inputs[3],
+        t -> FT(0.5),
+        t -> FT(0.3),
+    )
+    domain = Point(; z_sfc = zero(FT), context = ClimaComms.context())
+    continuous = MIMICS.MIMICSSoilModel{FT}(;
+        parameters,
+        drivers,
+        domain,
+        temporal_mode = MIMICS.ContinuousRate(),
+    )
+    legacy = MIMICS.MIMICSSoilModel{FT}(; parameters, drivers, domain)
+    initial = FT.((1, 2, 0.5, 0.03, 0.04, 3, 4, 5))
+    timesteps = FT.((3600, 1800, 900, 450))
+    solutions = map(timesteps) do timestep
+        integrate_mimics(continuous, initial, day, timestep)
+    end
+    refinement_errors = map(1:3) do index
+        sum(abs.(solutions[index] .- solutions[index + 1]))
+    end
+    @test refinement_errors[2] < FT(0.55) * refinement_errors[1]
+    @test refinement_errors[3] < FT(0.55) * refinement_errors[2]
+
+    legacy_day = integrate_mimics(legacy, initial, day, day)
+    relative_legacy_distance =
+        sum(abs.(solutions[end] .- legacy_day)) / sum(abs, legacy_day)
+    @test relative_legacy_distance ≈ FT(2.2978040984025262e-8) rtol = FT(1e-6)
 end
 
 
@@ -693,6 +888,18 @@ end
             maximum_relative_error = 0.0
             maximum_respiration_error = 0.0
             maximum_moisture_error = 0.0
+            continuous_state = (
+                Float64(mimics[mimics_names[1]][1, 1, 1]) / 1000,
+                Float64(mimics[mimics_names[2]][1, 1, 1]) / 1000,
+                Float64(casa["clitcwd"][1, 1, 1]) / 1000,
+                ntuple(
+                    index ->
+                        Float64(mimics[mimics_names[index]][1, 1, 1]) / 1000,
+                    7,
+                )[3:end]...,
+            )
+            maximum_continuous_pool_error = 0.0
+            maximum_continuous_respiration_error = 0.0
             for day in 2:365
                 previous = ntuple(
                     index ->
@@ -755,6 +962,28 @@ end
                     expected_mimics[6],
                     expected_mimics[7],
                 )
+                continuous_respiration = 0.0
+                for _ in 1:96
+                    continuous_fluxes = MIMICS.continuous_carbon_fluxes(
+                        parameters,
+                        continuous_state...,
+                        temperature,
+                        liquid,
+                        frozen,
+                        metabolic_input / 86400,
+                        structural_input / 86400,
+                        cwd_input / 86400,
+                        fixture_litter_quality(mimics, casa, day),
+                        0.3,
+                    )
+                    continuous_state =
+                        continuous_state .+ 900 .* Tuple(continuous_fluxes[1:8])
+                    continuous_respiration += 900 * continuous_fluxes[9]
+                end
+                maximum_continuous_pool_error = max(
+                    maximum_continuous_pool_error,
+                    maximum(abs.(1000 .* (continuous_state .- expected))),
+                )
                 maximum_relative_error = max(
                     maximum_relative_error,
                     maximum(abs.((actual .- expected) ./ expected)),
@@ -765,6 +994,13 @@ end
                     maximum_respiration_error,
                     abs(fluxes[9] - expected_respiration),
                 )
+                maximum_continuous_respiration_error = max(
+                    maximum_continuous_respiration_error,
+                    abs(
+                        1000 * continuous_respiration -
+                        Float64(mimics["cHresp"][1, 1, day]),
+                    ),
+                )
                 maximum_moisture_error = max(
                     maximum_moisture_error,
                     abs(fluxes[10] - Float64(mimics["fW"][1, 1, day])),
@@ -773,6 +1009,8 @@ end
             @test maximum_relative_error < 2e-7
             @test maximum_respiration_error < 2e-15
             @test maximum_moisture_error < 7e-8
+            @test maximum_continuous_pool_error < 0.0011
+            @test maximum_continuous_respiration_error < 4e-5
         end
     end
 end

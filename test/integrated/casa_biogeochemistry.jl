@@ -1026,7 +1026,10 @@ function carbon_only_model(model::CASAPlantCASASoilModel{FT}) where {FT}
     return CASAPlantSoilModel{FT}(plant, soil, model.coupling)
 end
 
-function carbon_only_model(model::CASAPlantMIMICSSoilModel{FT}) where {FT}
+function carbon_only_model(
+    model::CASAPlantMIMICSSoilModel{FT};
+    soil_temporal_mode = model.mimics_soil.temporal_mode,
+) where {FT}
     plant = PlantCASA.CASAPlantModel{FT}(;
         parameters = model.casa_plant.parameters,
         drivers = model.casa_plant.drivers,
@@ -1037,22 +1040,37 @@ function carbon_only_model(model::CASAPlantMIMICSSoilModel{FT}) where {FT}
         parameters = model.mimics_soil.parameters,
         drivers = model.mimics_soil.drivers,
         domain = model.mimics_soil.domain,
+        temporal_mode = soil_temporal_mode,
     )
     return CASAPlantSoilModel{FT}(plant, soil, model.coupling)
 end
 
 for FT in (Float32, Float64),
-    temporal_mode in (PlantCASA.LegacyDaily(), PlantCASA.ContinuousRate()),
-    soil_name in (:casa_soil, :mimics_soil)
+    plant_temporal_mode in
+    (PlantCASA.LegacyDaily(), PlantCASA.ContinuousRate()),
+    (soil_name, soil_temporal_mode) in (
+        (:casa_soil, nothing),
+        (:mimics_soil, MIMICS.LegacyDaily()),
+        (:mimics_soil, MIMICS.ContinuousRate()),
+    )
 
-    @testset "Integrated carbon-only conservation, FT = $FT, mode = $(typeof(temporal_mode)), soil = $soil_name" begin
+    @testset "Integrated carbon-only conservation, FT = $FT, plant mode = $(typeof(plant_temporal_mode)), soil = $soil_name, soil mode = $(typeof(soil_temporal_mode))" begin
         source = if soil_name == :casa_soil
-            integrated_casa_cn_model(FT; plant_temporal_mode = temporal_mode)
+            integrated_casa_cn_model(FT; plant_temporal_mode = plant_temporal_mode)
         else
-            integrated_mimics_cn_model(FT; plant_temporal_mode = temporal_mode)
+            integrated_mimics_cn_model(
+                FT;
+                plant_temporal_mode = plant_temporal_mode,
+            )
         end
-        model = carbon_only_model(source.model)
-        @test model.casa_plant.temporal_mode isa typeof(temporal_mode)
+        model =
+            soil_name == :mimics_soil ?
+            carbon_only_model(source.model; soil_temporal_mode) :
+            carbon_only_model(source.model)
+        @test model.casa_plant.temporal_mode isa typeof(plant_temporal_mode)
+        if soil_name == :mimics_soil
+            @test model.mimics_soil.temporal_mode isa typeof(soil_temporal_mode)
+        end
         Y, p, _ = ClimaLand.initialize(model)
         plant_initial = FT.((0.09, 0.37, 0.14, 0.01))
         for (name, value) in

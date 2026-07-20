@@ -23,7 +23,10 @@ main
   simultaneous ODE while retaining `LegacyDaily` as the exact Fortran-parity
   default. Add the corresponding opt-in CASA plant `ContinuousRate`
   formulation for simultaneous carbon-nitrogen SI-rate dynamics while
-  retaining its ordered `LegacyDaily` map as the default.
+  retaining its ordered `LegacyDaily` map as the default. Add an opt-in MIMICS
+  carbon-only `ContinuousRate` formulation that evaluates decomposition,
+  turnover, protection, desorption, oxidation, litter input, and CWD transfer
+  simultaneously while preserving `LegacyDaily` as the Fortran-parity default.
 - ![][badge-🔥behavioralΔ] Remove SAI from energy fluxes, tendency PR [#1782](https://github.com/CliMA/ClimaLand.jl/pull/1782)
 - ![][badge-🔥behavioralΔ] Set the `optimal_lai_z`/`optimal_lai_sigma`/`optimal_lai_alpha`
   defaults to values calibrated against MODIS LAI (Yuan et al. 2017): 21.4 / 0.939 / 0.0701.
