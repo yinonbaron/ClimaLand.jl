@@ -51,6 +51,8 @@ const COMPLETE_STAGES = (
     native_workflow().NativeStage(:historical, 114 * 365, 1),
 )
 
+const STRUCTURAL_LITTER_CARBON_TO_NITROGEN = 150.0
+
 supported_configurations() = (:carbon_only, :carbon_nitrogen)
 
 canonical_schedule(stages) = Tuple(stages) == COMPLETE_STAGES
@@ -78,6 +80,8 @@ function read_cn_parameters(path; boreal_fixation = false)
         pft => merge(
             base[pft],
             (;
+                leaf_phosphorus_to_nitrogen =
+                    inv(base[pft].leaf_nitrogen_to_phosphorus),
                 initial_nitrogen = Tuple(initial_nitrogen[pft][1:10]) ./ 1000,
                 nitrogen_ratio_minimum = Tuple(
                     nutrients[pft][index] for index in (1, 3, 5)
@@ -85,7 +89,8 @@ function read_cn_parameters(path; boreal_fixation = false)
                 nitrogen_ratio_maximum = Tuple(
                     nutrients[pft][index] for index in (2, 4, 6)
                 ),
-                structural_litter_nitrogen_ratio = inv(chemistry[pft][2]),
+                structural_litter_nitrogen_ratio =
+                    inv(STRUCTURAL_LITTER_CARBON_TO_NITROGEN),
                 soil_nitrogen_ratio_minimum = Tuple(
                     inv.(chemistry[pft][16:18]),
                 ),

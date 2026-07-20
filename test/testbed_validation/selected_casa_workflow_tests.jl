@@ -118,7 +118,15 @@ end
 
 @testset "selected-cell CASA-CN setup" begin
     setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_nitrogen)
+    cropland_mosaic = setup.normal.parameters[14]
+    grassland = setup.normal.parameters[10]
 
+    @test cropland_mosaic.leaf_phosphorus_to_nitrogen == 0.1
+    @test grassland.leaf_phosphorus_to_nitrogen == inv(15.0)
+    @test all(
+        parameter.structural_litter_nitrogen_ratio == inv(150.0) for
+        parameter in Base.values(setup.normal.parameters)
+    )
     @test getproperty.(setup.grid, :cell_id) == setup.cell_ids
     @test propertynames(setup.initial_state.casa_plant) == (
         :c_leaf,
