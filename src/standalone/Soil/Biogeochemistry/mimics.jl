@@ -35,6 +35,9 @@ Compile-time strategy for evaluating standalone MIMICS carbon processes.
 Concrete subtypes:
 - [`LegacyDaily`](@ref): Apply the ordered reference map.
 - [`ContinuousRate`](@ref): Evaluate the simultaneous carbon-only ODE.
+
+Subtypes implement `carbon_fluxes(::Subtype, args...)` to select their point
+kernel and must remain immutable singleton dispatch types.
 """
 abstract type TemporalMode end
 
@@ -45,7 +48,9 @@ Select the exact ordered one-day map used by the reference Fortran testbed.
 
 # Examples
 ```julia
-mode = LegacyDaily()
+using ClimaLand
+MIMICS = ClimaLand.Soil.Biogeochemistry.MIMICS
+mode = MIMICS.LegacyDaily()
 ```
 """
 struct LegacyDaily <: TemporalMode end
@@ -57,7 +62,9 @@ Select the timestep-independent, simultaneous MIMICS carbon ODE.
 
 # Examples
 ```julia
-mode = ContinuousRate()
+using ClimaLand
+MIMICS = ClimaLand.Soil.Biogeochemistry.MIMICS
+mode = MIMICS.ContinuousRate()
 ```
 """
 struct ContinuousRate <: TemporalMode end
@@ -927,7 +934,46 @@ transfer [kg C m⁻² s⁻¹], in that order.
 
 # Examples
 ```julia
-fluxes = continuous_carbon_fluxes(parameters, state..., drivers...)
+using ClimaLand
+MIMICS = ClimaLand.Soil.Biogeochemistry.MIMICS
+FT = Float64
+carbon = MIMICS.CarbonParameters{FT}(;
+    vmax_slope = ntuple(_ -> FT(0.063), 6),
+    vmax_intercept = ntuple(_ -> FT(5.47), 6),
+    vmax_prefactor = ntuple(_ -> FT(1.25e-8), 6),
+    vmax_modifier = FT.((10, 2, 10, 3, 3, 2)),
+    km_slope = ntuple(_ -> FT(0.02), 6),
+    km_intercept = ntuple(_ -> FT(3.19), 6),
+    km_prefactor = ntuple(_ -> FT(0.015625), 6),
+    km_modifier = FT.((8, 2, 4, 2, 4, 6)),
+    oxidation_modifier = FT.((4, 4)),
+    microbial_growth_efficiency = FT.((0.5, 0.25, 0.7, 0.35)),
+    r_turnover = FT.((0.00052, 0.3)),
+    k_turnover = FT.((0.00024, 0.1)),
+    turnover_npp_denominator = FT(100),
+    turnover_modifier_minimum = FT(0.6),
+    turnover_modifier_maximum = FT(1.3),
+    r_physical_partition = FT.((0.03, 1.3)),
+    k_physical_partition = FT.((0.02, 0.8)),
+    r_chemical_partition = FT.((0.1, -3, 3)),
+    k_chemical_partition = FT.((0.3, -3, 3)),
+    desorption = FT.((1.05e-6, -2)),
+    physical_scalar = FT.((3, -2)),
+    input_protection = FT.((0.005, 0.30)),
+    depth_cm = FT(100),
+)
+parameters = MIMICS.MIMICSSoilModelParameters{FT, typeof(carbon)}(;
+    carbon,
+    clay = FT(0.21805),
+    freezing_temperature = FT(273.15),
+    cwd_q10 = FT(1.72),
+    cwd_litter_optimum = FT(0.4),
+    cwd_base_rate = inv(FT(365 * 0.824 * 86400)),
+    cwd_respiration_fraction = FT(0.48),
+)
+state = FT.((1, 2, 0.5, 0.03, 0.04, 3, 4, 5))
+drivers = FT.((283.15, 0.3, 0.1, 1e-8, 2e-8, 3e-8, 0.5, 0.3))
+fluxes = MIMICS.continuous_carbon_fluxes(parameters, state..., drivers...)
 carbon_tendencies = fluxes[1:8]
 ```
 
