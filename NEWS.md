@@ -2,6 +2,9 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-🐛bugfix] Correct CASA-CN plant mineral-N supply limiting and
+  selected-workflow P:N and structural-litter C:N parameters, and regenerate
+  the 37-cell CASA references with the corrected Julia--Fortran tolerances.
 - ![][badge-✨feature] Add the native 4,263-cell MIMICS-C prespin, long-spin,
   and historical reconstruction with native checkpoints, process diagnostics,
   stage carbon budgets, and separate fresh-Fortran and archive comparisons.

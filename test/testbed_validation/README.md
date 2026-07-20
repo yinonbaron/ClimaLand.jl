@@ -720,6 +720,24 @@ julia --project=test \
   test/testbed_validation/fixtures/selected_cells/complete_casa_workflow.toml
 ```
 
+The CASA-CN reference includes the plant mineral-N supply limit, the parameter
+table's P:N interpretation, and CASA's fixed structural-litter C:N ratio of
+150. Regenerating the corrected 37-cell reference reduced the largest measured
+stage-boundary Julia--fresh-Fortran absolute error from `8.55 kg m^-2` to
+`0.00430 kg m^-2`; the regression caps it at `0.005 kg m^-2`. Over the matched
+daily windows 1901--1905 and 2010--2014, representative maximum cell NRMSE
+values changed as follows:
+
+| Pool | Before, Julia vs archive | Corrected Julia vs Fortran | Corrected Julia vs archive |
+| --- | ---: | ---: | ---: |
+| Slow soil C | 22.542% | 0.038% | 0.024% |
+| Structural litter N | 40.857% | 1.873% | 0.872% |
+| Mineral N | 37.569% | 2.762% | 2.478% |
+
+Every pool's across-cell median Julia--Fortran NRMSE is below `0.0013%`. The
+remaining `10.722%` maximum for metabolic litter C occurs at cell 923, where
+the fresh-Fortran mean stock is only `0.00495 g m^-2`.
+
 `Reproduces the Fortran` means the same pinned equations, ordering, daily map,
 parameters, drivers, initialization, restarts, and postprocessing; bitwise
 identity across languages is not required. An archive/source discrepancy must

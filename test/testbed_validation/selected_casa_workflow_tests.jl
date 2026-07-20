@@ -35,6 +35,13 @@ end
             haskey(tolerance, "measured_maximum_absolute_error") for
             stage in values(measured) for tolerance in values(stage)
         )
+        if configuration == :carbon_nitrogen
+            measured_errors = [
+                tolerance["measured_maximum_absolute_error"] for
+                stage in values(measured) for tolerance in values(stage)
+            ]
+            @test maximum(measured_errors) < 5e-3
+        end
         @test Set(
             keys(pinned["provenance"]["fresh_fortran_boundary_sha256"]),
         ) == Set(stage_names)
