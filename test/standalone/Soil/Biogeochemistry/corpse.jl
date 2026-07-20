@@ -7,9 +7,11 @@ using ClimaLand.Soil.Biogeochemistry
 using ClimaLand.Domains: Plane, Point
 import ClimaTimeSteppers as CTS
 import StaticArrays
-using NCDatasets
 
 include("../../../testbed_validation/model_architecture.jl")
+include("../../../shared_utilities/corpse_test_parameters.jl")
+
+using .TestCORPSEParameters: corpse_carbon_parameters
 
 const CORPSE = Biogeochemistry.CORPSE
 const FORWARD_EULER = CTS.ExplicitAlgorithm(
@@ -19,28 +21,6 @@ const FORWARD_EULER = CTS.ExplicitAlgorithm(
         c = zeros(Int, 1),
     ),
 )
-
-function corpse_carbon_parameters(::Type{FT}) where {FT}
-    return CORPSE.CarbonParameters{FT}(;
-        vmax_reference = FT.((1000, 25, 400)),
-        activation_energy = FT.((5000, 30000, 3000)),
-        michaelis_constant = FT.((0.01, 0.01, 0.01)),
-        minimum_microbe_fraction = FT(0.001),
-        microbe_turnover_time = FT(0.25),
-        uptake_efficiency = FT.((0.6, 0.05, 0.6)),
-        protection_rate = FT(1.5),
-        protection_species = FT.((0.11, 0.002, 1)),
-        protected_turnover_time = FT(75),
-        protected_decomposition_factor = zero(FT),
-        turnover_efficiency = FT(0.6),
-        enzyme_fraction = one(FT),
-        turnover_factor = FT.((1, 1, 1)),
-        gas_diffusion_exponent = FT(2.5),
-        minimum_anaerobic_factor = FT(0.003),
-        minimum_moisture_factor = FT(0.001),
-        litter_density = FT(22),
-    )
-end
 
 function corpse_model_parameters(
     ::Type{FT};
@@ -611,174 +591,4 @@ end
         sum(abs(legacy_day[index]) for index in physical_indices)
     @test relative_legacy_distance < 2e-5
     @test relative_legacy_distance > 1e-6
-end
-
-@testset "CORPSE fresh Fortran productive-cell trajectory" begin
-    fixture = normpath(
-        joinpath(
-            @__DIR__,
-            "../../../testbed_validation/fixtures/corpse_c_fresh_cell_11060",
-        ),
-    )
-    parameters = corpse_carbon_parameters(Float64)
-    initial_rhizosphere =
-        StaticArrays.SVector(0.0, 1.998, 0.0, 0.0, 0.0, 0.0, 0.002, 0.0, 2.0)
-    zero_cohort = zero(initial_rhizosphere)
-    state = (initial_rhizosphere, zero_cohort, zero_cohort, zero_cohort)
-    continuous_state = state
-    casa_path = joinpath(fixture, "casa_fortran_1901_cell_11060.nc")
-    corpse_path = joinpath(fixture, "corpse_fortran_1901_cell_11060.nc")
-    NCDataset(casa_path) do casa
-        NCDataset(corpse_path) do corpse
-            annual_npp = sum(Float64.(casa["cgpp"][:, :, :])) / 2
-            requested_exudate = 0.02 * annual_npp / 365 / 1000
-            qmax = CORPSE.mineral_protection_capacity(0.21805, 0.41312)
-            pool_variables = (
-                ("Soil_C1", 1),
-                ("Soil_C2", 2),
-                ("Soil_C3", 3),
-                ("SoilProtected_C1", 4),
-                ("SoilProtected_C2", 5),
-                ("SoilProtected_C3", 6),
-            )
-            maximum_pool_error = 0.0
-            maximum_respiration_error = 0.0
-            maximum_moisture_error = 0.0
-            maximum_continuous_pool_error = 0.0
-            maximum_continuous_respiration_error = 0.0
-            for day in 1:365
-                metabolic = Float64(casa["cLitInptMet"][1, 1, day]) / 1000
-                recalcitrant = Float64(casa["cLitInptStruc"][1, 1, day]) / 1000
-                exudate = min(requested_exudate, metabolic)
-                inputs = (;
-                    root_litter = StaticArrays.SVector(
-                        metabolic - exudate,
-                        recalcitrant,
-                        0.0,
-                    ),
-                    leaf_litter = StaticArrays.SVector(0.0, 0.0, 0.0),
-                    exudate = StaticArrays.SVector(exudate, 0.0, 0.0),
-                )
-                liquid = Float64(corpse["thetaLiq"][1, 1, day])
-                frozen = Float64(corpse["thetaFrzn"][1, 1, day])
-                environment = (;
-                    rhizosphere_fraction = 0.3,
-                    temperature = Float64(corpse["Ts"][1, 1, day]),
-                    liquid_saturation = liquid,
-                    air_filled_porosity = max(0.0, 1 - liquid - frozen),
-                    qmax,
-                    layer_thickness = 0.15,
-                )
-                mapped = CORPSE.daily_carbon_map(
-                    parameters,
-                    state,
-                    inputs,
-                    environment,
-                )
-                state = mapped.state
-
-                continuous_root_litter = inputs.root_litter / 86400
-                continuous_exudate = inputs.exudate / 86400
-                no_input = zero(continuous_exudate)
-                continuous_co2_before =
-                    sum(cohort[8] for cohort in continuous_state)
-                for _ in 1:96
-                    soil_rhiz_tendency =
-                        CORPSE.continuous_cohort_tendencies(
-                            parameters,
-                            continuous_state[1],
-                            continuous_root_litter,
-                            continuous_exudate,
-                            0.3,
-                            environment.temperature,
-                            environment.liquid_saturation,
-                            environment.air_filled_porosity,
-                            qmax,
-                            environment.layer_thickness,
-                        )
-                    soil_bulk_tendency =
-                        CORPSE.continuous_cohort_tendencies(
-                            parameters,
-                            continuous_state[2],
-                            continuous_root_litter,
-                            no_input,
-                            0.7,
-                            environment.temperature,
-                            environment.liquid_saturation,
-                            environment.air_filled_porosity,
-                            qmax,
-                            environment.layer_thickness,
-                        )
-                    continuous_state = (
-                        continuous_state[1] + 900 * soil_rhiz_tendency.state,
-                        continuous_state[2] + 900 * soil_bulk_tendency.state,
-                        continuous_state[3],
-                        continuous_state[4],
-                    )
-                end
-                for (variable, index) in pool_variables
-                    actual = 1000 * (state[1][index] + state[2][index])
-                    expected = Float64(corpse[variable][1, 1, day])
-                    maximum_pool_error =
-                        max(maximum_pool_error, abs(actual - expected))
-                    continuous_actual =
-                        1000 *
-                        (
-                            continuous_state[1][index] +
-                            continuous_state[2][index]
-                        )
-                    maximum_continuous_pool_error = max(
-                        maximum_continuous_pool_error,
-                        abs(continuous_actual - expected),
-                    )
-                end
-                actual_microbes = 1000 * (state[1][7] + state[2][7])
-                maximum_pool_error = max(
-                    maximum_pool_error,
-                    abs(
-                        actual_microbes -
-                        Float64(corpse["Soil_LiveMicrobeC"][1, 1, day]),
-                    ),
-                )
-                continuous_microbes =
-                    1000 * (continuous_state[1][7] + continuous_state[2][7])
-                maximum_continuous_pool_error = max(
-                    maximum_continuous_pool_error,
-                    abs(
-                        continuous_microbes -
-                        Float64(corpse["Soil_LiveMicrobeC"][1, 1, day]),
-                    ),
-                )
-                maximum_respiration_error = max(
-                    maximum_respiration_error,
-                    abs(
-                        1000 * mapped.respiration -
-                        Float64(corpse["Soil_CO2"][1, 1, day]),
-                    ),
-                )
-                continuous_respiration =
-                    1000 *
-                    (
-                        sum(cohort[8] for cohort in continuous_state) -
-                        continuous_co2_before
-                    )
-                maximum_continuous_respiration_error = max(
-                    maximum_continuous_respiration_error,
-                    abs(
-                        continuous_respiration -
-                        Float64(corpse["Soil_CO2"][1, 1, day]),
-                    ),
-                )
-                maximum_moisture_error = max(
-                    maximum_moisture_error,
-                    abs(mapped.moisture - Float64(corpse["fW"][1, 1, day])),
-                )
-            end
-            @test maximum_pool_error < 2e-6
-            @test maximum_respiration_error < 2e-8
-            @test maximum_moisture_error < 4e-18
-            @test maximum_continuous_pool_error < 0.2
-            @test maximum_continuous_respiration_error < 0.0013
-        end
-    end
 end
