@@ -39,9 +39,13 @@ import TOML
     @test initial_mimics_carbon(:c_microbe_r) == 0.015
     @test initial_mimics_carbon(:c_microbe_k) == 0.025
     @test initial_mimics_carbon(:c_soil_physical) == 1.0
-    boundary_scale = TestbedNativeMIMICSCReconstruction.boundary_reference_scale
-    @test boundary_scale(:casa) == 1000.0
-    @test boundary_scale(:mimics) == 1.0
+    native_scale = TestbedNativeMIMICSCReconstruction.boundary_native_scale
+    reference_scale =
+        TestbedNativeMIMICSCReconstruction.boundary_reference_scale
+    @test native_scale(:casa) == 1000.0
+    @test native_scale(:mimics) == 1000.0
+    @test reference_scale(:casa) == 1.0
+    @test reference_scale(:mimics) == 1000.0
     annual_mean = TestbedNativeMIMICSCReconstruction.annual_point_mean
     @test annual_mean(reshape(1.0:6.0, 2, 3)) == [3.0, 4.0]
 end

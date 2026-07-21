@@ -520,7 +520,8 @@ function read_boundary_csv(path)
     return columns, data
 end
 
-boundary_reference_scale(source) = source == :casa ? 1000.0 : 1.0
+boundary_native_scale(_) = 1000.0
+boundary_reference_scale(source) = source == :casa ? 1.0 : 1000.0
 
 function compare_boundary_csv(Y, casa_path, mimics_path; atol, rtol)
     casa_columns, casa_data = read_boundary_csv(casa_path)
@@ -532,11 +533,13 @@ function compare_boundary_csv(Y, casa_path, mimics_path; atol, rtol)
         columns, data =
             source == :casa ? (casa_columns, casa_data) :
             (mimics_columns, mimics_data)
-        scale = boundary_reference_scale(source)
+        native_scale = boundary_native_scale(source)
+        reference_scale = boundary_reference_scale(source)
         actual =
-            scale .*
+            native_scale .*
             vec(Array(parent(getproperty(getproperty(Y, component), variable))))
         expected =
+            reference_scale .*
             [parse(Float64, row[columns[reference_name]]) for row in data]
         report[reference_name] =
             casa().error_metrics(actual, expected; atol, rtol)
