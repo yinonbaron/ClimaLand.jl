@@ -95,7 +95,11 @@ function define_like(destination, source, source_name, destination_name)
     )
 end
 
-function write_fortran_meteorology(source_path, destination_path)
+function write_fortran_meteorology(
+    source_path,
+    destination_path;
+    selected_year = 1901,
+)
     NCDatasets.NCDataset(source_path) do source
         NCDatasets.NCDataset(
             destination_path,
@@ -131,7 +135,9 @@ function write_fortran_meteorology(source_path, destination_path)
             latitude = NCDatasets.defVar(destination, "lat", Float32, ("lat",))
             latitude[:] = Float32[0]
             year = NCDatasets.defVar(destination, "year", Int32, ("myear",))
-            year[:] = Int32[1901]
+            year[:] = Int32[selected_year]
+            first_day = (selected_year - 1901) * 365 + 1
+            days = first_day:(first_day + 364)
             for name in ("landfrac", "cellMissing", "cellid")
                 variable = source[name]
                 output = NCDatasets.defVar(
@@ -152,7 +158,7 @@ function write_fortran_meteorology(source_path, destination_path)
                     ("lon", "lat", "time");
                     attrib = Dict(variable.attrib),
                 )
-                output[:, 1, :] = permutedims(variable[1:365, :], (2, 1))
+                output[:, 1, :] = permutedims(variable[days, :], (2, 1))
             end
             for name in ("xtsoil", "xmoist", "xfrznmoist")
                 variable = source[name]
@@ -164,7 +170,7 @@ function write_fortran_meteorology(source_path, destination_path)
                     attrib = Dict(variable.attrib),
                 )
                 output[:, 1, :, :] =
-                    permutedims(variable[:, 1:365, :], (3, 1, 2))
+                    permutedims(variable[:, days, :], (3, 1, 2))
             end
         end
     end

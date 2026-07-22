@@ -608,6 +608,31 @@ core, extended, and arbitrary subset collections all pass through the shared
 bounded comparison runner. Following the Fortran CASA/CORPSE driver, PFTs 11,
 13, 15, and 17 are reported as explicitly skipped ice/water cells.
 
+The complete workflow oracle is
+`fixtures/selected_corpse/complete_workflow.nc`, with extraction and run
+provenance in `complete_workflow.toml`. It uses the same pinned source,
+compiler flags, CASA parameters, CORPSE namelist, and selected GSWP3 fixture
+for a 100-year prespin, two 9,980-year spins joined by exact CASA and
+cohort-restart handoffs, and the 1901--2014 historical transient. The extended
+run contains the core set as an explicit mask, so both collections share one
+authoritative execution. The artifact records every CASA boundary and each
+rhizosphere/bulk, litter/soil CORPSE cohort component, including cumulative
+respiration, original-carbon bookkeeping, and cumulative decomposition.
+Per-cell conservation and spin-convergence records and SHA-256 hashes for each
+stage's control, inputs, outputs, and log remain in the manifest.
+
+The legacy 2000--2010 mean is not promoted because its exact CRU-NCEP forcing
+and CASA/CORPSE restart are unavailable. The complete fresh GSWP3 execution is
+therefore the oracle, while the legacy mean remains informational. Regenerate
+the resumable workflow with:
+
+```bash
+julia --startup-file=no --project=test \
+  test/testbed_validation/generate_complete_selected_corpse_reference.jl \
+  <biogeochem-testbed-source-root> <run-root> \
+  test/testbed_validation/fixtures/selected_corpse
+```
+
 Every productive cell uses one forcing series and initial state for both the
 LegacyDaily and 900-second ContinuousRate paths. LegacyDaily retains absolute
 pool, respiration, final-state, and machine-precision moisture gates.

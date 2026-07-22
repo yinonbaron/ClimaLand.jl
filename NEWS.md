@@ -2,6 +2,12 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Added the source-pinned selected-cell CORPSE reference
+  covering CASA/CORPSE prespin, two 9,980-year spin stages with cohort restart
+  handoff, and the 1901--2014 GSWP3 transient. Package tests consume the
+  extracted CASA/cohort boundary artifact and its per-cell convergence,
+  conservation, control, input, output, and log hashes without compiling
+  Fortran. Issue [#36](https://github.com/yinonbaron/ClimaLand.jl/issues/36).
 - ![][badge-✨feature] Add the source-pinned, resumable 4,263-cell MIMICS-CN
   prespin, two-stage long-spin, and 1901--2014 archive reconstruction workflow,
   with paired CASA/MIMICS restart hashes, C/N convergence records, and exact

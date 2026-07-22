@@ -29,6 +29,8 @@ using ..TestCORPSEParameters: corpse_carbon_parameters
 const CORPSE = ClimaLand.Soil.Biogeochemistry.CORPSE
 const REFERENCE_MANIFEST =
     joinpath(@__DIR__, "fixtures", "selected_corpse", "fixture.toml")
+const WORKFLOW_REFERENCE_MANIFEST =
+    joinpath(@__DIR__, "fixtures", "selected_corpse", "complete_workflow.toml")
 
 reference_cells() =
     getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
@@ -49,6 +51,29 @@ function verified_reference()
         error("CORPSE reference size mismatch: $path")
     sha256sum(path) == description["sha256"] ||
         error("CORPSE reference checksum mismatch: $path")
+    return (; manifest, path)
+end
+
+"""
+    verified_workflow_reference()
+
+Return the verified, package-test-ready complete CORPSE workflow reference.
+"""
+function verified_workflow_reference()
+    isfile(WORKFLOW_REFERENCE_MANIFEST) || error(
+        "Complete CORPSE workflow manifest is missing: " *
+        WORKFLOW_REFERENCE_MANIFEST,
+    )
+    manifest = TOML.parsefile(WORKFLOW_REFERENCE_MANIFEST)
+    manifest["schema_version"] == 1 ||
+        error("Unsupported complete CORPSE workflow reference schema")
+    artifact = manifest["artifact"]
+    path = joinpath(dirname(WORKFLOW_REFERENCE_MANIFEST), artifact["filename"])
+    isfile(path) || error("Complete CORPSE workflow artifact is missing: $path")
+    filesize(path) == artifact["bytes"] ||
+        error("Complete CORPSE workflow artifact size mismatch: $path")
+    sha256sum(path) == artifact["sha256"] ||
+        error("Complete CORPSE workflow artifact checksum mismatch: $path")
     return (; manifest, path)
 end
 

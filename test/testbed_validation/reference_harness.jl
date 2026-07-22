@@ -1067,6 +1067,11 @@ function write_smoke_control(
     mimics_initial = "unused_mimics_initial.csv",
     mimics_final = "unused_mimics_final.csv",
     mimics_netcdf = "unused_mimics_yyyy.nc",
+    corpse_initial = "unused_corpse_initial.csv",
+    corpse_final = "unused_corpse_final.csv",
+    corpse_parameters = "corpse_parameters.nml",
+    corpse_netcdf = "corpse_pool_flux_yyyy.nc",
+    netcdf_interval = 1,
 )
     values = (
         string(points),
@@ -1090,15 +1095,14 @@ function write_smoke_control(
         mimics_initial,
         mimics_final,
         mimics_netcdf,
-        "unused_corpse_initial.csv",
-        "unused_corpse_final.csv",
-        soil_model == 3 ? "corpse_parameters.nml" :
-        "unused_corpse_parameters.nml",
-        "corpse_pool_flux_yyyy.nc",
+        corpse_initial,
+        corpse_final,
+        soil_model == 3 ? corpse_parameters : "unused_corpse_parameters.nml",
+        corpse_netcdf,
         "perturbation.txt",
         "-1",
         "./",
-        "1",
+        string(netcdf_interval),
     )
     path = joinpath(run_dir, "fcasacnp_clm_testbed.lst")
     write(path, join(values, '\n') * "\n")
