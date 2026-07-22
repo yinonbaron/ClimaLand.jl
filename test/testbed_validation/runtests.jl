@@ -17,6 +17,7 @@ include("selected_casa_workflow_tests.jl")
 include("selected_casa_workflow_regression_tests.jl")
 include("selected_corpse_workflow.jl")
 include("selected_corpse_workflow_tests.jl")
+include("selected_corpse_workflow_regression_tests.jl")
 
 TestbedReferenceHarness.self_test()
 TestbedCandidateReconstruction.self_test()

@@ -67,6 +67,24 @@ const CORPSE_COMPONENTS = (
 )
 const LAYERS = ("litter", "soil")
 const COHORTS = ("rhizosphere", "bulk")
+const HISTORICAL_YEARS = (1901, 1957, 2014)
+const HISTORICAL_CASA_FIELDS = ("cleaf", "cwood", "cfroot", "clitcwd")
+const HISTORICAL_CORPSE_FIELDS = (
+    "Soil_C1",
+    "Soil_C2",
+    "Soil_C3",
+    "SoilProtected_C1",
+    "SoilProtected_C2",
+    "SoilProtected_C3",
+    "Soil_LiveMicrobeC",
+    "LitterLayer_C1",
+    "LitterLayer_C2",
+    "LitterLayer_C3",
+    "LitterLayer_LiveMicrobeC",
+    "Ts",
+    "thetaLiq",
+    "thetaFrzn",
+)
 
 sha256sum(path) =
     open(path) do io
@@ -332,6 +350,45 @@ function boundary_arrays(run_root, cell_ids)
     return (; casa_fields, casa_state, corpse_state, pfts)
 end
 
+function historical_arrays(run_root, cell_ids)
+    directory = joinpath(run_root, "stages", "04-historical")
+    casa = zeros(
+        Float64,
+        length(HISTORICAL_CASA_FIELDS),
+        length(HISTORICAL_YEARS),
+        length(cell_ids),
+    )
+    corpse = zeros(
+        Float64,
+        length(HISTORICAL_CORPSE_FIELDS),
+        length(HISTORICAL_YEARS),
+        length(cell_ids),
+    )
+    for (year_index, year) in enumerate(HISTORICAL_YEARS)
+        NCDatasets.NCDataset(
+            joinpath(directory, output_name("casaclm", year, false)),
+        ) do dataset
+            Int.(vec(dataset["cellid"][:, 1])) == cell_ids ||
+                error("Historical CASA cells are not in fixture order")
+            for (field_index, field) in enumerate(HISTORICAL_CASA_FIELDS)
+                casa[field_index, year_index, :] =
+                    vec(Float64.(dataset[field][:, 1, 1]))
+            end
+        end
+        NCDatasets.NCDataset(
+            joinpath(directory, output_name("corpse", year, false)),
+        ) do dataset
+            Int.(vec(dataset["cellid"][:, 1])) == cell_ids ||
+                error("Historical CORPSE cells are not in fixture order")
+            for (field_index, field) in enumerate(HISTORICAL_CORPSE_FIELDS)
+                corpse[field_index, year_index, :] =
+                    vec(Float64.(dataset[field][:, 1, 1]))
+            end
+        end
+    end
+    return (; casa, corpse)
+end
+
 function diagnostics(arrays, cell_ids)
     respiration = findfirst(==("cumulative_respiration"), CORPSE_COMPONENTS)
     original = findfirst(==("original_carbon"), CORPSE_COMPONENTS)
@@ -386,7 +443,7 @@ function diagnostics(arrays, cell_ids)
     )
 end
 
-function write_artifact(path, arrays, cell_ids, core_ids)
+function write_artifact(path, arrays, historical, cell_ids, core_ids)
     NCDatasets.NCDataset(path, "c"; format = :netcdf4) do dataset
         NCDatasets.defDim(dataset, "cell", length(cell_ids))
         NCDatasets.defDim(dataset, "stage", length(STAGES))
@@ -402,6 +459,17 @@ function write_artifact(path, arrays, cell_ids, core_ids)
         )
         NCDatasets.defDim(dataset, "layer", length(LAYERS))
         NCDatasets.defDim(dataset, "cohort", length(COHORTS))
+        NCDatasets.defDim(dataset, "historical_year", length(HISTORICAL_YEARS))
+        NCDatasets.defDim(
+            dataset,
+            "historical_casa_field",
+            length(HISTORICAL_CASA_FIELDS),
+        )
+        NCDatasets.defDim(
+            dataset,
+            "historical_corpse_field",
+            length(HISTORICAL_CORPSE_FIELDS),
+        )
         dataset.attrib["source"] = "pinned fresh GSWP3 CORPSE Fortran workflow"
         NCDatasets.defVar(dataset, "cellid", Int32, ("cell",))[:] = cell_ids
         NCDatasets.defVar(dataset, "pft", Int32, ("cell",))[:] = arrays.pfts
@@ -443,6 +511,42 @@ function write_artifact(path, arrays, cell_ids, core_ids)
         )
         corpse_state.attrib["units"] = "kg C m-2"
         corpse_state[:] = arrays.corpse_state
+        NCDatasets.defVar(
+            dataset,
+            "historical_year",
+            Int32,
+            ("historical_year",),
+        )[:] = collect(Int32.(HISTORICAL_YEARS))
+        NCDatasets.defVar(
+            dataset,
+            "historical_casa_field",
+            String,
+            ("historical_casa_field",),
+        )[:] = collect(HISTORICAL_CASA_FIELDS)
+        NCDatasets.defVar(
+            dataset,
+            "historical_corpse_field",
+            String,
+            ("historical_corpse_field",),
+        )[:] = collect(HISTORICAL_CORPSE_FIELDS)
+        historical_casa = NCDatasets.defVar(
+            dataset,
+            "historical_casa",
+            Float64,
+            ("historical_casa_field", "historical_year", "cell");
+            deflatelevel = 3,
+        )
+        historical_casa.attrib["units"] = "g C m-2 annual mean"
+        historical_casa[:] = historical.casa
+        historical_corpse = NCDatasets.defVar(
+            dataset,
+            "historical_corpse",
+            Float64,
+            ("historical_corpse_field", "historical_year", "cell");
+            deflatelevel = 3,
+        )
+        historical_corpse.attrib["units"] = "source units; carbon g C m-2, temperature K, saturation fraction"
+        historical_corpse[:] = historical.corpse
     end
     return path
 end
@@ -510,9 +614,11 @@ function generate(source_root, run_root, destination = REFERENCE_DIRECTORY)
     cell_ids = Int.(selection["extended_cell_ids"])
     core_ids = Int.(selection["core_cell_ids"])
     arrays = boundary_arrays(run_root, cell_ids)
+    historical = historical_arrays(run_root, cell_ids)
     artifact_path = write_artifact(
         joinpath(destination, ARTIFACT_FILENAME),
         arrays,
+        historical,
         cell_ids,
         core_ids,
     )
@@ -555,7 +661,7 @@ function generate(source_root, run_root, destination = REFERENCE_DIRECTORY)
         "extraction" => Dict(
             "command" => "julia --project=test generate_complete_selected_corpse_reference.jl <source-root> <run-root> [destination]",
             "state_boundary" => "final CASA and cohort-resolved CORPSE restart state for each stage",
-            "historical_coverage" => "1901-2014 annual raw outputs verified by stage output hashes",
+            "historical_coverage" => "1901, 1957, and 2014 annual samples packed from the hash-verified 1901-2014 raw outputs",
             "core_representation" => "core_cell mask over the complete extended-cell artifact",
         ),
     )

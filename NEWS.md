@@ -2,6 +2,10 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-🔥behavioralΔ] Added prescribed CORPSE exudation to integrated
+  CASA--CORPSE carbon routing and a complete selected-cell `LegacyDaily`
+  prespin-to-history regression. Issue
+  [#37](https://github.com/yinonbaron/ClimaLand.jl/issues/37).
 - ![][badge-✨feature] Added the source-pinned selected-cell CORPSE reference
   covering CASA/CORPSE prespin, two 9,980-year spin stages with cohort restart
   handoff, and the 1901--2014 GSWP3 transient. Package tests consume the

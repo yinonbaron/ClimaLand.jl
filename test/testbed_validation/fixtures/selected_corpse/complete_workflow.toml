@@ -2,9 +2,9 @@ schema_version = 1
 title = "Complete selected-cell CORPSE fresh-Fortran workflow reference"
 
 [artifact]
-bytes = 45384
+bytes = 66173
 filename = "complete_workflow.nc"
-sha256 = "dd780f318614eadfe19b1792d044557ec67d5716c47793b77ef756c6eabb0b8b"
+sha256 = "5f1cb5c95649698693f256f05bdb4e44e9af688645fd5435076f771c8e4051db"
 
 [build]
 compatibility_patch_md5 = "f428bde7532893d2daeaaa483e15708c"
@@ -1433,7 +1433,7 @@ spin_active_carbon = 9.316558
 [extraction]
 command = "julia --project=test generate_complete_selected_corpse_reference.jl <source-root> <run-root> [destination]"
 core_representation = "core_cell mask over the complete extended-cell artifact"
-historical_coverage = "1901-2014 annual raw outputs verified by stage output hashes"
+historical_coverage = "1901, 1957, and 2014 annual samples packed from the hash-verified 1901-2014 raw outputs"
 state_boundary = "final CASA and cohort-resolved CORPSE restart state for each stage"
 
 [oracle]

@@ -2,6 +2,65 @@ using Test
 
 import NCDatasets
 
+@testset "complete native CORPSE workflow schedule" begin
+    stages = TestbedSelectedCORPSEWorkflow.COMPLETE_STAGES
+
+    @test getproperty.(stages, :name) ==
+          (:prespin, :spin, :restart, :historical)
+    @test getproperty.(stages, :forcing_days) ==
+          (365, 20 * 365, 20 * 365, 114 * 365)
+    @test getproperty.(stages, :repeats) == (100, 499, 499, 1)
+    @test TestbedSelectedCORPSEWorkflow.canonical_schedule(stages)
+end
+
+@testset "inactive CORPSE cells retain native diagnostic semantics" begin
+    setup = TestbedSelectedCORPSEWorkflow.load_complete_setup(
+        TestbedReferenceCellComparisons.extended_cell_collection(),
+    )
+    inactive = findall(!, setup.forcing.base.active)
+
+    @test !isempty(inactive)
+    @test all(iszero, setup.forcing.liquid_saturation[inactive, :])
+    @test all(iszero, setup.forcing.frozen_saturation[inactive, :])
+    @test any(x -> !iszero(x), setup.forcing.base.soil_temperature[inactive, :])
+end
+
+@testset "native CORPSE checkpoints hand off the complete state" begin
+    reference_cells = TestbedReferenceCellComparisons
+    collection = reference_cells.subset(
+        reference_cells.extended_cell_collection(),
+        [532],
+    )
+    tiny_stages = Tuple(
+        TestbedNativeWorkflow.NativeStage(
+            name,
+            2,
+            1;
+            write_output = name == :historical,
+        ) for name in (:prespin, :spin, :restart, :historical)
+    )
+
+    mktempdir() do output_root
+        result = TestbedSelectedCORPSEWorkflow.run_selected_case(
+            output_root;
+            collection,
+            stages = tiny_stages,
+            compare_references = false,
+        )
+
+        @test getproperty.(result.stages, :name) ==
+              (:prespin, :spin, :restart, :historical)
+        @test all(getproperty.(result.stages, :checkpoint_roundtrip_verified))
+        @test all(getproperty.(result.stages, :checkpoint_handoff_verified))
+        @test all(getproperty.(result.stages, :restart_transform_verified))
+        @test all(getproperty.(result.stages, :complete_corpse_state_verified))
+        @test all(getproperty.(result.stages, :conservation_verified))
+        @test result.full_workflow_conservation_verified
+        @test result.age_representation == "fixed cohort identity"
+        @test isfile(result.report)
+    end
+end
+
 @testset "CORPSE comparison accepts replaceable cell collections" begin
     ordinary = TestbedReferenceCellComparisons.ordinary_cell_collection()
     extended = TestbedReferenceCellComparisons.extended_cell_collection()
@@ -145,6 +204,12 @@ end
         @test dataset["corpse_state"].attrib["units"] == "kg C m-2"
         @test "original_carbon" in dataset["corpse_state_field"][:]
         @test "cumulative_respiration" in dataset["corpse_state_field"][:]
+        @test Int.(dataset["historical_year"][:]) == [1901, 1957, 2014]
+        @test size(dataset["historical_casa"]) == (4, 3, 37)
+        @test size(dataset["historical_corpse"]) == (14, 3, 37)
+        @test Set(dataset["historical_corpse_field"][:]) ⊇
+              Set(("Ts", "thetaLiq", "thetaFrzn"))
+        @test "clitcwd" in dataset["historical_casa_field"][:]
     end
 
     diagnostics = manifest["diagnostics"]

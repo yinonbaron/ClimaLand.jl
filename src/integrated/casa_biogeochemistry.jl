@@ -815,6 +815,7 @@ function make_update_boundary_fluxes(model::CASAPlantCORPSESoilModel)
         plant_boundary!(p, Y, t)
         soil_boundary!(p, Y, t)
         update_litter_coupling!(p, model.coupling)
+        @. p.exudate_labile_input += p.corpse_soil.exudate_labile_input
         Soil.Biogeochemistry.CORPSE.update_carbon_fluxes!(
             p,
             Y,
