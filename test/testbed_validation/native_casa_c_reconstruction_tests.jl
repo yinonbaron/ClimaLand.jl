@@ -368,6 +368,14 @@ end
             0.0,
         )
         @test vec(Array(parent(nitrogen_deposition))) == [2 / 1000 / 86400, 0]
+        @test @allocated(
+            TestbedNativeCASACReconstruction.update_forcing!(
+                nitrogen_forcing,
+                stage,
+                1,
+                0.0,
+            )
+        ) == 0
         TestbedNativeCASACReconstruction.close_forcing!(nitrogen_forcing)
     end
 end

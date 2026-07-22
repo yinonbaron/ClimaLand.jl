@@ -753,21 +753,34 @@ function load_forcing_day!(forcing, cache, year, day)
     return cache
 end
 
+function copy_forcing_day!(field, values, day)
+    destination = vec(parent(field))
+    for point in eachindex(destination)
+        @inbounds destination[point] = values[point, day]
+    end
+    return field
+end
+
 function update_forcing!(forcing, stage, index, _)
     year, day = forcing_year_day(stage, index)
     cache = load_forcing_day!(forcing, year_cache!(forcing, year), year, day)
-    vec(parent(forcing.buffers.gpp)) .= view(cache.gpp, :, day)
-    vec(parent(forcing.buffers.air_temperature)) .=
-        view(cache.air_temperature, :, day)
-    vec(parent(forcing.buffers.soil_temperature)) .=
-        view(cache.soil_temperature, :, day)
-    vec(parent(forcing.buffers.water_stress)) .=
-        view(cache.water_stress, :, day)
-    vec(parent(forcing.buffers.liquid_water)) .=
-        view(cache.liquid_water, :, day)
-    isnothing(forcing.nitrogen_deposition) || (
-        vec(parent(forcing.nitrogen_deposition)) .=
-            view(cache.nitrogen_deposition, :, day)
+    copy_forcing_day!(forcing.buffers.gpp, cache.gpp, day)
+    copy_forcing_day!(
+        forcing.buffers.air_temperature,
+        cache.air_temperature,
+        day,
+    )
+    copy_forcing_day!(
+        forcing.buffers.soil_temperature,
+        cache.soil_temperature,
+        day,
+    )
+    copy_forcing_day!(forcing.buffers.water_stress, cache.water_stress, day)
+    copy_forcing_day!(forcing.buffers.liquid_water, cache.liquid_water, day)
+    isnothing(forcing.nitrogen_deposition) || copy_forcing_day!(
+        forcing.nitrogen_deposition,
+        cache.nitrogen_deposition,
+        day,
     )
     update_phenology!(forcing, day)
     return nothing

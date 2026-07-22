@@ -103,6 +103,18 @@ end
         cache,
     )
     @test bookkeeping.values["casabal%Fcnppyear"] == 1000 * 86400 .* [1, 2]
+    TestbedNativeCASACNReconstruction.accumulate_bookkeeping!(
+        bookkeeping,
+        367,
+        cache,
+    )
+    @test @allocated(
+        TestbedNativeCASACNReconstruction.accumulate_bookkeeping!(
+            bookkeeping,
+            368,
+            cache,
+        )
+    ) == 0
 end
 
 @testset "native CASA-CN synthetic handoff and reports" begin

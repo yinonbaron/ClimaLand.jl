@@ -42,7 +42,8 @@ immobilization, leaching, and gaseous-loss bookkeeping, plus carbon and
 nitrogen budgets. Fresh-Fortran and published-archive errors and tolerances
 are stored in separate report namespaces. The native historical stream uses
 Float32 NetCDF with light deflation; model integration and checkpoints remain
-Float64.
+Float64. The command fails if exudation is nonzero, a comparison fails, or an
+aggregate carbon or nitrogen budget does not close.
 
 The automated acceptance case uses the same public four-stage handoff with a
 small pinned fixture. The multi-hour full-grid scientific run remains outside

@@ -21,6 +21,10 @@ native_casa() =
 selected_casa() =
     getfield(parentmodule(@__MODULE__), :TestbedSelectedCASAWorkflow)
 
+# =============================================================================
+# Scientific state and diagnostics
+# =============================================================================
+
 const COMPLETE_STAGES = selected_casa().COMPLETE_STAGES
 
 const STOCK_VARIABLES = (
@@ -140,6 +144,10 @@ function casa_cn_diagnostics(soil_parameters)
     )
 end
 
+# =============================================================================
+# Stage-boundary comparisons
+# =============================================================================
+
 const BOUNDARY_VARIABLES = (
     native_casa().BOUNDARY_VARIABLES...,
     "casapool%nplant(LEAF)" => (:casa_plant, :n_leaf),
@@ -257,6 +265,10 @@ function compare_bookkeeping_csv(bookkeeping, path; atol = 0.0, rtol = 0.0)
         "all_match" => all(metric["all_match"] for metric in values(metrics)),
     )
 end
+
+# =============================================================================
+# Historical-output comparisons
+# =============================================================================
 
 function require_variables(dataset, path)
     missing =
@@ -406,6 +418,10 @@ function compare_historical_outputs(
     )
 end
 
+# =============================================================================
+# Full gridded workflow
+# =============================================================================
+
 function gridded_provenance(stage, parameter_path, reference_root)
     stage_directory = Dict(
         :prespin => "01-prespin",
@@ -437,8 +453,7 @@ function gridded_provenance(stage, parameter_path, reference_root)
     )
 end
 
-function augment_report!(path, normal, accelerated, tolerances)
-    report = TOML.parsefile(path)
+function exudation_report(normal, accelerated)
     fractions(model) = vec(
         Array(
             parent(
@@ -448,23 +463,74 @@ function augment_report!(path, normal, accelerated, tolerances)
             ),
         ),
     )
-    normal_exudation = fractions(normal.model)
-    accelerated_exudation = fractions(accelerated.model)
+    return Dict(
+        "normal_all_zero" => all(iszero, fractions(normal.model)),
+        "accelerated_all_zero" => all(iszero, fractions(accelerated.model)),
+    )
+end
+
+function augment_report!(path, normal, accelerated, tolerances)
+    report = TOML.parsefile(path)
     report["scientific_configuration"] = Dict(
         "mineral_nitrogen_owner" => "casa_soil.n_mineral",
         "native_checkpoint_handoff" => true,
         "cwd_nitrogen" => "casa_soil.n_litter_cwd with structural-input bookkeeping",
         "passive_pool_transformation" => "casa_soil.c_soil_passive and casa_soil.n_soil_passive multiplied by 10",
-        "root_exudation" => Dict(
-            "normal_all_zero" => all(iszero, normal_exudation),
-            "accelerated_all_zero" => all(iszero, accelerated_exudation),
-        ),
+        "root_exudation" => exudation_report(normal, accelerated),
     )
     report["comparison_tolerance"] = tolerances
     open(path, "w") do io
         TOML.print(io, report; sorted = true)
     end
     return path
+end
+
+function require_acceptance!(path)
+    report = TOML.parsefile(path)
+    exudation = report["scientific_configuration"]["root_exudation"]
+    checks = Dict(
+        "normal root exudation" => exudation["normal_all_zero"],
+        "accelerated root exudation" => exudation["accelerated_all_zero"],
+        "boundary comparisons" => all(
+            comparison["all_match"] for
+            comparison in values(report["boundary_comparison"])
+        ),
+        "fresh Fortran comparison" =>
+            report["historical_comparison"]["fresh_fortran"]["all_match"],
+        "published archive comparison" =>
+            report["historical_comparison"]["published_archive"]["all_match"],
+        "carbon budget" => report["carbon_budget"]["all_close"],
+        "nitrogen budget" => report["nitrogen_budget"]["all_close"],
+    )
+    failures = sort!([name for (name, passed) in checks if !passed])
+    isempty(failures) || error(
+        "CASA-CN reconstruction failed acceptance: $(join(failures, ", "))",
+    )
+    return path
+end
+
+struct GriddedCNForcingUpdate{F}
+    forcing::F
+end
+
+function (callback::GriddedCNForcingUpdate)(stage, index, time)
+    return native_casa().update_forcing!(callback.forcing, stage, index, time)
+end
+
+struct GriddedCNAfterStep{B, K}
+    budget::B
+    bookkeeping::K
+end
+
+function (callback::GriddedCNAfterStep)(stage, step, _, p, _)
+    selected_casa().accumulate_budget!(
+        callback.budget,
+        :carbon_nitrogen,
+        stage,
+        p,
+    )
+    accumulate_bookkeeping!(callback.bookkeeping, step, p)
+    return nothing
 end
 
 """
@@ -536,6 +602,8 @@ function run_gridded_case(
         nitrogen_deposition;
         domain,
     )
+    all(values(exudation_report(normal, accelerated))) ||
+        error("CASA-CN normal and accelerated root exudation must be zero")
     forcing = native_casa().GriddedForcing(
         grid,
         soils,
@@ -661,17 +729,8 @@ function run_gridded_case(
             COMPLETE_STAGES,
             output_root;
             model_for_stage,
-            update_forcing! = (stage, index, time) ->
-                native_casa().update_forcing!(forcing, stage, index, time),
-            after_step! = function (stage, step, _, p, _)
-                selected_casa().accumulate_budget!(
-                    budget,
-                    :carbon_nitrogen,
-                    stage,
-                    p,
-                )
-                accumulate_bookkeeping!(bookkeeping, step, p)
-            end,
+            update_forcing! = GriddedCNForcingUpdate(forcing),
+            after_step! = GriddedCNAfterStep(budget, bookkeeping),
             diagnostics = casa_cn_diagnostics(
                 normal.model.casa_soil.parameters,
             ),
@@ -699,11 +758,16 @@ function run_gridded_case(
             deflatelevel = 1,
         )
         augment_report!(result.report, normal, accelerated, tolerances)
+        require_acceptance!(result.report)
         return result
     finally
         native_casa().close_forcing!(forcing)
     end
 end
+
+# =============================================================================
+# Synthetic acceptance fixture and command-line entrypoint
+# =============================================================================
 
 function split_historical_comparison!(report_path)
     report = TOML.parsefile(report_path)
