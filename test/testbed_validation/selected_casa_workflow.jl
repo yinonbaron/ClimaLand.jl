@@ -80,8 +80,9 @@ function read_cn_parameters(path; boreal_fixation = false)
         pft => merge(
             base[pft],
             (;
-                leaf_phosphorus_to_nitrogen =
-                    inv(base[pft].leaf_nitrogen_to_phosphorus),
+                leaf_phosphorus_to_nitrogen = inv(
+                    base[pft].leaf_nitrogen_to_phosphorus,
+                ),
                 initial_nitrogen = Tuple(initial_nitrogen[pft][1:10]) ./ 1000,
                 nitrogen_ratio_minimum = Tuple(
                     nutrients[pft][index] for index in (1, 3, 5)
@@ -89,8 +90,9 @@ function read_cn_parameters(path; boreal_fixation = false)
                 nitrogen_ratio_maximum = Tuple(
                     nutrients[pft][index] for index in (2, 4, 6)
                 ),
-                structural_litter_nitrogen_ratio =
-                    inv(STRUCTURAL_LITTER_CARBON_TO_NITROGEN),
+                structural_litter_nitrogen_ratio = inv(
+                    STRUCTURAL_LITTER_CARBON_TO_NITROGEN,
+                ),
                 soil_nitrogen_ratio_minimum = Tuple(
                     inv.(chemistry[pft][16:18]),
                 ),
@@ -1040,8 +1042,16 @@ function run_selected_case(
     stages = COMPLETE_STAGES,
     budget_rtol = 5e-12,
     compare_references = true,
+    diagnostics = nothing,
 )
     setup = load_setup(configuration; collection)
+    active_diagnostics = if isnothing(diagnostics)
+        native_casa().casa_diagnostics(setup.normal.model.casa_soil.parameters)
+    elseif diagnostics isa Function
+        diagnostics(setup)
+    else
+        diagnostics
+    end
     reference =
         canonical_schedule(stages) && compare_references ?
         workflow_reference(configuration, collection) : nothing
@@ -1123,9 +1133,7 @@ function run_selected_case(
         model_for_stage,
         update_forcing! = update!,
         after_step!,
-        diagnostics = native_casa().casa_diagnostics(
-            setup.normal.model.casa_soil.parameters,
-        ),
+        diagnostics = active_diagnostics,
         provenance = stage -> stage_provenance(setup, stage),
         initialization_comparison,
         compare_boundary = (stage, result, _) ->

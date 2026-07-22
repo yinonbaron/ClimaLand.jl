@@ -111,6 +111,11 @@ function write_gridded_fixture(directory)
             :,
             :,
         ] .= 1
+        NCDatasets.defVar(output, "ndep", Float64, ("lon", "lat", "time"))[
+            :,
+            :,
+            :,
+        ] .= 2
         NCDatasets.defVar(output, "xtairk", Float64, ("lon", "lat", "time"))[
             :,
             :,
@@ -344,6 +349,26 @@ end
         @test vec(parent(buffers.phase)) == [2, 2]
         @test forcing.spin_cache[1901].loaded[1]
         TestbedNativeCASACReconstruction.close_forcing!(forcing)
+
+        nitrogen_deposition =
+            TestbedNativeCASACReconstruction.scalar_field(domain, zeros(2))
+        nitrogen_forcing = TestbedNativeCASACReconstruction.GriddedForcing(
+            grid,
+            soils,
+            built.parameters,
+            fixture.phenology,
+            fixture.forcing,
+            buffers;
+            nitrogen_deposition,
+        )
+        TestbedNativeCASACReconstruction.update_forcing!(
+            nitrogen_forcing,
+            stage,
+            1,
+            0.0,
+        )
+        @test vec(Array(parent(nitrogen_deposition))) == [2 / 1000 / 86400, 0]
+        TestbedNativeCASACReconstruction.close_forcing!(nitrogen_forcing)
     end
 end
 

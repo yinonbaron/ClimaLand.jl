@@ -428,6 +428,13 @@ julia --startup-file=no --project=.buildkite \
   test/testbed_validation/casa_cn_reconstruction.jl search \
   <biogeochem-testbed-source-root> <data-root> <run-root>
 
+# Run the native four-stage, 4,263-cell CASA-CN reconstruction and compare its
+# boundaries and historical output with fresh Fortran and archive data.
+julia --startup-file=no --project=test \
+  test/testbed_validation/native_casa_cn_reconstruction.jl \
+  <biogeochem-testbed-source-root> <forcing-root> \
+  <casa-cn-reference-root> <run-root>
+
 # Run the complete bounded MIMICS-CN archive reconstruction search.
 julia --startup-file=no --project=.buildkite \
   test/testbed_validation/mimics_cn_reconstruction.jl search \

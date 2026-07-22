@@ -567,13 +567,14 @@ end
 mutable struct YearForcingCache
     loaded::BitVector
     gpp::Matrix{Float64}
+    nitrogen_deposition::Matrix{Float64}
     air_temperature::Matrix{Float64}
     soil_temperature::Matrix{Float64}
     water_stress::Matrix{Float64}
     liquid_water::Matrix{Float64}
 end
 
-mutable struct GriddedForcing{P, D, B}
+mutable struct GriddedForcing{P, D, B, N}
     root_fraction::Matrix{Float64}
     field_capacity::Vector{Float64}
     wilting::Vector{Float64}
@@ -586,6 +587,7 @@ mutable struct GriddedForcing{P, D, B}
     current_year::Int
     dataset::D
     buffers::B
+    nitrogen_deposition::N
     spin_cache::Dict{Int, YearForcingCache}
     transient_year::Int
     transient_cache::YearForcingCache
@@ -598,6 +600,8 @@ function GriddedForcing(
     phenology_path,
     forcing_root,
     buffers,
+    ;
+    nitrogen_deposition = nothing,
 )
     phenology = read_phenology(phenology_path, grid)
     forcing_root = abspath(forcing_root)
@@ -621,6 +625,7 @@ function GriddedForcing(
         1901,
         dataset,
         buffers,
+        nitrogen_deposition,
         Dict{Int, YearForcingCache}(),
         0,
         empty_year_cache(length(grid)),
@@ -677,6 +682,7 @@ function empty_year_cache(points)
         zeros(points, 365),
         zeros(points, 365),
         zeros(points, 365),
+        zeros(points, 365),
     )
 end
 
@@ -699,6 +705,9 @@ function load_forcing_day!(forcing, cache, year, day)
     longitude = forcing.longitude_index
     latitude = forcing.latitude_index
     gpp_grid = dataset["xcgpp"][:, :, day]
+    deposition_grid =
+        isnothing(forcing.nitrogen_deposition) ? nothing :
+        dataset["ndep"][:, :, day]
     air_grid = dataset["xtairk"][:, :, day]
     temperature_grid = dataset["xtsoil"][:, :, :, day]
     moisture_grid = dataset["xmoist"][:, :, :, day]
@@ -708,6 +717,10 @@ function load_forcing_day!(forcing, cache, year, day)
             lat = latitude[point]
             roots = view(forcing.root_fraction, point, :)
             cache.gpp[point, day] = gpp_grid[lon, lat] / 1000 / DAY_SECONDS
+            isnothing(deposition_grid) || (
+                cache.nitrogen_deposition[point, day] =
+                    deposition_grid[lon, lat] / 1000 / DAY_SECONDS
+            )
             cache.air_temperature[point, day] = air_grid[lon, lat]
             temperature = 0.0
             moisture = 0.0
@@ -752,6 +765,10 @@ function update_forcing!(forcing, stage, index, _)
         view(cache.water_stress, :, day)
     vec(parent(forcing.buffers.liquid_water)) .=
         view(cache.liquid_water, :, day)
+    isnothing(forcing.nitrogen_deposition) || (
+        vec(parent(forcing.nitrogen_deposition)) .=
+            view(cache.nitrogen_deposition, :, day)
+    )
     update_phenology!(forcing, day)
     return nothing
 end
@@ -1246,8 +1263,7 @@ function run_gridded_case(
         rtol = boundary_rtol,
     )
     budget = CarbonBudgetAccumulator(grid)
-    stoichiometry =
-        CarbonOnlyPlantStoichiometryTracker(grid, normal.parameters)
+    stoichiometry = CarbonOnlyPlantStoichiometryTracker(grid, normal.parameters)
     function carbon_budget(stage, result, _, _, initial_state, _)
         name = String(stage.name)
         start_stock = area_weighted_carbon(initial_state, budget.area_m2)
@@ -1633,6 +1649,8 @@ function run_case(
     prepare_stage! = (_, _, _) -> nothing,
     restore_passive! = restore_passive_carbon!,
     passive_multiplier = 10,
+    output_eltype = Float64,
+    deflatelevel = 0,
 )
     expected_names = (:prespin, :accelerated_spin, :normal_spin, :historical)
     getproperty.(stages, :name) == expected_names || throw(
@@ -1671,6 +1689,8 @@ function run_case(
             update_forcing!,
             after_step!,
             diagnostics,
+            output_eltype,
+            deflatelevel,
             provenance = provenance(stage),
         )
         checkpoint = only(result.checkpoints)
