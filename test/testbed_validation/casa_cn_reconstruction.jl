@@ -416,12 +416,34 @@ function run_case(source_root, data_root, run_root, case_id)
         matrix["postprocessing"]["annual_reference"];
         archive,
     )
+    fresh_root = joinpath(case_root, "fresh_reference")
+    mkpath(fresh_root)
+    fresh_annual =
+        joinpath(fresh_root, matrix["postprocessing"]["annual_reference"])
+    prepare_fresh_annual(annual_reference, fresh_annual)
     results = harness().run_stage_workflow(
         executable,
         workflow,
         case_root;
-        stage_hook = historical_retention_hook(annual_reference, matrix),
+        stage_hook = historical_retention_hook(
+            annual_reference,
+            fresh_annual,
+            matrix,
+        ),
     )
+    historical = joinpath(case_root, "stages", "04-historical")
+    for year in retained_daily_years(matrix)
+        destination = joinpath(fresh_root, netcdf_name(year; daily = true))
+        (ispath(destination) || islink(destination)) &&
+            rm(destination; force = true)
+        symlink(
+            relpath(
+                joinpath(historical, netcdf_name(year; daily = true)),
+                fresh_root,
+            ),
+            destination,
+        )
+    end
     write_case_report(data_root, case_root)
     return results
 end
@@ -917,9 +939,47 @@ function wait_for_completed_year(
     return daily_file_complete(daily_path)
 end
 
+function prepare_fresh_annual(reference_path, fresh_path)
+    (ispath(fresh_path) || islink(fresh_path)) &&
+        rm(fresh_path; force = true)
+    cp(realpath(reference_path), fresh_path)
+    islink(fresh_path) &&
+        error("fresh annual reference must not be a symbolic link: $fresh_path")
+    return fresh_path
+end
+
+function write_fresh_annual_year!(
+    annual_path,
+    daily_path,
+    year;
+    variables = required_variables(),
+    first_year = first(load_matrix()["history_years"]),
+)
+    NCDatasets.NCDataset(annual_path, "a") do annual
+        NCDatasets.NCDataset(daily_path) do daily
+            for name in variables
+                annual_variable = annual[name]
+                daily_variable = daily[name]
+                daily_time =
+                    findfirst(==("time"), NCDatasets.dimnames(daily_variable))
+                isnothing(daily_time) && continue
+                annual_indices = ntuple(ndims(annual_variable)) do dimension
+                    name = NCDatasets.dimnames(annual_variable)[dimension]
+                    name == "time" && return year - first_year + 1
+                    return Colon()
+                end
+                annual_variable.var[annual_indices...] =
+                    casa().annual_mean(daily_variable, daily_time)
+            end
+        end
+    end
+    return annual_path
+end
+
 function stream_historical_outputs!(
     stage_dir,
     reference_path,
+    fresh_annual_path,
     finished,
     matrix = load_matrix(),
 )
@@ -944,6 +1004,7 @@ function stream_historical_outputs!(
             finished,
         ) || return nothing
         record = annual_year_record(reference_path, daily_path, year)
+        write_fresh_annual_year!(fresh_annual_path, daily_path, year)
         harness().write_toml_atomic(
             joinpath(stage_dir, annual_fragment(year)),
             record,
@@ -953,7 +1014,11 @@ function stream_historical_outputs!(
     return nothing
 end
 
-function historical_retention_hook(reference_path, matrix = load_matrix())
+function historical_retention_hook(
+    reference_path,
+    fresh_annual_path,
+    matrix = load_matrix(),
+)
     state = Dict{String, Any}()
     return function (stage, name, stage_dir, event)
         name == "historical" || return nothing
@@ -968,6 +1033,7 @@ function historical_retention_hook(reference_path, matrix = load_matrix())
             state["task"] = @async stream_historical_outputs!(
                 stage_dir,
                 reference_path,
+                fresh_annual_path,
                 finished,
                 matrix,
             )
@@ -1402,6 +1468,37 @@ function self_test()
                 reduced = casa().annual_mean(dataset["stock"], 2)
                 Test.@test reduced[1] == 2.0f0
                 Test.@test reduced[2] == fill_value
+            end
+            fresh_daily = joinpath(root, "fresh_daily.nc")
+            NCDatasets.NCDataset(fresh_daily, "c") do dataset
+                NCDatasets.defDim(dataset, "x", 2)
+                NCDatasets.defDim(dataset, "time", 2)
+                stock = NCDatasets.defVar(
+                    dataset,
+                    "stock",
+                    Float32,
+                    ("x", "time");
+                    fillvalue = fill_value,
+                )
+                stock.var[:, :] = Float32[4 6; 8 12]
+            end
+            annual_link = joinpath(root, "annual_link.nc")
+            symlink(basename(annual), annual_link)
+            fresh_annual = joinpath(root, "fresh_annual.nc")
+            symlink(basename(annual), fresh_annual)
+            prepare_fresh_annual(annual_link, fresh_annual)
+            Test.@test !islink(fresh_annual)
+            source_before = read(annual)
+            write_fresh_annual_year!(
+                fresh_annual,
+                fresh_daily,
+                1902;
+                variables = Set(["stock"]),
+                first_year = 1901,
+            )
+            Test.@test read(annual) == source_before
+            NCDatasets.NCDataset(fresh_annual) do dataset
+                Test.@test dataset["stock"][:, 2] == Float32[5, 10]
             end
 
             final_finished = Ref(false)

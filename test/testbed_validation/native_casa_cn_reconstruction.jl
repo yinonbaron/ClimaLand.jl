@@ -359,6 +359,31 @@ function find_reference(root, filenames)
     )
 end
 
+function compare_yearly_daily(native_output, grid, root, years; atol, rtol)
+    report = Dict(
+        name => native_casa().empty_aggregate(atol, rtol) for
+        (name, _) in historical_variables()
+    )
+    references = String[]
+    for year in years
+        filename = "casaclm_pool_flux_$(year)_daily.nc"
+        path = find_reference(root, (filename, joinpath("HIST", filename)))
+        push!(references, abspath(path))
+        native_days = ((year - 1901) * 365 + 1):((year - 1900) * 365)
+        comparison =
+            compare_daily(native_output, path, grid, native_days; atol, rtol)
+        for (name, metric) in comparison["variable"]
+            native_casa().merge_metrics!(report[name], metric)
+        end
+    end
+    return Dict(
+        "reference" => references,
+        "years" => collect(years),
+        "variable" => report,
+        "all_match" => all(metric["all_match"] for metric in values(report)),
+    )
+end
+
 function compare_source(native_output, grid, root, source; atol, rtol)
     annual_name = "ann_casaclm_pool_flux_1901_2014.nc"
     annual = compare_annual(
@@ -371,11 +396,29 @@ function compare_source(native_output, grid, root, source; atol, rtol)
     daily = Dict{String, Any}()
     for (label, years) in (("1901_1905", 1901:1905), ("2010_2014", 2010:2014))
         combined = "casaclm_pool_flux_$(first(years))_$(last(years))_daily.nc"
-        path = find_reference(root, (combined, joinpath("HIST", combined)))
-        native_days =
-            ((first(years) - 1901) * 365 + 1):((last(years) - 1900) * 365)
-        daily[label] =
-            compare_daily(native_output, path, grid, native_days; atol, rtol)
+        paths = (joinpath(root, combined), joinpath(root, "HIST", combined))
+        path = findfirst(isfile, paths)
+        if isnothing(path)
+            daily[label] = compare_yearly_daily(
+                native_output,
+                grid,
+                root,
+                years;
+                atol,
+                rtol,
+            )
+        else
+            native_days =
+                ((first(years) - 1901) * 365 + 1):((last(years) - 1900) * 365)
+            daily[label] = compare_daily(
+                native_output,
+                paths[path],
+                grid,
+                native_days;
+                atol,
+                rtol,
+            )
+        end
     end
     return Dict(
         "source" => source,

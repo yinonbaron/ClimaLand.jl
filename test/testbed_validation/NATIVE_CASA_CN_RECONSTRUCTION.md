@@ -29,12 +29,12 @@ julia --startup-file=no --project=test \
   ../native_casa_cn_reconstruction_issue30
 ```
 
-The issue-24 reference root supplies the reconstructed candidates, all four
-fresh-Fortran boundary CSVs, and the published archive under `reference/`.
-Before the scientific run, place separately reduced fresh-Fortran products in
-`fresh_reference/`: the 1901--2014 annual file and the combined 1901--1905 and
-2010--2014 daily files. Keeping these products separate prevents archive
-postprocessing differences from being attributed to the Julia model.
+The CASA-CN Fortran reconstruction runner now writes separately reduced fresh
+products under `fresh_reference/`: the 1901--2014 annual file and links to the
+retained yearly files for 1901--1905 and 2010--2014. The native runner accepts
+these yearly files or the previously supported combined-window files. Keeping
+fresh products separate from `reference/` prevents archive postprocessing
+differences from being attributed to the Julia model.
 
 `reconstruction_report.toml` records all plant C/N states, organic C/N pools,
 mineral N and its deposition, fixation, uptake, mineralization,
