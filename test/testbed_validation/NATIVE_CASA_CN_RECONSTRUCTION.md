@@ -45,6 +45,17 @@ Float32 NetCDF with light deflation; model integration and checkpoints remain
 Float64. The command fails if exudation is nonzero, a comparison fails, or an
 aggregate carbon or nitrogen budget does not close.
 
+The full Julia reconstruction passes scientific validation when the
+`nLitInptStruc` comparison failure is treated as a documented invalid oracle.
+The pinned Fortran `casa_delsoil` diagnostic increments its local `nwd2str`
+work array without initializing or resetting it; fresh runs therefore produce
+nonfinite and extreme compiler-dependent values, while the published archive
+happens to remain finite. Julia instead sums initialized structural-litter and
+CWD nitrogen inputs. The report retains the failed raw comparison for
+provenance, but the independent state, flux, and budget comparisons determine
+parity. See [`CN_REFERENCE_AUDIT.md`](CN_REFERENCE_AUDIT.md) for the
+source-level audit.
+
 The automated acceptance case uses the same public four-stage handoff with a
 small pinned fixture. The multi-hour full-grid scientific run remains outside
 ordinary package tests.
