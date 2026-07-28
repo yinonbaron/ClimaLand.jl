@@ -18,7 +18,10 @@ end
 @testset "selected-cell pinned reference contract" begin
     collection = TestbedReferenceCellComparisons.extended_cell_collection()
     reference =
-        TestbedSelectedCASAWorkflow.workflow_reference(:carbon_only, collection).reference
+        TestbedSelectedCASAWorkflow.workflow_reference(
+            :carbon_only,
+            collection,
+        ).reference
     stage_names = collect(
         String.(
             getproperty.(TestbedSelectedCASAWorkflow.COMPLETE_STAGES, :name),
@@ -161,6 +164,25 @@ end
     )
     @test setup.prespin.parameters[1].fixation_rate ==
           0.21 / 1000 / (365 * 86400)
+    @test vec(
+        Array(parent(setup.normal.model.casa_plant.nitrogen_parameters.active)),
+    ) == map(point -> !setup.normal.parameters[point.pft].inactive, setup.grid)
+    wood_lignin_nitrogen = vec(
+        Array(
+            parent(
+                setup.normal.model.casa_plant.nitrogen_parameters.wood_lignin_nitrogen_ratio,
+            ),
+        ),
+    )
+    expected_wood_lignin_nitrogen = map(setup.grid) do point
+        parameters = setup.normal.parameters[point.pft]
+        inv(parameters.plant_nitrogen_ratio[2]) * parameters.lignin_wood
+    end
+    @test wood_lignin_nitrogen == expected_wood_lignin_nitrogen
+    @test all(
+        wood_lignin_nitrogen[index] == 60 for
+        index in eachindex(setup.grid) if setup.grid[index].pft == 7
+    )
     @test all(
         iszero,
         vec(

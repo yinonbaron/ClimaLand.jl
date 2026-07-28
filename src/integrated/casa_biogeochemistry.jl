@@ -272,21 +272,12 @@ end
     )
 end
 
-@inline mimics_nitrogen_limitation(
-    plant_parameters,
-    soil_parameters,
-    mineral_nitrogen,
-    litter_metabolic,
-    litter_structural,
-    litter_cwd,
-) = Soil.Biogeochemistry.CASA.nitrogen_limitation(
-    mineral_nitrogen,
-    plant_parameters.limitation_minimum,
-    plant_parameters.limitation_maximum,
-    (litter_metabolic, litter_structural, litter_cwd),
-    soil_parameters.maximum_fine_litter,
-    soil_parameters.maximum_cwd,
-)
+@inline mimics_nitrogen_limitation(plant_parameters, mineral_nitrogen) =
+    Soil.Biogeochemistry.CASA.nitrogen_demand_fraction(
+        mineral_nitrogen,
+        plant_parameters.limitation_minimum,
+        plant_parameters.limitation_maximum,
+    )
 
 function CASAPlantSoilModel{FT}(
     plant::Vegetation.CASA.CASAPlantModel{FT},
@@ -723,11 +714,7 @@ function make_update_boundary_fluxes(model::CASAPlantMIMICSSoilModel)
                 )
             @. p.casa_plant.nitrogen_limitation = mimics_nitrogen_limitation(
                 plant_nitrogen_parameters,
-                soil_nitrogen_parameters,
                 Y.mimics_soil.n_mineral,
-                Y.mimics_soil.c_litter_metabolic,
-                Y.mimics_soil.c_litter_structural,
-                Y.mimics_soil.c_litter_cwd,
             )
             Vegetation.CASA.update_nitrogen_limited_carbon_fluxes!(
                 p,

@@ -883,10 +883,14 @@ for FT in (Float32, Float64),
         soil_nitrogen = p.mimics_soil.nitrogen_fluxes[]
         conservation_tolerance =
             FT(512) * eps(FT) * sum(soil_initial[9:17]) / FT(86400)
+        legacy_unallocated_uptake =
+            temporal_mode isa PlantCASA.LegacyDaily ? FT(1e-10 / 1000 / 86400) :
+            zero(FT)
         @test plant_nitrogen_tendency +
               soil_nitrogen_tendency +
               soil_nitrogen[10] +
-              soil_nitrogen[11] ≈ setup.deposition + setup.fixation atol =
+              soil_nitrogen[11] +
+              legacy_unallocated_uptake ≈ setup.deposition + setup.fixation atol =
             conservation_tolerance
     end
 end
@@ -919,6 +923,25 @@ end
     Y.casa_soil.n_mineral .= FT(1e-6)
     ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
     @test p.casa_plant.carbon_fluxes[][4] > zero(FT)
+end
+
+@testset "Integrated MIMICS retains mineral-N limitation with excess litter" begin
+    for FT in (Float32, Float64)
+        model = integrated_mimics_cn_model(FT).model
+        Y, p, _ = ClimaLand.initialize(model)
+        for component_name in ClimaLand.land_components(model)
+            component = getproperty(model, component_name)
+            for name in ClimaLand.prognostic_vars(component)
+                getproperty(getproperty(Y, component_name), name) .= FT(0.01)
+            end
+        end
+        Y.mimics_soil.c_litter_metabolic .= FT(1)
+        Y.mimics_soil.c_litter_structural .= FT(2)
+        Y.mimics_soil.c_litter_cwd .= FT(0.5)
+        Y.mimics_soil.n_mineral .= FT(1.25e-3)
+        ClimaLand.make_set_initial_cache(model)(p, Y, zero(FT))
+        @test p.casa_plant.nitrogen_limitation[] ≈ FT(0.5)
+    end
 end
 
 for FT in (Float32, Float64),
@@ -1023,10 +1046,14 @@ for FT in (Float32, Float64),
         )
         soil_nitrogen = p.casa_soil.nitrogen_fluxes[]
         external_inputs = setup.deposition + setup.fixation
+        legacy_unallocated_uptake =
+            temporal_mode isa PlantCASA.LegacyDaily ? FT(1e-10 / 1000 / 86400) :
+            zero(FT)
         @test plant_nitrogen_tendency +
               soil_nitrogen_tendency +
               soil_nitrogen[12] +
-              soil_nitrogen[13] ≈ external_inputs atol =
+              soil_nitrogen[13] +
+              legacy_unallocated_uptake ≈ external_inputs atol =
             FT(128) * eps(FT) * external_inputs
     end
 end

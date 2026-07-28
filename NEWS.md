@@ -2,6 +2,22 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add the native four-stage, 4,263-cell MIMICS-CN
+  reconstruction using issue 43's hash-pinned KO4/FI30 parameters, with native
+  C/N checkpoints, working-DIN and process diagnostics, stage budgets, and
+  separate fresh-Fortran and archive comparisons. Issue
+  [#31](https://github.com/yinonbaron/ClimaLand.jl/issues/31).
+- ![][badge-🐛bugfix] Match legacy CASA plant-N uptake offsets, allocation
+  arithmetic, ratio units, stage-restart serialization, and single-precision
+  meteorological input handoff to the Fortran selected-cell trajectory. Preserve
+  MIMICS-CN's fixed wood lignin:N value from the initial plant C:N table rather
+  than deriving it from the separately rounded minimum N:C table. Preserve
+  Fortran's gram/day CASA and MIMICS-CN arithmetic order in `LegacyDaily`,
+  including LAI evaluation, before converting the result to native SI
+  tendencies. Document the remaining long-spin sensitivity caused by applying
+  those tendencies to kilogram-valued ClimaTimeSteppers state at a
+  discontinuous minimum-LAI gate. Issue
+  [#31](https://github.com/yinonbaron/ClimaLand.jl/issues/31).
 - ![][badge-🔥behavioralΔ] Added prescribed CORPSE exudation to integrated
   CASA--CORPSE carbon routing and a complete selected-cell `LegacyDaily`
   prespin-to-history regression. Issue

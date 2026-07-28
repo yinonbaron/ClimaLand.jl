@@ -120,6 +120,47 @@ function combined_carbon_allocations(
     )
 end
 
+function combined_carbon_nitrogen_allocations(
+    parameters,
+    nitrogen_parameters,
+    carbon,
+    nitrogen,
+    mineral_nitrogen,
+    environment,
+    carbon_inputs,
+    nitrogen_inputs,
+    external_nitrogen,
+    litter_metabolic_fraction,
+    annual_npp,
+)
+    MIMICS.combined_carbon_nitrogen_fluxes(
+        parameters,
+        nitrogen_parameters,
+        carbon...,
+        nitrogen...,
+        mineral_nitrogen,
+        environment...,
+        carbon_inputs...,
+        nitrogen_inputs...,
+        external_nitrogen...,
+        litter_metabolic_fraction,
+        annual_npp,
+    )
+    return @allocated MIMICS.combined_carbon_nitrogen_fluxes(
+        parameters,
+        nitrogen_parameters,
+        carbon...,
+        nitrogen...,
+        mineral_nitrogen,
+        environment...,
+        carbon_inputs...,
+        nitrogen_inputs...,
+        external_nitrogen...,
+        litter_metabolic_fraction,
+        annual_npp,
+    )
+end
+
 for FT in (Float32, Float64)
     @testset "MIMICS carbon kernels, FT = $FT" begin
         parameters = mimics_carbon_parameters(FT)
@@ -215,6 +256,56 @@ for FT in (Float32, Float64)
         mineral_nitrogen = FT(0.01)
         carbon_inputs = FT.((0.01, 0.02))
         nitrogen_inputs = FT.((0.001, 0.002))
+        ordered_environment =
+            merge(environment, (r_partition = FT.((0.03, 0.11, 0.79)),))
+        hourly = @inferred MIMICS.hourly_carbon_nitrogen_map(
+            carbon_parameters,
+            nitrogen_parameters,
+            carbon,
+            nitrogen,
+            mineral_nitrogen,
+            carbon_inputs,
+            nitrogen_inputs,
+            ordered_environment,
+        )
+        litter_r_m =
+            carbon[3] * environment.vmax[1] * carbon[1] /
+            (environment.km[1] + carbon[3])
+        litter_r_s =
+            carbon[3] * environment.vmax[2] * carbon[2] /
+            (environment.km[2] + carbon[3])
+        soil_r =
+            carbon[3] * environment.vmax[3] * carbon[5] /
+            (environment.km[3] + carbon[3])
+        turnover_r =
+            carbon[3]^nitrogen_parameters.microbial_turnover_density_exponent *
+            ordered_environment.r_turnover
+        turnover_r_partitions =
+            turnover_r * ordered_environment.r_partition[1] +
+            turnover_r * ordered_environment.r_partition[2] +
+            turnover_r * ordered_environment.r_partition[3]
+        din_r = mineral_nitrogen * carbon[3] / (carbon[3] + carbon[4])
+        mge = carbon_parameters.microbial_growth_efficiency
+        nue = nitrogen_parameters.nitrogen_use_efficiency
+        small = FT(1e-10)
+        uptake_r_c = mge[1] * (litter_r_m + soil_r) + mge[2] * litter_r_s
+        uptake_r_n =
+            nue[1] * (
+                litter_r_m * nitrogen[1] / (carbon[1] + small) +
+                soil_r * nitrogen[5] / (carbon[5] + small)
+            ) +
+            nue[2] * litter_r_s * nitrogen[2] / (carbon[2] + small) +
+            din_r
+        target_r =
+            nitrogen_parameters.microbial_carbon_nitrogen_ratio[1] * sqrt(
+                nitrogen_parameters.carbon_nitrogen_modifier /
+                environment.litter_metabolic_fraction,
+            )
+        uptake_ratio_r = uptake_r_c / (uptake_r_n + small)
+        overflow_r = uptake_r_c - uptake_r_n * min(target_r, uptake_ratio_r)
+        expected_mic_r =
+            carbon[3] + (uptake_r_c - turnover_r_partitions - overflow_r)
+        @test hourly.carbon[3] == expected_mic_r
         mapped = @inferred MIMICS.daily_carbon_nitrogen_map(
             carbon_parameters,
             nitrogen_parameters,
@@ -245,6 +336,84 @@ for FT in (Float32, Float64)
         )
         @test sum(mapped.nitrogen .- nitrogen) + mapped.mineral_nitrogen -
               mineral_nitrogen ≈ sum(nitrogen_inputs) atol = nitrogen_tolerance
+        @test mapped.microbial_assimilation >=
+              mapped.overflow_r + mapped.overflow_k
+        @test mapped.physical_protection >= zero(FT)
+
+        combined_carbon = (
+            carbon[1],
+            carbon[2],
+            FT(0.2),
+            carbon[3],
+            carbon[4],
+            carbon[5],
+            carbon[6],
+            carbon[7],
+        )
+        combined_nitrogen = (
+            nitrogen[1],
+            nitrogen[2],
+            nitrogen[3],
+            nitrogen[4],
+            nitrogen[5],
+            nitrogen[6],
+            nitrogen[7],
+            FT(0.01),
+        )
+        combined_arguments = (
+            mimics_model_parameters(FT),
+            nitrogen_parameters,
+            combined_carbon,
+            combined_nitrogen,
+            mineral_nitrogen,
+            FT.((283.15, 0.3, 0.1)),
+            FT.((1e-8, 2e-8, 3e-8)),
+            FT.((1e-9, 2e-9, 3e-9)),
+            FT.((1e-10, 2e-10, 3e-10)),
+            FT(0.5),
+            FT(0.3),
+        )
+        combined = @inferred MIMICS.combined_carbon_nitrogen_fluxes(
+            combined_arguments[1],
+            combined_arguments[2],
+            combined_arguments[3]...,
+            combined_arguments[4]...,
+            combined_arguments[5],
+            combined_arguments[6]...,
+            combined_arguments[7]...,
+            combined_arguments[8]...,
+            combined_arguments[9]...,
+            combined_arguments[10],
+            combined_arguments[11],
+        )
+        @test length(combined) == 29
+        @test combined_carbon_nitrogen_allocations(combined_arguments...) == 0
+
+        zero_microbe_carbon =
+            FT.((carbon[1], carbon[2], 0, 0, carbon[5], carbon[6], carbon[7]))
+        zero_microbe_nitrogen =
+            FT.((
+                nitrogen[1],
+                nitrogen[2],
+                0,
+                0,
+                nitrogen[5],
+                nitrogen[6],
+                nitrogen[7],
+            ))
+        zero_microbe_map = @inferred MIMICS.daily_carbon_nitrogen_map(
+            carbon_parameters,
+            nitrogen_parameters,
+            zero_microbe_carbon,
+            zero_microbe_nitrogen,
+            mineral_nitrogen,
+            carbon_inputs,
+            nitrogen_inputs,
+            environment,
+        )
+        @test all(isfinite, zero_microbe_map.carbon)
+        @test all(isfinite, zero_microbe_map.nitrogen)
+        @test zero_microbe_map.mineral_nitrogen == mineral_nitrogen
     end
 end
 

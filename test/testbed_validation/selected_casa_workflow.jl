@@ -165,10 +165,12 @@ function build_cn_model(
                 values.lignin_wood,
                 values.lignin_root,
             ),
+            wood_lignin_nitrogen_ratio = inv(values.plant_nitrogen_ratio[2]) * values.lignin_wood,
             structural_litter_nitrogen_ratio = values.structural_litter_nitrogen_ratio,
             limitation_minimum = values.limitation_minimum,
             limitation_maximum = values.limitation_maximum,
             mineral_half_saturation = values.limitation_maximum,
+            active = !values.inactive,
         )
     end
     plant = PlantCASA.CASAPlantModel{Float64}(;

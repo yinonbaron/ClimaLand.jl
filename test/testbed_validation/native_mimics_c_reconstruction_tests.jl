@@ -102,6 +102,16 @@ end
     end
 end
 
+@testset "Fortran annual-NPP sentinel parity" begin
+    annual_npp = [-0.2, -0.099, -0.098, 0.5]
+    forced = [1.0, 2.0, 3.0, 4.0]
+    TestbedNativeMIMICSCReconstruction.apply_annual_npp_sentinel!(
+        annual_npp,
+        forced,
+    )
+    @test annual_npp == [1.0, 2.0, -0.098, 0.5]
+end
+
 
 @testset "native MIMICS-C budget callback allocations" begin
     stage = TestbedNativeMIMICSCReconstruction.native_workflow().NativeStage(

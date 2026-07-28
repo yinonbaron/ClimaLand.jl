@@ -103,6 +103,15 @@ prespin_casa_candidate = "casa_boreal_nfix"
 prespin_mimics_candidate = "mimics_ko6_fi30"
 reason = "Latest public source before archive creation with the high-confidence reconstructed prespin candidates"
 
+[[case]]
+id = "bundled_ko4_fi30"
+issue = 43
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+prespin_control_candidate = "mimics_cn_prespin_fi30"
+prespin_casa_candidate = "casa_boreal_nfix"
+prespin_mimics_parameters = "normal_mimics_parameters"
+reason = "Run every stage with the hash-pinned KO4/FI30 parameter file bundled in the MIMICS-CN run folder"
+
 [excluded.prespin_fi10]
 candidate = "mimics_cn_prespin_fi10"
 reason = "The archive records FI30 and the FI10 prespin alternative has only medium-confidence README support."

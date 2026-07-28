@@ -32,7 +32,10 @@ export CarbonNitrogen,
 "Compile-time temporal formulation for the CASA plant model."
 abstract type AbstractTemporalMode end
 
-"Exact ordered one-day map used by the reference Fortran testbed."
+"""
+Exact ordered one-day map used by the reference Fortran testbed, including
+its `1e-10` g N m⁻² day⁻¹ total plant-uptake floor.
+"""
 struct LegacyDaily <: AbstractTemporalMode end
 
 "Timestep-independent, simultaneous CASA plant ordinary differential equation."
@@ -91,8 +94,7 @@ end
     small = oftype(carbon[1], 1e-10)
     return ntuple(Val(3)) do index
         if index == 2
-            inv(parameters.nitrogen_ratio_minimum[index]) *
-            parameters.lignin_fraction[index]
+            parameters.wood_lignin_nitrogen_ratio
         else
             carbon_nitrogen = min(
                 carbon[index] / max(small, nitrogen[index]),
@@ -166,16 +168,24 @@ Base.broadcastable(parameters::CASAPlantModelParameters) = tuple(parameters)
 
 CASA plant nitrogen parameters. Ratios are N:C, mineral thresholds use
 kg N m⁻², and `mineral_half_saturation` uses kg N m⁻².
+`wood_lignin_nitrogen_ratio` preserves the fixed ratio initialized from the
+plant C:N table by the legacy MIMICS-CN implementation; unlike leaf and
+fine-root ratios, it is not recomputed from the minimum N:C limit. Set
+`active = false` for ice, water, and other points skipped by the legacy CASA
+calculation.
 """
 Base.@kwdef struct CASAPlantNitrogenParameters{FT <: AbstractFloat}
     nitrogen_ratio_minimum::NTuple{3, FT}
     nitrogen_ratio_maximum::NTuple{3, FT}
     nitrogen_fraction_to_litter::NTuple{3, FT}
     lignin_fraction::NTuple{3, FT}
+    wood_lignin_nitrogen_ratio::FT =
+        inv(nitrogen_ratio_minimum[2]) * lignin_fraction[2]
     structural_litter_nitrogen_ratio::FT
     limitation_minimum::FT
     limitation_maximum::FT
     mineral_half_saturation::FT
+    active::FT = one(FT)
 end
 
 Base.broadcastable(parameters::CASAPlantNitrogenParameters) = tuple(parameters)
@@ -274,8 +284,43 @@ end
 
 @inline function legacy_bounded_tendency(state, tendency)
     seconds_per_day = oftype(state, 86400)
-    next_state = max(zero(state), state + seconds_per_day * tendency)
+    grams_per_kilogram = oftype(state, 1000)
+    state_grams = grams_per_kilogram * state
+    tendency_grams = tendency * seconds_per_day * grams_per_kilogram
+    next_state =
+        max(zero(state_grams), state_grams + tendency_grams) /
+        grams_per_kilogram
     return (next_state - state) / seconds_per_day
+end
+
+@inline function legacy_daily_tendency(state, tendency)
+    seconds_per_day = oftype(state, 86400)
+    grams_per_kilogram = oftype(state, 1000)
+    state_grams = grams_per_kilogram * state
+    tendency_grams = tendency * seconds_per_day * grams_per_kilogram
+    next_state = (state_grams + tendency_grams) / grams_per_kilogram
+    return (next_state - state) / seconds_per_day
+end
+
+@inline legacy_flux_to_si(value, grams_per_kilogram, seconds_per_day) =
+    value / grams_per_kilogram / seconds_per_day
+
+"""
+    legacy_single_precision(value)
+
+Reproduce the legacy `real(4)` process-input handoff for ordinary floating-point
+values. For number types that carry derivative information, quantize the primal
+to the same 24-bit significand and return a zero derivative, matching the
+piecewise-constant compatibility operation without importing an AD package.
+"""
+@inline legacy_single_precision(value::AbstractFloat) =
+    oftype(value, Float32(value))
+@inline function legacy_single_precision(value::Number)
+    iszero(value) && return zero(value)
+    isfinite(value) || return value
+    quantum = ldexp(one(value), max(exponent(value) - 23, -149))
+    quantized = round(value / quantum) * quantum
+    return oftype(value, quantized)
 end
 
 ClimaLand.name(::CASAPlantModel) = :casa_plant
@@ -412,6 +457,21 @@ Convert leaf carbon to the prognostic CASA LAI and apply the PFT bounds.
     )
 end
 
+"""
+    legacy_leaf_area_index(parameters, leaf_carbon_grams)
+
+Compute LAI from the units and multiplication order used by legacy CASA.
+"""
+@inline function legacy_leaf_area_index(parameters, leaf_carbon_grams)
+    grams_per_kilogram = oftype(leaf_carbon_grams, 1000)
+    return clamp(
+        (parameters.specific_leaf_area / grams_per_kilogram) *
+        leaf_carbon_grams,
+        parameters.minimum_leaf_area_index,
+        parameters.maximum_leaf_area_index,
+    )
+end
+
 @inline function normalize_fractions(fractions)
     total = sum(fractions)
     if total > zero(total)
@@ -514,39 +574,53 @@ See also [`nitrogen_uptake`](@ref) and [`carbon_fluxes`](@ref).
     mineral_nitrogen,
     available_gpp,
 )
+    seconds_per_day = oftype(mineral_nitrogen, 86400)
+    grams_per_kilogram = oftype(mineral_nitrogen, 1000)
+    carbon_grams = ntuple(index -> grams_per_kilogram * carbon[index], Val(3))
+    nitrogen_grams =
+        ntuple(index -> grams_per_kilogram * nitrogen[index], Val(3))
+    npp_daily = npp * seconds_per_day * grams_per_kilogram
+    turnover_daily =
+        ntuple(index -> turnover_rates[index] * seconds_per_day, Val(3))
+    mineral_nitrogen_grams = grams_per_kilogram * mineral_nitrogen
+    available_gpp_daily = available_gpp * seconds_per_day * grams_per_kilogram
     zero_mineral = zero(mineral_nitrogen)
     minimum_demand =
         nitrogen_uptake(
             parameters,
-            carbon,
-            nitrogen,
-            npp,
+            carbon_grams,
+            nitrogen_grams,
+            npp_daily,
             allocation,
-            turnover_rates,
+            turnover_daily,
             zero_mineral,
             zero_mineral,
             zero_mineral,
+            grams_per_kilogram * parameters.mineral_half_saturation,
+            oftype(mineral_nitrogen, 1e-10),
         ).minimum_demand
-    seconds_per_day = oftype(mineral_nitrogen, 86400)
-    nitrogen_epsilon = oftype(mineral_nitrogen, 1e-13)
+    nitrogen_epsilon = oftype(mineral_nitrogen, 1e-10)
     available_fraction = clamp(
-        mineral_nitrogen /
-        (seconds_per_day * sum(minimum_demand) + nitrogen_epsilon),
+        mineral_nitrogen_grams / (sum(minimum_demand) + nitrogen_epsilon),
         zero_mineral,
         one(mineral_nitrogen),
     )
-    limited = (npp > zero(npp)) & (available_fraction < one(available_fraction))
-    gpp_epsilon = oftype(available_gpp, 1e-10 / 1000 / 86400)
+    limited =
+        (npp_daily > zero(npp_daily)) &
+        (available_fraction < one(available_fraction))
+    gpp_epsilon = oftype(available_gpp_daily, 1e-10)
     labile_fraction = ifelse(
         limited,
-        (one(available_fraction) - available_fraction) * max(zero(npp), npp) / (available_gpp + gpp_epsilon),
-        zero(available_gpp),
+        (one(available_fraction) - available_fraction) *
+        max(zero(npp_daily), npp_daily) /
+        (available_gpp_daily + gpp_epsilon),
+        zero(available_gpp_daily),
     )
-    safe_npp = ifelse(limited, npp, one(npp))
+    safe_npp = ifelse(limited, npp_daily, one(npp_daily))
     npp_scalar = ifelse(
         limited,
-        (npp - labile_fraction * available_gpp) / safe_npp,
-        one(npp),
+        (npp_daily - labile_fraction * available_gpp_daily) / safe_npp,
+        one(npp_daily),
     )
     return (; npp_scalar, labile_fraction)
 end
@@ -582,7 +656,9 @@ end
     )
 
 Compute CASA mineral-N demand, uptake, and allocation among leaf, wood, and
-fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`.
+fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`. The
+legacy `1e-10` g C m⁻² denominator offset is converted to kg C m⁻² before the
+maximum N:C-ratio comparison.
 """
 @inline function nitrogen_uptake(
     parameters,
@@ -594,6 +670,8 @@ fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`.
     mineral_nitrogen,
     demand_fraction,
     limitation,
+    mineral_half_saturation = parameters.mineral_half_saturation,
+    nitrogen_ratio_epsilon = oftype(carbon[1], 1e-10 / 1000),
 )
     available_ratio = ntuple(Val(3)) do index
         parameters.nitrogen_ratio_minimum[index] +
@@ -624,7 +702,7 @@ fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`.
     end
     minimum_demand = ntuple(Val(3)) do index
         excessive =
-            nitrogen[index] / (carbon[index] + oftype(carbon[index], 1e-10)) >
+            nitrogen[index] / (carbon[index] + nitrogen_ratio_epsilon) >
             parameters.nitrogen_ratio_maximum[index]
         ifelse(
             excessive,
@@ -634,7 +712,7 @@ fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`.
     end
     maximum_demand = ntuple(Val(3)) do index
         excessive =
-            nitrogen[index] / (carbon[index] + oftype(carbon[index], 1e-10)) >
+            nitrogen[index] / (carbon[index] + nitrogen_ratio_epsilon) >
             parameters.nitrogen_ratio_maximum[index]
         ifelse(
             excessive,
@@ -643,8 +721,7 @@ fine-root pools in the order used by `casa_Nrequire` and `casa_nuptake`.
         )
     end
     mineral_response =
-        mineral_nitrogen /
-        (mineral_nitrogen + parameters.mineral_half_saturation)
+        mineral_nitrogen / (mineral_nitrogen + mineral_half_saturation)
     by_pool = ntuple(Val(3)) do index
         minimum_demand[index] +
         limitation *
@@ -681,7 +758,8 @@ end
     )
 
 Compute plant-N tendencies, mineral uptake, and litter-N boundary fluxes for
-one CASA point.
+one CASA point. A positive `uptake_floor` is included in the allocation
+denominator and pool-uptake reconstruction to preserve legacy arithmetic.
 """
 @inline function nitrogen_fluxes(
     parameters,
@@ -694,6 +772,9 @@ one CASA point.
     demand_fraction,
     limitation,
     metabolic_fractions = plant_litter_fractions(parameters, carbon, nitrogen),
+    uptake_floor = zero(npp),
+    mineral_half_saturation = parameters.mineral_half_saturation,
+    nitrogen_ratio_epsilon = oftype(carbon[1], 1e-10 / 1000),
 )
     uptake = nitrogen_uptake(
         parameters,
@@ -705,10 +786,33 @@ one CASA point.
         mineral_nitrogen,
         demand_fraction,
         limitation,
+        mineral_half_saturation,
+        nitrogen_ratio_epsilon,
+    )
+    total_uptake = uptake.total + uptake_floor
+    uses_floor = uptake_floor > zero(uptake_floor)
+    safe_total_uptake = ifelse(uses_floor, total_uptake, one(total_uptake))
+    floor_allocation =
+        ntuple(index -> uptake.by_pool[index] / safe_total_uptake, Val(3))
+    uptake_allocation = ntuple(
+        index -> ifelse(
+            uses_floor,
+            floor_allocation[index],
+            uptake.fractions[index],
+        ),
+        Val(3),
+    )
+    allocated_uptake = ntuple(
+        index -> ifelse(
+            uses_floor,
+            total_uptake * uptake_allocation[index],
+            uptake.by_pool[index],
+        ),
+        Val(3),
     )
     fractions_to_litter = (
         ifelse(
-            iszero(uptake.fractions[1]),
+            iszero(uptake_allocation[1]),
             one(nitrogen[1]),
             parameters.nitrogen_fraction_to_litter[1],
         ),
@@ -734,15 +838,15 @@ one CASA point.
     metabolic = nitrogen_turnover[1] + nitrogen_turnover[3] - structural
     litter = (metabolic, structural, nitrogen_turnover[2])
     tendencies = ntuple(
-        index -> uptake.by_pool[index] - nitrogen_turnover[index],
+        index -> allocated_uptake[index] - nitrogen_turnover[index],
         Val(3),
     )
     return (
         tendencies = tendencies,
         litter = litter,
-        uptake = uptake.total,
+        uptake = total_uptake,
         uptake_by_pool = uptake.by_pool,
-        uptake_allocation = uptake.fractions,
+        uptake_allocation,
         nitrogen_turnover = nitrogen_turnover,
         metabolic_fractions = metabolic_fractions,
     )
@@ -833,6 +937,7 @@ Return the carbon-only CASA plant fluxes for one surface point.
     npp_scalar,
     labile_fraction,
     plant_nitrogen = parameters.plant_nitrogen,
+    lai = leaf_area_index(parameters, carbon[1]),
 )
     respiration = respiration_fluxes(
         parameters,
@@ -844,7 +949,6 @@ Return the carbon-only CASA plant fluxes for one surface point.
         plant_nitrogen,
     )
     npp = respiration.npp * npp_scalar
-    lai = leaf_area_index(parameters, carbon[1])
     allocation = allocation_fractions(
         parameters,
         phase,
@@ -888,6 +992,202 @@ Return the carbon-only CASA plant fluxes for one surface point.
     )
 end
 
+"""
+    legacy_carbon_fluxes(parameters, carbon, gpp, air_temperature,
+                         soil_temperature, water_stress, phase,
+                         npp_scalar, labile_fraction, plant_nitrogen)
+
+Evaluate the ordered CASA plant-carbon calculation in the legacy model's
+native grams and days, then return SI tendencies and diagnostics. This keeps
+long repeated-forcing runs on the same side of the discontinuous LAI gates as
+the reference implementation.
+"""
+@inline function legacy_carbon_fluxes(
+    parameters,
+    carbon,
+    gpp,
+    air_temperature,
+    soil_temperature,
+    water_stress,
+    phase,
+    npp_scalar,
+    labile_fraction,
+    plant_nitrogen,
+)
+    seconds_per_day = oftype(gpp, 86400)
+    grams_per_kilogram = oftype(gpp, 1000)
+    carbon_grams = ntuple(index -> grams_per_kilogram * carbon[index], Val(4))
+    nitrogen_grams =
+        ntuple(index -> grams_per_kilogram * plant_nitrogen[index], Val(3))
+    gpp_daily =
+        legacy_single_precision(gpp * seconds_per_day * grams_per_kilogram)
+    air_factor =
+        temperature_response(air_temperature, parameters.freezing_temperature)
+    soil_factor =
+        temperature_response(soil_temperature, parameters.freezing_temperature)
+    wood =
+        parameters.maintenance_rates[2] *
+        seconds_per_day *
+        nitrogen_grams[2] *
+        air_factor
+    root =
+        parameters.maintenance_rates[3] *
+        seconds_per_day *
+        nitrogen_grams[3] *
+        soil_factor
+    pool_threshold = oftype(carbon_grams[2], 1e-6)
+    wood = ifelse(
+        (air_temperature > oftype(air_temperature, 250)) &
+        (carbon_grams[2] > pool_threshold),
+        wood,
+        zero(wood),
+    )
+    root = ifelse(
+        (soil_temperature > oftype(soil_temperature, 250)) &
+        (carbon_grams[3] > pool_threshold),
+        root,
+        zero(root),
+    )
+    maintenance = wood + root
+    p_to_n = parameters.leaf_phosphorus_to_nitrogen
+    growth_efficiency =
+        oftype(gpp_daily, 0.65) +
+        oftype(gpp_daily, 0.2) * p_to_n / (p_to_n + inv(oftype(gpp_daily, 15)))
+    growth =
+        (one(gpp_daily) - growth_efficiency) *
+        max(zero(gpp_daily), gpp_daily - maintenance)
+    npp = (gpp_daily - maintenance - growth) * npp_scalar
+    lai = legacy_leaf_area_index(parameters, carbon_grams[1])
+    allocation = allocation_fractions(
+        parameters,
+        phase,
+        lai,
+        npp,
+        (zero(wood), wood, root),
+    )
+    five = oftype(air_temperature, 5)
+    cold_state = clamp(
+        (air_temperature - (parameters.shedding_temperature - five)) / five,
+        zero(air_temperature),
+        one(air_temperature),
+    )
+    cold =
+        parameters.cold_turnover_maximum *
+        seconds_per_day *
+        (one(cold_state) - cold_state)^parameters.cold_turnover_exponent
+    dry =
+        parameters.drought_turnover_maximum *
+        seconds_per_day *
+        (one(water_stress) - water_stress)^parameters.drought_turnover_exponent
+    leaf_switch = ifelse(phase == one(phase), zero(phase), one(phase))
+    leaf_rate =
+        parameters.turnover_rates[1] * seconds_per_day * leaf_switch +
+        cold +
+        dry
+    leaf_rate = ifelse(
+        lai <= parameters.minimum_leaf_area_index,
+        zero(leaf_rate),
+        leaf_rate,
+    )
+    rates = (
+        leaf_rate,
+        parameters.turnover_rates[2] * seconds_per_day,
+        parameters.turnover_rates[3] * seconds_per_day,
+    )
+    turnover = ntuple(index -> rates[index] * carbon_grams[index], Val(3))
+    exudate = max(zero(gpp_daily), parameters.root_exudate_fraction * gpp_daily)
+    labile_factor = ifelse(
+        air_temperature > oftype(air_temperature, 250),
+        air_factor,
+        zero(air_temperature),
+    )
+    labile_loss =
+        parameters.labile_loss_rate *
+        seconds_per_day *
+        max(zero(carbon_grams[4]), carbon_grams[4]) *
+        labile_factor
+    tendencies = (
+        npp * allocation[1] - turnover[1],
+        npp * allocation[2] - turnover[2],
+        npp * allocation[3] - turnover[3],
+        (gpp_daily - exudate) * labile_fraction - labile_loss,
+    )
+    return (
+        tendencies = ntuple(
+            index -> legacy_flux_to_si(
+                tendencies[index],
+                grams_per_kilogram,
+                seconds_per_day,
+            ),
+            Val(4),
+        ),
+        allocation = allocation,
+        turnover = ntuple(
+            index -> legacy_flux_to_si(
+                turnover[index],
+                grams_per_kilogram,
+                seconds_per_day,
+            ),
+            Val(3),
+        ),
+        rates = ntuple(index -> rates[index] / seconds_per_day, Val(3)),
+        gpp = legacy_flux_to_si(gpp_daily, grams_per_kilogram, seconds_per_day),
+        npp = legacy_flux_to_si(npp, grams_per_kilogram, seconds_per_day),
+        autotrophic_respiration = legacy_flux_to_si(
+            maintenance + growth,
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        maintenance_respiration = legacy_flux_to_si(
+            maintenance,
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        growth_respiration = legacy_flux_to_si(
+            growth,
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        leaf_area_index = lai,
+        root_exudate = legacy_flux_to_si(
+            exudate,
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        labile_loss = legacy_flux_to_si(
+            labile_loss,
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+    )
+end
+
+@inline function pack_carbon_fluxes(fluxes)
+    return StaticArrays.SVector{21}(
+        fluxes.tendencies[1],
+        fluxes.tendencies[2],
+        fluxes.tendencies[3],
+        fluxes.tendencies[4],
+        fluxes.allocation[1],
+        fluxes.allocation[2],
+        fluxes.allocation[3],
+        fluxes.turnover[1],
+        fluxes.turnover[2],
+        fluxes.turnover[3],
+        fluxes.rates[1],
+        fluxes.rates[2],
+        fluxes.rates[3],
+        fluxes.gpp,
+        fluxes.npp,
+        fluxes.autotrophic_respiration,
+        fluxes.maintenance_respiration,
+        fluxes.growth_respiration,
+        fluxes.leaf_area_index,
+        fluxes.root_exudate,
+        fluxes.labile_loss,
+    )
+end
+
 @inline function packed_carbon_fluxes(
     parameters,
     c_leaf,
@@ -919,6 +1219,7 @@ end
         c_wood,
         c_fine_root,
     )[3],
+    lai = leaf_area_index(parameters, c_leaf),
 )
     carbon = (c_leaf, c_wood, c_fine_root, c_labile)
     fluxes = carbon_fluxes(
@@ -932,30 +1233,9 @@ end
         npp_scalar,
         labile_fraction,
         (n_leaf, n_wood, n_fine_root),
+        lai,
     )
-    return StaticArrays.SVector{21}(
-        fluxes.tendencies[1],
-        fluxes.tendencies[2],
-        fluxes.tendencies[3],
-        fluxes.tendencies[4],
-        fluxes.allocation[1],
-        fluxes.allocation[2],
-        fluxes.allocation[3],
-        fluxes.turnover[1],
-        fluxes.turnover[2],
-        fluxes.turnover[3],
-        fluxes.rates[1],
-        fluxes.rates[2],
-        fluxes.rates[3],
-        fluxes.gpp,
-        fluxes.npp,
-        fluxes.autotrophic_respiration,
-        fluxes.maintenance_respiration,
-        fluxes.growth_respiration,
-        fluxes.leaf_area_index,
-        fluxes.root_exudate,
-        fluxes.labile_loss,
-    )
+    return pack_carbon_fluxes(fluxes)
 end
 
 """
@@ -1013,7 +1293,7 @@ the standalone and coupled CN cache updates.
         (unrestricted[5], unrestricted[6], unrestricted[7]),
         (unrestricted[11], unrestricted[12], unrestricted[13]),
         mineral_nitrogen,
-        gpp - unrestricted[20],
+        unrestricted[14] - unrestricted[20],
     )
     return packed_carbon_fluxes(
         temporal_mode,
@@ -1071,12 +1351,9 @@ end
         c_fine_root,
     )[3],
 )
-    fluxes = packed_carbon_fluxes(
+    fluxes = legacy_carbon_fluxes(
         parameters,
-        c_leaf,
-        c_wood,
-        c_fine_root,
-        c_labile,
+        (c_leaf, c_wood, c_fine_root, c_labile),
         gpp,
         air_temperature,
         soil_temperature,
@@ -1084,19 +1361,19 @@ end
         phase,
         npp_scalar,
         labile_fraction,
-        n_leaf,
-        n_wood,
-        n_fine_root,
+        (n_leaf, n_wood, n_fine_root),
     )
+    fluxes = pack_carbon_fluxes(fluxes)
     fluxes =
         Base.setindex(fluxes, legacy_bounded_tendency(c_leaf, fluxes[1]), 1)
     fluxes =
         Base.setindex(fluxes, legacy_bounded_tendency(c_wood, fluxes[2]), 2)
-    return Base.setindex(
+    fluxes = Base.setindex(
         fluxes,
         legacy_bounded_tendency(c_fine_root, fluxes[3]),
         3,
     )
+    return Base.setindex(fluxes, legacy_daily_tendency(c_labile, fluxes[4]), 4)
 end
 
 @inline function packed_nitrogen_fluxes(
@@ -1116,6 +1393,7 @@ end
         (c_leaf, c_wood, c_fine_root),
         (n_leaf, n_wood, n_fine_root),
     ),
+    uptake_floor = zero(c_leaf),
 )
     fluxes = nitrogen_fluxes(
         parameters,
@@ -1128,6 +1406,7 @@ end
         demand_fraction,
         limitation,
         metabolic_fractions,
+        uptake_floor,
     )
     return StaticArrays.SVector{12}(
         fluxes.tendencies...,
@@ -1160,32 +1439,119 @@ end
         (n_leaf, n_wood, n_fine_root),
     ),
 )
-    fluxes = packed_nitrogen_fluxes(
+    seconds_per_day = oftype(c_leaf, 86400)
+    grams_per_kilogram = oftype(c_leaf, 1000)
+    carbon_grams = ntuple(
+        index -> grams_per_kilogram * (c_leaf, c_wood, c_fine_root)[index],
+        Val(3),
+    )
+    nitrogen_grams = ntuple(
+        index -> grams_per_kilogram * (n_leaf, n_wood, n_fine_root)[index],
+        Val(3),
+    )
+    daily_mass_factor = seconds_per_day * grams_per_kilogram
+    carbon_fluxes_daily = StaticArrays.SVector{21}(
+        carbon_fluxes[1] * daily_mass_factor,
+        carbon_fluxes[2] * daily_mass_factor,
+        carbon_fluxes[3] * daily_mass_factor,
+        carbon_fluxes[4] * daily_mass_factor,
+        carbon_fluxes[5],
+        carbon_fluxes[6],
+        carbon_fluxes[7],
+        carbon_fluxes[8] * daily_mass_factor,
+        carbon_fluxes[9] * daily_mass_factor,
+        carbon_fluxes[10] * daily_mass_factor,
+        carbon_fluxes[11] * seconds_per_day,
+        carbon_fluxes[12] * seconds_per_day,
+        carbon_fluxes[13] * seconds_per_day,
+        carbon_fluxes[14] * daily_mass_factor,
+        carbon_fluxes[15] * daily_mass_factor,
+        carbon_fluxes[16] * daily_mass_factor,
+        carbon_fluxes[17] * daily_mass_factor,
+        carbon_fluxes[18] * daily_mass_factor,
+        carbon_fluxes[19],
+        carbon_fluxes[20] * daily_mass_factor,
+        carbon_fluxes[21] * daily_mass_factor,
+    )
+    uptake_floor =
+        ifelse(!iszero(parameters.active), oftype(c_leaf, 1e-10), zero(c_leaf))
+    fluxes = nitrogen_fluxes(
         parameters,
-        c_leaf,
-        c_wood,
-        c_fine_root,
-        n_leaf,
-        n_wood,
-        n_fine_root,
-        mineral_nitrogen,
+        carbon_grams,
+        nitrogen_grams,
+        carbon_fluxes_daily[15],
+        (
+            carbon_fluxes_daily[5],
+            carbon_fluxes_daily[6],
+            carbon_fluxes_daily[7],
+        ),
+        (
+            carbon_fluxes_daily[11],
+            carbon_fluxes_daily[12],
+            carbon_fluxes_daily[13],
+        ),
+        grams_per_kilogram * mineral_nitrogen,
         demand_fraction,
         limitation,
-        carbon_fluxes,
         metabolic_fractions,
+        uptake_floor,
+        grams_per_kilogram * parameters.mineral_half_saturation,
+        oftype(c_leaf, 1e-10),
     )
-    seconds_per_day = oftype(c_leaf, 86400)
+    si_fluxes = StaticArrays.SVector{12}(
+        legacy_flux_to_si(
+            fluxes.tendencies[1],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(
+            fluxes.tendencies[2],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(
+            fluxes.tendencies[3],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(
+            fluxes.litter[1],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(
+            fluxes.litter[2],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(
+            fluxes.litter[3],
+            grams_per_kilogram,
+            seconds_per_day,
+        ),
+        legacy_flux_to_si(fluxes.uptake, grams_per_kilogram, seconds_per_day),
+        fluxes.uptake_allocation...,
+        fluxes.metabolic_fractions...,
+    )
     update_nitrogen = carbon_fluxes[1] > -c_leaf / seconds_per_day
-    nitrogen = (n_leaf, n_wood, n_fine_root)
-    for index in 1:3
-        tendency = ifelse(update_nitrogen, fluxes[index], zero(fluxes[index]))
-        fluxes = Base.setindex(
-            fluxes,
-            legacy_bounded_tendency(nitrogen[index], tendency),
-            index,
-        )
-    end
-    return fluxes
+    leaf_tendency = ifelse(update_nitrogen, si_fluxes[1], zero(si_fluxes[1]))
+    wood_tendency = ifelse(update_nitrogen, si_fluxes[2], zero(si_fluxes[2]))
+    root_tendency = ifelse(update_nitrogen, si_fluxes[3], zero(si_fluxes[3]))
+    result = StaticArrays.SVector{12}(
+        legacy_bounded_tendency(n_leaf, leaf_tendency),
+        legacy_bounded_tendency(n_wood, wood_tendency),
+        legacy_bounded_tendency(n_fine_root, root_tendency),
+        si_fluxes[4],
+        si_fluxes[5],
+        si_fluxes[6],
+        si_fluxes[7],
+        si_fluxes[8],
+        si_fluxes[9],
+        si_fluxes[10],
+        si_fluxes[11],
+        si_fluxes[12],
+    )
+    return result::StaticArrays.SVector{12, typeof(c_leaf)}
 end
 
 @inline function packed_mimics_nitrogen_fluxes(

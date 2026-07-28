@@ -447,6 +447,21 @@ julia --startup-file=no --project=test \
   <biogeochem-testbed-source-root> <forcing-root> \
   <mimics-c-reference-root> <run-root>
 
+# Run the native four-stage, 4,263-cell MIMICS-CN reconstruction with the
+# issue-43 KO4/FI30 parameters and separate fresh/archive comparisons.
+# See NATIVE_MIMICS_CN_RECONSTRUCTION.md for parameters, stage boundaries,
+# diagnostics, tolerances, and the selected-cell validation procedure.
+julia --startup-file=no --project=test \
+  test/testbed_validation/native_mimics_cn_reconstruction.jl \
+  <biogeochem-testbed-source-root> <forcing-root> \
+  <issue-43-reference-root> <run-root>
+
+# Gate the global run on a fresh Fortran comparison over the 37 selected cells.
+julia --startup-file=no --project=test \
+  test/testbed_validation/selected_mimics_cn_validation.jl \
+  <biogeochem-testbed-source-root> <issue-43-reference-root> \
+  <fortran-executable> <selected-reference-root> <selected-julia-root>
+
 # Validate the ordered MIMICS-CN map, working DIN, overflow, and N fluxes.
 julia --startup-file=no --project=test \
   test/testbed_validation/grid_transition_parity.jl mimics-cn \

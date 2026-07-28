@@ -1,5 +1,9 @@
-include(joinpath(@__DIR__, "reference_harness.jl"))
-include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
+if !isdefined(@__MODULE__, :TestbedReferenceHarness)
+    include(joinpath(@__DIR__, "reference_harness.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedSelectedCellFixtures)
+    include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
+end
 
 module GenerateSelectedCORPSEReference
 

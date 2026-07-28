@@ -1,0 +1,91 @@
+schema_version = 1
+issue = 31
+parameter_source_issue = 43
+points = 4263
+calendar = "365_day"
+dt_seconds = 86400
+mineral_nitrogen_owner = "mimics_soil.n_mineral"
+
+[inputs]
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+prespin_casa_parameters = "candidates/parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+normal_casa_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+mimics_parameters = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+mimics_parameters_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+forcing_pattern = "met_YEAR_YEAR.nc"
+
+[stages.prespin]
+forcing_years = [1901, 1901]
+repeats = 100
+
+[stages.spin]
+forcing_years = [1901, 1920]
+repeats = 499
+
+[stages.spin_continuation]
+forcing_years = [1901, 1920]
+repeats = 499
+
+[stages.historical]
+forcing_years = [1901, 2014]
+repeats = 1
+
+[comparison.boundary]
+atol = 5.0e-3
+rtol = 1.0e-3
+
+[comparison.fresh_fortran]
+atol = 5.0e-3
+rtol = 1.0e-3
+annual_years = [1901, 2014]
+daily_windows = [[1901, 1905], [2010, 2014]]
+
+[comparison.published_archive]
+atol = 5.0e-3
+rtol = 1.0e-3
+annual_years = [1901, 2014]
+daily_windows = [[1901, 1905], [2010, 2014]]
+
+[comparison.budget]
+carbon_rtol = 5.0e-12
+nitrogen_rtol = 5.0e-12
+
+[output]
+eltype = "Float32"
+deflatelevel = 1
+checkpoint_format = "native ClimaLand HDF5"
+
+[restart_handoff]
+application = "stage entry after prespin"
+validation_initialization = "Julia native checkpoint, quantized to the paired Fortran restart format"
+diagnostic_reference_initialization = "reference_stage_initialization = true loads the paired fresh-Fortran predecessor restart"
+casa_carried_pools = "f18.6 in legacy grams"
+mimics_organic_pools = "f18.10 in native kg m-2"
+labile_carbon = "reset to zero after CASA restart read"
+
+[legacy_lai]
+fortran_order = "SLA [m2 g-1] * leaf C [g m-2]"
+continuous_rate_order = "SLA [m2 kg-1] * leaf C [kg m-2]"
+reason = "floating-point side-of-bound parity at discontinuous minimum/maximum LAI gates"
+fortran_state_storage = "grams; direct one-day map"
+native_state_storage = "kilograms; per-second tendency applied by ClimaTimeSteppers"
+first_traced_branch_mismatch = "selected cell 1715, long-spin day 102749"
+deadband = "none; a tested 1e-5 g guard band postponed one flip but introduced other incorrect branches"
+
+[forcing_handoff]
+source_storage = "NetCDF"
+legacy_reader_buffer = "real(4)"
+native_compatibility_conversion = "Float64(Float32(value)) before unit conversion or root-weighted aggregation"
+drivers = ["xcgpp", "ndep", "xtairk", "xtsoil", "xmoist", "xfrznmoist"]
+
+[plant_lignin_nitrogen]
+leaf = "dynamic from current plant C and N, capped by maximum C:N"
+fine_root = "dynamic from current plant C and N, capped by maximum C:N"
+wood = "fixed from the initial plant C:N table, matching mimics_readbiome"
+
+[provenance]
+fresh_fortran = "issue-43 fresh_reference/ (or complete stages/04-historical fallback)"
+published_archive = "issue-43 reference/"
+rule = "Julia-Fresh-Fortran and Julia-published-archive metrics and tolerances are reported independently."

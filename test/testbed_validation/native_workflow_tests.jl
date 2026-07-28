@@ -60,9 +60,10 @@ end
             nutrients = :carbon_nitrogen,
             microbial_carbon_nitrogen = (6.0, 10.0),
         )
-        @test mimics.mimics_soil.c_litter_metabolic == 0.001
+        @test mimics.mimics_soil.c_litter_metabolic == 1.0
         @test mimics.mimics_soil.c_litter_cwd == 0.112
-        @test mimics.mimics_soil.n_microbe_r == 2.5e-6
+        @test mimics.mimics_soil.n_litter_metabolic == 0.1
+        @test mimics.mimics_soil.n_microbe_r == 0.0025
         @test mimics.mimics_soil.n_mineral == 1.0
 
         inactive = TestbedNativeWorkflow.fortran_initial_state(
@@ -94,7 +95,7 @@ end
             soil_model = :mimics,
             nutrients = :carbon_only,
         )
-        @test mimics_c.mimics_soil.c_microbe_k == 0.000025
+        @test mimics_c.mimics_soil.c_microbe_k == 0.025
 
         inactive_casa = TestbedNativeWorkflow.fortran_initial_state(
             path,
@@ -128,9 +129,16 @@ end
         )
         @test grass_casa.casa_plant.c_leaf == 0.02
         @test grass_casa.casa_plant.c_wood == 0.0
-        @test grass_casa.casa_plant.n_wood == 0.0
+        @test all(
+            value >= 1e-9 for value in (
+                grass_casa.casa_plant.n_leaf,
+                grass_casa.casa_plant.n_wood,
+                grass_casa.casa_plant.n_fine_root,
+            )
+        )
+        @test grass_casa.casa_plant.n_wood == 1e-9
         @test grass_casa.casa_soil.c_litter_cwd == 0.0
-        @test grass_casa.casa_soil.n_litter_cwd == 0.0
+        @test grass_casa.casa_soil.n_litter_cwd == 1e-9
 
         grass_mimics = TestbedNativeWorkflow.fortran_initial_state(
             path,
@@ -139,6 +147,6 @@ end
             nutrients = :carbon_nitrogen,
         )
         @test grass_mimics.mimics_soil.c_litter_cwd == 0.0
-        @test grass_mimics.mimics_soil.n_litter_cwd == 0.0
+        @test grass_mimics.mimics_soil.n_litter_cwd == 1e-9
     end
 end

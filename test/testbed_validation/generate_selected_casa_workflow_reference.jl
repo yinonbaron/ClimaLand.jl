@@ -190,9 +190,9 @@ function generate_reference(
             "fresh_fortran_boundary" =>
                 measured_fortran_tolerance(fortran, julia),
             "native_julia_boundary" => Dict(
-                "atol" => 64eps(Float64),
-                "rtol" => 64eps(Float64),
-                "method" => "64 machine eps for pinned Float64 native checkpoints",
+                "atol" => 256eps(Float64),
+                "rtol" => 256eps(Float64),
+                "method" => "256 machine eps for pinned Float64 native checkpoints",
             ),
             "native_julia_initialization" => Dict(
                 "atol" => 64eps(Float64),
@@ -200,9 +200,9 @@ function generate_reference(
                 "method" => "64 machine eps for pinned Float64 initialization",
             ),
             "native_julia_historical" => Dict(
-                "atol" => 64eps(Float64),
-                "rtol" => 64eps(Float64),
-                "method" => "64 machine eps for pinned Float64 native history",
+                "atol" => 256eps(Float64),
+                "rtol" => 256eps(Float64),
+                "method" => "256 machine eps for pinned Float64 native history",
             ),
         ),
         "provenance" => Dict(

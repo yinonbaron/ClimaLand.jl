@@ -205,6 +205,9 @@ function MIMICSForcing(
     phenology_path,
     forcing_root,
     buffers,
+    ;
+    nitrogen_deposition = nothing,
+    legacy_single_precision = false,
 )
     base = casa().GriddedForcing(
         grid,
@@ -213,6 +216,9 @@ function MIMICSForcing(
         phenology_path,
         forcing_root,
         buffers,
+        ;
+        nitrogen_deposition,
+        legacy_single_precision,
     )
     return MIMICSForcing(
         base,
@@ -262,8 +268,10 @@ function forced_annual_npp!(forcing, year)
         for (index, point) in enumerate(forcing.grid)
             forcing.base.active[index] || continue
             values[index] =
-                sum(gpp[point.longitude_index, point.latitude_index, :]) / 2 /
-                1000
+                sum(
+                    casa().forcing_value(forcing.base, value) for
+                    value in gpp[point.longitude_index, point.latitude_index, :]
+                ) / 2 / 1000
         end
         values
     end
@@ -295,7 +303,10 @@ function load_frozen_saturation!(forcing, year, day)
         for layer in axes(forcing.root_fraction, 2)
             frozen_water +=
                 forcing.root_fraction[point_index, layer] *
-                frozen[point.longitude_index, point.latitude_index, layer]
+                casa().forcing_value(
+                    forcing.base,
+                    frozen[point.longitude_index, point.latitude_index, layer],
+                )
         end
         cache.saturation[point_index, day] =
             min(1.0, frozen_water / forcing.porosity[point_index])
@@ -438,6 +449,16 @@ AnnualNPPTracker(domain) = AnnualNPPTracker(
     ClimaCore.Fields.zeros(Float64, domain.space.surface),
 )
 
+function apply_annual_npp_sentinel!(annual_npp, forced_annual_npp)
+    fortran_uninitialized_annual_npp = -0.099
+    @. annual_npp = ifelse(
+        annual_npp <= fortran_uninitialized_annual_npp,
+        forced_annual_npp,
+        annual_npp,
+    )
+    return nothing
+end
+
 function prepare_annual_npp!(tracker, forcing, stage, index)
     year, day = casa().forcing_year_day(stage, index)
     day == 1 || return nothing
@@ -446,7 +467,8 @@ function prepare_annual_npp!(tracker, forcing, stage, index)
         tracker.active_stage = stage.name
         values .= forced_annual_npp!(forcing, year)
     else
-        forcing.buffers.annual_npp .= tracker.accumulated
+        values .= vec(parent(tracker.accumulated))
+        apply_annual_npp_sentinel!(values, forced_annual_npp!(forcing, year))
     end
     tracker.accumulated .= 0.0
     return nothing

@@ -581,6 +581,7 @@ mutable struct GriddedForcing{P, D, B, N}
     longitude_index::Vector{Int}
     latitude_index::Vector{Int}
     active::BitVector
+    legacy_single_precision::Bool
     phenology::P
     phase::Vector{Int}
     forcing_root::String
@@ -602,6 +603,7 @@ function GriddedForcing(
     buffers,
     ;
     nitrogen_deposition = nothing,
+    legacy_single_precision = false,
 )
     phenology = read_phenology(phenology_path, grid)
     forcing_root = abspath(forcing_root)
@@ -619,6 +621,7 @@ function GriddedForcing(
         getproperty.(grid, :longitude_index),
         getproperty.(grid, :latitude_index),
         BitVector(!parameters[p.pft].inactive for p in grid),
+        legacy_single_precision,
         phenology,
         getproperty.(phenology, :initial),
         forcing_root,
@@ -659,7 +662,10 @@ function update_phenology!(forcing, day)
         elapsed < 0 && (elapsed += 365)
         elapsed > duration && (forcing.phase[point] = mod(phase + 1, 4))
     end
-    vec(parent(forcing.buffers.phase)) .= forcing.phase
+    destination = parent(parent(forcing.buffers.phase))
+    for point in eachindex(forcing.phase)
+        @inbounds destination[point] = forcing.phase[point]
+    end
     return nothing
 end
 
@@ -688,15 +694,30 @@ end
 
 function year_cache!(forcing, year)
     if year <= 1920
-        return get!(forcing.spin_cache, year) do
-            empty_year_cache(length(forcing.phase))
+        if haskey(forcing.spin_cache, year)
+            return forcing.spin_cache[year]
         end
+        cache = empty_year_cache(length(forcing.phase))
+        forcing.spin_cache[year] = cache
+        return cache
     end
     if forcing.transient_year != year
         forcing.transient_year = year
         forcing.transient_cache = empty_year_cache(length(forcing.phase))
     end
     return forcing.transient_cache
+end
+
+"""
+    forcing_value(forcing, value)
+
+When requested by a reconstruction, reproduce the legacy NetCDF handoff that
+reads every meteorological driver through an explicit `real(4)` array before
+assigning it to the model's double-precision forcing arrays.
+"""
+@inline function forcing_value(forcing, value)
+    return forcing.legacy_single_precision ? Float64(Float32(value)) :
+           Float64(value)
 end
 
 function load_forcing_day!(forcing, cache, year, day)
@@ -716,12 +737,14 @@ function load_forcing_day!(forcing, cache, year, day)
             lon = longitude[point]
             lat = latitude[point]
             roots = view(forcing.root_fraction, point, :)
-            cache.gpp[point, day] = gpp_grid[lon, lat] / 1000 / DAY_SECONDS
+            cache.gpp[point, day] =
+                forcing_value(forcing, gpp_grid[lon, lat]) / 1000 / DAY_SECONDS
             isnothing(deposition_grid) || (
                 cache.nitrogen_deposition[point, day] =
-                    deposition_grid[lon, lat] / 1000 / DAY_SECONDS
+                    forcing_value(forcing, deposition_grid[lon, lat]) / 1000 / DAY_SECONDS
             )
-            cache.air_temperature[point, day] = air_grid[lon, lat]
+            cache.air_temperature[point, day] =
+                forcing_value(forcing, air_grid[lon, lat])
             temperature = 0.0
             moisture = 0.0
             stress = 0.0
@@ -729,9 +752,11 @@ function load_forcing_day!(forcing, cache, year, day)
                 root = roots[layer]
                 water = min(
                     forcing.field_capacity[point],
-                    moisture_grid[lon, lat, layer],
+                    forcing_value(forcing, moisture_grid[lon, lat, layer]),
                 )
-                temperature += root * temperature_grid[lon, lat, layer]
+                temperature +=
+                    root *
+                    forcing_value(forcing, temperature_grid[lon, lat, layer])
                 moisture += root * water
                 stress +=
                     root * (
@@ -754,14 +779,14 @@ function load_forcing_day!(forcing, cache, year, day)
 end
 
 function copy_forcing_day!(field, values, day)
-    destination = vec(parent(field))
-    for point in eachindex(destination)
+    destination = parent(parent(field))
+    for point in axes(values, 1)
         @inbounds destination[point] = values[point, day]
     end
     return field
 end
 
-function update_forcing!(forcing, stage, index, _)
+function update_forcing!(forcing::GriddedForcing, stage, index, _)
     year, day = forcing_year_day(stage, index)
     cache = load_forcing_day!(forcing, year_cache!(forcing, year), year, day)
     copy_forcing_day!(forcing.buffers.gpp, cache.gpp, day)
@@ -777,11 +802,13 @@ function update_forcing!(forcing, stage, index, _)
     )
     copy_forcing_day!(forcing.buffers.water_stress, cache.water_stress, day)
     copy_forcing_day!(forcing.buffers.liquid_water, cache.liquid_water, day)
-    isnothing(forcing.nitrogen_deposition) || copy_forcing_day!(
-        forcing.nitrogen_deposition,
-        cache.nitrogen_deposition,
-        day,
-    )
+    if !isnothing(forcing.nitrogen_deposition)
+        copy_forcing_day!(
+            forcing.nitrogen_deposition,
+            cache.nitrogen_deposition,
+            day,
+        )
+    end
     update_phenology!(forcing, day)
     return nothing
 end

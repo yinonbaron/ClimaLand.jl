@@ -33,7 +33,7 @@ comparator() = casa().comparator()
 sha256sum(path) = casa().sha256sum(path)
 file_record(path) = casa().file_record(path)
 netcdf_name(model, year; daily = false) =
-    mimics_c().netcdf_name(model, year; daily)
+    mimics_c().netcdf_name(model == "casa" ? "casaclm" : model, year; daily)
 
 function load_matrix(path = MATRIX_PATH)
     matrix = TOML.parsefile(path)
@@ -88,6 +88,21 @@ function candidate_paths(spec_path = CANDIDATE_SPEC_PATH)
     Set(keys(selected)) == Set(CANDIDATE_IDS) ||
         error("Candidate specification is missing a MIMICS-CN input")
     return selected
+end
+
+function prespin_mimics_parameter(
+    case,
+    source_root,
+    candidate_root,
+    paths,
+    inputs,
+)
+    if haskey(case, "prespin_mimics_candidate")
+        return joinpath(candidate_root, paths[case["prespin_mimics_candidate"]])
+    end
+    case["prespin_mimics_parameters"] == "normal_mimics_parameters" ||
+        error("Unsupported MIMICS-CN prespin parameter selection")
+    return joinpath(source_root, inputs["normal_mimics_parameters"])
 end
 
 function retained_daily_years(matrix = load_matrix())
@@ -234,8 +249,13 @@ function write_full_workflow(
         error("MIMICS-CN KO4 parameter hash differs from the matrix")
     prespin_casa =
         joinpath(candidate_root, paths[case["prespin_casa_candidate"]])
-    prespin_mimics =
-        joinpath(candidate_root, paths[case["prespin_mimics_candidate"]])
+    prespin_mimics = prespin_mimics_parameter(
+        case,
+        source_root,
+        candidate_root,
+        paths,
+        inputs,
+    )
     parameter_by_stage = Dict(
         "prespin" => (casa = prespin_casa, mimics = prespin_mimics),
         "spin" => (casa = normal_casa, mimics = normal_mimics),
@@ -432,10 +452,8 @@ function model_spec(id, matrix = load_matrix())
     )
 end
 
-daily_reference_name(
-    model,
-    window,
-) = "$(model["prefix"])_pool_flux_$(first(window))_$(last(window))_daily.nc"
+daily_reference_name(model, window) =
+    "$(model["prefix"])_pool_flux_$(first(window))_$(last(window))_daily.nc"
 
 function reference_paths(
     data_root,
@@ -781,13 +799,13 @@ function mimics_restart_diagnostic(mimics_path, casa_path)
         "carbon" => findall(
             name ->
                 startswith(lowercase(name), "mimicspool%") &&
-                !endswith(name, "N"),
+                    !endswith(name, "N"),
             header,
         ),
         "organic_nitrogen" => findall(
             name ->
                 startswith(lowercase(name), "mimicspool%") &&
-                endswith(name, "N"),
+                    endswith(name, "N"),
             header,
         ),
     )
@@ -908,10 +926,6 @@ function boundary_report(case_root)
             error("CASA-CN restart boundary does not contain 4,263 points")
         mimics_record["points"] == 4263 ||
             error("MIMICS-CN restart boundary does not contain 4,263 points")
-        all(iszero, values(casa_record["nonfinite_count"])) ||
-            error("CASA-CN restart contains non-finite pools")
-        all(iszero, values(mimics_record["nonfinite_count"])) ||
-            error("MIMICS-CN restart contains non-finite pools")
         boundaries[stage.name] =
             Dict("casa" => casa_record, "mimics" => mimics_record)
     end
@@ -981,16 +995,21 @@ function write_case_report(data_root, case_root)
     )
     daily =
         Dict(model => daily_comparison(case_root, model) for model in MODEL_IDS)
+    restart_boundaries_finite = all(
+        all(iszero, values(model["nonfinite_count"])) for
+        stage in values(boundaries["restart_boundary"]) for
+        model in values(stage)
+    )
     convergence_passes = all(
         record["passes_documented_checks"] for
         record in values(boundaries["spin_convergence"])
     )
     nitrogen_assessment_complete = all(
         record["nitrogen_assessment_complete"] &&
-            record["organic_nitrogen"]["assessment"] ==
-            "reported_without_published_threshold" &&
-            record["mineral_nitrogen"]["assessment"] ==
-            "reported_without_published_threshold" for
+        record["organic_nitrogen"]["assessment"] ==
+        "reported_without_published_threshold" &&
+        record["mineral_nitrogen"]["assessment"] ==
+        "reported_without_published_threshold" for
         record in values(boundaries["spin_convergence"])
     )
     control = harness().parse_control(
@@ -1006,6 +1025,7 @@ function write_case_report(data_root, case_root)
     matches =
         all(record["all_match"] for record in values(annual)) &&
         all(record["all_match"] for record in values(daily)) &&
+        restart_boundaries_finite &&
         convergence_passes &&
         nitrogen_assessment_complete &&
         exudation["all_zero"]
@@ -1026,6 +1046,7 @@ function write_case_report(data_root, case_root)
         "schema_version" => 1,
         "case" => basename(case_root),
         "status" => matches ? "matching_setup_pinned" : "mismatch",
+        "restart_boundaries_finite" => restart_boundaries_finite,
         "documented_convergence_checks_pass" => convergence_passes,
         "nitrogen_convergence_assessment_complete" =>
             nitrogen_assessment_complete,
@@ -1082,6 +1103,7 @@ function mismatch_count(report)
         count += casa().comparison_mismatch_count(year)
     end
     get(report, "documented_convergence_checks_pass", false) || (count += 1)
+    get(report, "restart_boundaries_finite", false) || (count += 1)
     get(report, "exudation_zero_verified", false) || (count += 1)
     return count
 end
@@ -1171,6 +1193,9 @@ function run_search(source_root, data_root, run_root)
         (
             "evidence_backed_matrix_exhausted",
             "No evidence-backed setup exactly reconstructs the archive. " *
+            "The published archive does not contain the original CASA-CN " *
+            "and MIMICS-CN restart states, so its exact 1901 initialization " *
+            "cannot be recovered. " *
             "Tested compiler(s): $(join(tested_compilers, "; ")). " *
             "The archive compiler is unrecorded and GNU Fortran 8.1.0 is unavailable.",
         )
@@ -1207,6 +1232,8 @@ function self_test()
         Test.@test "cOverflow_r" in required_variables("mimics", matrix)
         Test.@test "nMinUptake" in required_variables("casa", matrix)
         Test.@test "nMinLoss" in required_variables("casa", matrix)
+        Test.@test netcdf_name("casa", 1901; daily = true) ==
+                   "casaclm_pool_flux_1901_daily.nc"
         Test.@test matrix["postprocessing"]["spin_checkpoint_interval"] == 9960
         nitrogen_assessment = record_unthresholded_nitrogen_assessment!(
             Dict{String, Any}("absolute_global_delta_pg" => 0.1),
@@ -1217,7 +1244,20 @@ function self_test()
             model_spec("mimics", matrix),
             [1901, 1905],
         ) == "mimics_pool_flux_1901_1905_daily.nc"
-        Test.@test only(matrix["case"])["source_commit"] ==
+        issue_43_case = case_spec(matrix, "bundled_ko4_fi30")
+        Test.@test issue_43_case["prespin_mimics_parameters"] ==
+                   "normal_mimics_parameters"
+        Test.@test prespin_mimics_parameter(
+            issue_43_case,
+            "/source",
+            "/candidate",
+            Dict{String, String}(),
+            matrix["inputs"],
+        ) == joinpath(
+            "/source",
+            matrix["inputs"]["normal_mimics_parameters"],
+        )
+        Test.@test case_spec(matrix, "archive_predecessor_ko6_fi30")["source_commit"] ==
                    "82c57f8aa1179865d9752b617493ef06f45c3266"
         outputs = historical_stage_outputs(matrix)
         Test.@test annual_fragment("casa", 1901) in outputs

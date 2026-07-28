@@ -27,6 +27,7 @@ function plant_parameters(
     root_exudate_fraction = zero(FT),
     plant_nitrogen_ratio = ntuple(_ -> zero(FT), 3),
     turnover_rates = nothing,
+    specific_leaf_area = FT(9.92),
 ) where {FT}
     day = FT(86400)
     year = FT(365) * day
@@ -41,7 +42,7 @@ function plant_parameters(
         plant_nitrogen_ratio,
         leaf_phosphorus_to_nitrogen = inv(FT(15)),
         labile_loss_rate = inv(FT(0.2) * year),
-        specific_leaf_area = FT(9.92),
+        specific_leaf_area,
         minimum_leaf_area_index = FT(0.1),
         maximum_leaf_area_index = FT(3),
         shedding_temperature = FT(277.15),
@@ -53,6 +54,55 @@ function plant_parameters(
         root_exudate_fraction,
         nonwoody,
     )
+end
+
+@testset "CASA legacy daily LAI arithmetic" begin
+    FT = Float64
+    parameters = plant_parameters(FT; specific_leaf_area = FT(7.2))
+    leaf_carbon =
+        parameters.maximum_leaf_area_index / parameters.specific_leaf_area
+    arguments = (
+        parameters,
+        leaf_carbon,
+        FT(1),
+        FT(1),
+        zero(FT),
+        FT(1e-5),
+        FT(283.15),
+        FT(278.15),
+        one(FT),
+        FT(2),
+        one(FT),
+        zero(FT),
+    )
+    legacy = CASA.packed_carbon_fluxes(CASA.LegacyDaily(), arguments...)
+    continuous = CASA.packed_carbon_fluxes(CASA.ContinuousRate(), arguments...)
+
+    @test legacy[5] == parameters.allocation[1]
+    @test iszero(continuous[5])
+    expected_legacy_gpp =
+        Float64(Float32(arguments[6] * 86400 * 1000)) / 1000 / 86400
+    @test legacy[14] == expected_legacy_gpp
+    @test continuous[14] == arguments[6]
+
+    differentiable_gpp = FT(1.23456789e-5)
+    legacy_gpp(gpp) = CASA.packed_carbon_fluxes(
+        CASA.LegacyDaily(),
+        Base.setindex(arguments, gpp, 6)...,
+    )[14]
+    @test legacy_gpp(differentiable_gpp) ==
+          FT(Float32(differentiable_gpp * 86400 * 1000)) / 1000 / 86400
+    @test ForwardDiff.value(
+        legacy_gpp(ForwardDiff.Dual(differentiable_gpp, one(FT))),
+    ) == legacy_gpp(differentiable_gpp)
+    @test iszero(ForwardDiff.derivative(legacy_gpp, differentiable_gpp))
+    for AD_FT in (Float32, Float64)
+        value = AD_FT(1.23456789e-5)
+        quantized =
+            CASA.legacy_single_precision(ForwardDiff.Dual(value, one(AD_FT)))
+        @test ForwardDiff.value(quantized) == AD_FT(Float32(value))
+        @test iszero(only(ForwardDiff.partials(quantized)))
+    end
 end
 
 @testset "CASA plant mineral-N supply" begin
@@ -136,10 +186,11 @@ end
             Base.setindex(zero_demand_arguments, zero(FT), 7)
         zero_supply =
             CASA.nitrogen_supply(CASA.LegacyDaily(), zero_supply_arguments...)
-        expected_zero_labile =
-            arguments[4] / (arguments[8] + FT(1e-10 / 1000 / 86400))
+        npp_daily = arguments[4] * FT(86400) * FT(1000)
+        gpp_daily = arguments[8] * FT(86400) * FT(1000)
+        expected_zero_labile = npp_daily / (gpp_daily + FT(1e-10))
         expected_zero_scalar =
-            (arguments[4] - expected_zero_labile * arguments[8]) / arguments[4]
+            (npp_daily - expected_zero_labile * gpp_daily) / npp_daily
         @test all(isfinite, zero_supply)
         @test zero_supply.npp_scalar ≈ expected_zero_scalar
         @test zero_supply.labile_fraction ≈ expected_zero_labile
@@ -161,6 +212,37 @@ end
                 ) / (FT(2) * step)
             @test derivative > zero(FT)
             @test derivative ≈ finite_difference rtol = FT(1e-6)
+
+            threshold_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+                nitrogen_ratio_minimum = (FT(0.01), FT(0.006), FT(0.01)),
+                nitrogen_ratio_maximum = (FT(0.02), FT(0.008), FT(0.02)),
+                nitrogen_fraction_to_litter = ntuple(_ -> one(FT), 3),
+                lignin_fraction = ntuple(_ -> zero(FT), 3),
+                structural_litter_nitrogen_ratio = FT(0.01),
+                limitation_minimum = FT(0.5e-3),
+                limitation_maximum = FT(2e-3),
+                mineral_half_saturation = FT(2e-3),
+            )
+            threshold_carbon = (FT(1), FT(0.325), FT(1))
+            threshold_nitrogen = (
+                zero(FT),
+                threshold_parameters.nitrogen_ratio_maximum[2] *
+                (threshold_carbon[2] + FT(5e-11)),
+                zero(FT),
+            )
+            threshold_uptake = CASA.nitrogen_uptake(
+                threshold_parameters,
+                threshold_carbon,
+                threshold_nitrogen,
+                FT(1e-6),
+                (zero(FT), one(FT), zero(FT)),
+                ntuple(_ -> zero(FT), 3),
+                FT(1),
+                one(FT),
+                one(FT),
+            )
+            @test iszero(threshold_uptake.by_pool[2])
+
         end
 
         carbon_parameters =
@@ -208,7 +290,135 @@ end
             packed_arguments[8:10]...,
         )
         @test unrestricted[15] - packed[15] ≈ packed[4] + packed[21] atol =
-            FT(64) * eps(FT)
+            FT(256) * eps(FT)
+
+        carbon_fluxes = CASA.packed_carbon_fluxes(
+            CASA.LegacyDaily(),
+            carbon_parameters,
+            packed_arguments[4:7]...,
+            packed_arguments[12:18]...,
+            packed_arguments[8:10]...,
+        )
+        legacy_nitrogen = CASA.packed_nitrogen_fluxes(
+            CASA.LegacyDaily(),
+            nitrogen_parameters,
+            packed_arguments[4:6]...,
+            packed_arguments[8:10]...,
+            packed_arguments[11],
+            one(FT),
+            one(FT),
+            carbon_fluxes,
+        )
+        continuous_nitrogen = CASA.packed_nitrogen_fluxes(
+            CASA.ContinuousRate(),
+            nitrogen_parameters,
+            packed_arguments[4:6]...,
+            packed_arguments[8:10]...,
+            packed_arguments[11],
+            one(FT),
+            one(FT),
+            carbon_fluxes,
+        )
+        @test legacy_nitrogen[7] ==
+              continuous_nitrogen[7] + FT(1e-10 / 1000 / 86400)
+        seconds_per_day = FT(86400)
+        grams_per_kilogram = FT(1000)
+        carbon_grams = grams_per_kilogram .* packed_arguments[4:6]
+        nitrogen_grams = grams_per_kilogram .* packed_arguments[8:10]
+        carbon_fluxes_daily = (
+            npp = carbon_fluxes[15] * seconds_per_day * grams_per_kilogram,
+            allocation = Tuple(carbon_fluxes[5:7]),
+            turnover = Tuple(carbon_fluxes[11:13] .* seconds_per_day),
+        )
+        unpacked_nitrogen = CASA.nitrogen_fluxes(
+            nitrogen_parameters,
+            carbon_grams,
+            nitrogen_grams,
+            carbon_fluxes_daily.npp,
+            carbon_fluxes_daily.allocation,
+            carbon_fluxes_daily.turnover,
+            grams_per_kilogram * packed_arguments[11],
+            one(FT),
+            one(FT),
+            CASA.plant_litter_fractions(
+                nitrogen_parameters,
+                packed_arguments[4:6],
+                packed_arguments[8:10],
+            ),
+            FT(1e-10),
+            grams_per_kilogram * nitrogen_parameters.mineral_half_saturation,
+            FT(1e-10),
+        )
+        for index in 1:3
+            @test legacy_nitrogen[7 + index] ==
+                  unpacked_nitrogen.uptake_allocation[index]
+            expected_tendency =
+                unpacked_nitrogen.tendencies[index] / grams_per_kilogram /
+                seconds_per_day
+            @test legacy_nitrogen[index] == CASA.legacy_bounded_tendency(
+                packed_arguments[7 + index],
+                expected_tendency,
+            )
+        end
+        inactive_nitrogen_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+            nitrogen_ratio_minimum = nitrogen_parameters.nitrogen_ratio_minimum,
+            nitrogen_ratio_maximum = nitrogen_parameters.nitrogen_ratio_maximum,
+            nitrogen_fraction_to_litter = nitrogen_parameters.nitrogen_fraction_to_litter,
+            lignin_fraction = nitrogen_parameters.lignin_fraction,
+            wood_lignin_nitrogen_ratio = nitrogen_parameters.wood_lignin_nitrogen_ratio,
+            structural_litter_nitrogen_ratio = nitrogen_parameters.structural_litter_nitrogen_ratio,
+            limitation_minimum = nitrogen_parameters.limitation_minimum,
+            limitation_maximum = nitrogen_parameters.limitation_maximum,
+            mineral_half_saturation = nitrogen_parameters.mineral_half_saturation,
+            active = false,
+        )
+        inactive_legacy = CASA.packed_nitrogen_fluxes(
+            CASA.LegacyDaily(),
+            inactive_nitrogen_parameters,
+            packed_arguments[4:6]...,
+            packed_arguments[8:10]...,
+            packed_arguments[11],
+            one(FT),
+            one(FT),
+            carbon_fluxes,
+        )
+        @test inactive_legacy[7] == continuous_nitrogen[7]
+
+        fixed_wood_ratio_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
+            nitrogen_ratio_minimum = (FT(0.02), FT(0.006666667), FT(0.0244)),
+            nitrogen_ratio_maximum = (FT(0.024), FT(0.008), FT(0.0293)),
+            nitrogen_fraction_to_litter = (FT(0.5), FT(0.95), FT(0.9)),
+            lignin_fraction = (FT(0.2), FT(0.4), FT(0.2)),
+            wood_lignin_nitrogen_ratio = FT(60),
+            structural_litter_nitrogen_ratio = FT(0.01),
+            limitation_minimum = FT(0.5e-3),
+            limitation_maximum = FT(2e-3),
+            mineral_half_saturation = FT(2e-3),
+        )
+        leaf_turnover = FT(3.541411646230984e-9)
+        root_turnover = FT(8.878741755454085e-10)
+        cwd_turnover = FT(6.02335058302554e-10)
+        litter_quality = CASA.mimics_litter_quality(
+            fixed_wood_ratio_parameters,
+            (FT(0.088), FT(0.372), FT(0.14)),
+            (FT(0.002933333304), FT(0.002755555404), FT(0.00341463416)),
+            leaf_turnover,
+            root_turnover,
+            cwd_turnover,
+        )
+        ratios = CASA.mimics_lignin_nitrogen_ratios(
+            fixed_wood_ratio_parameters,
+            (FT(0.088), FT(0.372), FT(0.14)),
+            (FT(0.002933333304), FT(0.002755555404), FT(0.00341463416)),
+        )
+        expected_average =
+            (
+                ratios[1] * leaf_turnover +
+                ratios[3] * root_turnover +
+                FT(60) * cwd_turnover
+            ) / (leaf_turnover + root_turnover + cwd_turnover)
+        @test litter_quality ==
+              FT(0.75) * (FT(0.85) - FT(0.013) * expected_average)
     end
 end
 
@@ -329,9 +539,12 @@ end
           Tuple(-initial[index] / day for index in 1:3)
     @test Tuple(continuous_carbon[1:3]) ==
           Tuple(-continuous_carbon[index] for index in 8:10)
-    @test Tuple(legacy_carbon[8:10]) == Tuple(continuous_carbon[8:10])
+    @test all(
+        isapprox.(legacy_carbon[8:10], continuous_carbon[8:10]; rtol = eps(FT)),
+    )
     @test all(iszero, legacy_nitrogen[1:3])
     @test any(!iszero, continuous_nitrogen[1:3])
+
     legacy_carbon_kernel = @inferred CASA.packed_carbon_fluxes(
         CASA.LegacyDaily(),
         parameters,
@@ -487,10 +700,10 @@ end
     )
 
     legacy_solution = integrate_plant(legacy, initial, stop_time, day)
-    @test legacy_solution == solutions[1]
+    @test legacy_solution != solutions[1]
     relative_legacy_distance =
         sum(abs.(legacy_solution .- reference)) / sum(abs, reference)
-    @test relative_legacy_distance ≈ FT(2.508246047039484e-4) rtol = FT(1e-6)
+    @test relative_legacy_distance ≈ FT(2.5084018342749667e-4) rtol = FT(1e-6)
 end
 
 @testset "CASA carbon-only dummy plant nitrogen" begin
@@ -648,6 +861,13 @@ for FT in (Float32, Float64)
             FT(270),
             zero(FT),
         )[1] == zero(FT)
+        @test CASA.senescence_rates(
+            parameters,
+            FT(2),
+            parameters.minimum_leaf_area_index + eps(FT),
+            FT(270),
+            zero(FT),
+        )[1] > zero(FT)
 
         carbon = (FT(0.09), FT(0.37), FT(0.14), FT(0.01))
         args = (
@@ -724,6 +944,19 @@ for FT in (Float32, Float64)
             FT(1e-3),
             limitation,
             limitation,
+        ) == 0
+        @test nitrogen_flux_allocations(
+            nitrogen_parameters,
+            carbon[1:3],
+            plant_nitrogen,
+            fluxes.npp,
+            fluxes.allocation,
+            plant_rates,
+            FT(1e-3),
+            limitation,
+            limitation,
+            nitrogen.metabolic_fractions,
+            FT(1e-10 / 1000 / 86400),
         ) == 0
         @test sum(nitrogen.tendencies) + sum(nitrogen.litter) ≈ nitrogen.uptake atol =
             16eps(FT)
@@ -879,7 +1112,8 @@ end
             Array(parent(getproperty(dY.casa_plant, name)))[1] for
             name in (:n_leaf, :n_wood, :n_fine_root)
         )
-        @test plant_tendency + sum(fluxes[4:6]) ≈ fluxes[7] atol =
+        uptake_floor = FT(1e-10 / 1000 / 86400)
+        @test plant_tendency + sum(fluxes[4:6]) ≈ fluxes[7] - uptake_floor atol =
             32eps(FT) * max(fluxes[7], eps(FT))
 
         day = FT(86400)

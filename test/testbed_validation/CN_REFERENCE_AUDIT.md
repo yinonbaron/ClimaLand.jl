@@ -38,6 +38,18 @@ CN restart are absent from the repository and published archives. As in the
 carbon-only milestone, archived daily transitions can still provide
 input-output tests without claiming restart reconstruction.
 
+The Fortran NetCDF reader stages `xcgpp`, `ndep`, `xtairk`, `xtsoil`,
+`xmoist`, and `xfrznmoist` through explicit `real(4)` arrays before assigning
+them to double-precision driver storage. Native trajectory comparisons must
+therefore round each raw forcing value to `Float32` before widening it,
+converting units, or computing root-weighted drivers. Skipping that handoff
+creates a first-day GPP difference that can eventually flip CASA's
+discontinuous LAI allocation or turnover branches.
+The rounded GPP value is also the value reported by the legacy carbon map and
+passed to its nitrogen-supply calculation; mixing the rounded process input
+with an unrounded diagnostic breaks the carbon budget and changes the
+nitrogen-limitation arithmetic.
+
 ## Prognostic ownership
 
 CN mode adds the following surface-integrated stocks in kg N m⁻²:
@@ -104,6 +116,53 @@ For `icycle = 2` and MIMICS, `biogeochem` executes:
 6. application of CASA plant, CWD, and mineral-N deltas
    (`mimics_cncycle`);
 7. carbon and nitrogen output accumulation.
+
+`mimics_readbiome` initializes all three plant-organ lignin:N ratios from the
+initial plant C:N table. In CN mode, `mimics_coeffplant` later replaces only
+the leaf and fine-root entries with ratios calculated from current pools and
+the maximum C:N limits; wood remains at its initialized value. Consequently,
+the fixed wood ratio must not be reconstructed from the separate minimum-N:C
+table, whose rounded decimal values need not be exact reciprocals of the
+initial C:N entries.
+
+Acceptance comparisons use Julia's complete prespin-to-history checkpoint
+chain. A separate diagnostic can load the paired Fortran predecessor restart
+before a stage to hold initial conditions fixed and test only that stage.
+
+CASA's LAI gates are discontinuous. Fortran computes LAI from grams and
+`m² g⁻¹`, while the original Julia path used kilograms and `m² kg⁻¹`. At an
+exact maximum-LAI state, floating-point operation order can make Fortran retain
+leaf allocation while Julia suppresses it. `LegacyDaily` now preserves the
+Fortran gram/day calculation order for carbon, nitrogen, and LAI before
+converting the resulting map to SI tendencies; `ContinuousRate` keeps SI
+arithmetic.
+
+That conversion cannot make the two long integrations bitwise identical:
+Fortran stores the evolving pools in grams and applies the daily map directly,
+whereas ClimaTimeSteppers stores kilograms and reconstructs the daily update
+from a per-second tendency. A high-precision trace for selected cell 1715
+first differs by one binary rounding unit in root N on day one. Smooth
+differences remain below `4.1e-5` g through day 102,748, but on day 102,749
+Fortran leaf C is `2.99e-5` g above the minimum-LAI threshold while Julia is
+`7.81e-6` g below it. One different senescence decision then produces a
+`0.593` g leaf-C separation. A tested LAI deadband only postponed this event
+and created other incorrect branches, so no deadband is included. Selected
+validation therefore reports the measured absolute and relative errors rather
+than claiming bitwise long-spin identity.
+
+The complete 37-cell Julia checkpoint chain confirms that this is a material
+acceptance failure rather than a tolerance-labeling issue. At `atol = 0.005`
+g m⁻² and `rtol = 0.001`, the first long-spin boundary fails for one labile-C
+and one mineral-N value, and both fresh-Fortran historical daily windows fail.
+The largest retained daily leaf-C difference is `0.889` g m⁻². Carbon and
+nitrogen conservation still pass. No global run is authorized by this result.
+
+The legacy DIN partition is undefined when both microbial C pools are zero:
+it evaluates `MICr / (MICr + MICk)` and `MICk / (MICr + MICk)`. Fixed-width
+restart output can round both sufficiently small pools to zero, causing a
+`0 / 0` on the first continuation step. The Julia map defines microbial DIN
+uptake as zero in this degenerate state. Its nonzero-biomass path is unchanged,
+so archived daily-transition parity is retained.
 
 The MIMICS branch deliberately does not multiply litter decomposition by the
 CASA `xkNlimiting` scalar. Inside every hourly update it:

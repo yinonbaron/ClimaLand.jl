@@ -47,6 +47,12 @@ active_value(category::PFTCategory, value) =
 woody_value(category::PFTCategory, value) =
     category == WoodyPFT ? value : zero(value)
 
+function nitrogen_value(category::PFTCategory, value)
+    fortran_nitrogen_floor = 1e-9
+    return category == InactivePFT ? zero(value) :
+           max(fortran_nitrogen_floor, value)
+end
+
 function parameter_rows(path, header)
     lines = readlines(path)
     header_index = findfirst(line -> startswith(strip(line), header), lines)
@@ -88,9 +94,12 @@ function casa_plant_state(carbon, nitrogen, nutrients, category)
     return merge(
         state,
         (;
-            n_leaf = active_value(category, nitrogen[1] / 1000),
-            n_wood = woody_value(category, nitrogen[2] / 1000),
-            n_fine_root = active_value(category, nitrogen[3] / 1000),
+            n_leaf = nitrogen_value(category, nitrogen[1] / 1000),
+            n_wood = nitrogen_value(
+                category,
+                woody_value(category, nitrogen[2] / 1000),
+            ),
+            n_fine_root = nitrogen_value(category, nitrogen[3] / 1000),
         ),
     )
 end
@@ -108,13 +117,16 @@ function casa_soil_state(carbon, nitrogen, nutrients, category)
     return merge(
         state,
         (;
-            n_litter_metabolic = active_value(category, nitrogen[4] / 1000),
-            n_litter_structural = active_value(category, nitrogen[5] / 1000),
-            n_litter_cwd = woody_value(category, nitrogen[6] / 1000),
-            n_soil_microbial = active_value(category, nitrogen[7] / 1000),
-            n_soil_slow = active_value(category, nitrogen[8] / 1000),
-            n_soil_passive = active_value(category, nitrogen[9] / 1000),
-            n_mineral = active_value(category, nitrogen[10] / 1000),
+            n_litter_metabolic = nitrogen_value(category, nitrogen[4] / 1000),
+            n_litter_structural = nitrogen_value(category, nitrogen[5] / 1000),
+            n_litter_cwd = nitrogen_value(
+                category,
+                woody_value(category, nitrogen[6] / 1000),
+            ),
+            n_soil_microbial = nitrogen_value(category, nitrogen[7] / 1000),
+            n_soil_slow = nitrogen_value(category, nitrogen[8] / 1000),
+            n_soil_passive = nitrogen_value(category, nitrogen[9] / 1000),
+            n_mineral = nitrogen_value(category, nitrogen[10] / 1000),
         ),
     )
 end
@@ -127,34 +139,37 @@ function mimics_soil_state(
     microbial_carbon_nitrogen,
 )
     state = (;
-        c_litter_metabolic = active_value(category, 0.001),
-        c_litter_structural = active_value(category, 0.001),
+        c_litter_metabolic = active_value(category, 1.0),
+        c_litter_structural = active_value(category, 1.0),
         c_litter_cwd = woody_value(category, carbon[6] / 1000),
-        c_microbe_r = active_value(category, 0.000015),
-        c_microbe_k = active_value(category, 0.000025),
-        c_soil_available = active_value(category, 0.001),
-        c_soil_chemical = active_value(category, 0.001),
-        c_soil_physical = active_value(category, 0.001),
+        c_microbe_r = active_value(category, 0.015),
+        c_microbe_k = active_value(category, 0.025),
+        c_soil_available = active_value(category, 1.0),
+        c_soil_chemical = active_value(category, 1.0),
+        c_soil_physical = active_value(category, 1.0),
     )
     nutrients == :carbon_only && return state
     return merge(
         state,
         (;
-            n_litter_metabolic = active_value(category, 0.0001),
-            n_litter_structural = active_value(category, 0.0001),
-            n_microbe_r = active_value(
+            n_litter_metabolic = nitrogen_value(category, 0.1),
+            n_litter_structural = nitrogen_value(category, 0.1),
+            n_microbe_r = nitrogen_value(
                 category,
-                0.000015 / microbial_carbon_nitrogen[1],
+                0.015 / microbial_carbon_nitrogen[1],
             ),
-            n_microbe_k = active_value(
+            n_microbe_k = nitrogen_value(
                 category,
-                0.000025 / microbial_carbon_nitrogen[2],
+                0.025 / microbial_carbon_nitrogen[2],
             ),
-            n_soil_available = active_value(category, 0.0001),
-            n_soil_chemical = active_value(category, 0.0001),
-            n_soil_physical = active_value(category, 0.0001),
-            n_litter_cwd = woody_value(category, nitrogen[6] / 1000),
-            n_mineral = active_value(category, nitrogen[10] / 1000),
+            n_soil_available = nitrogen_value(category, 0.1),
+            n_soil_chemical = nitrogen_value(category, 0.1),
+            n_soil_physical = nitrogen_value(category, 0.1),
+            n_litter_cwd = nitrogen_value(
+                category,
+                woody_value(category, nitrogen[6] / 1000),
+            ),
+            n_mineral = nitrogen_value(category, nitrogen[10] / 1000),
         ),
     )
 end

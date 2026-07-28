@@ -110,17 +110,17 @@ function write_gridded_fixture(directory)
             :,
             :,
             :,
-        ] .= 1
+        ] .= 1.0000001
         NCDatasets.defVar(output, "ndep", Float64, ("lon", "lat", "time"))[
             :,
             :,
             :,
-        ] .= 2
+        ] .= 2.0000001
         NCDatasets.defVar(output, "xtairk", Float64, ("lon", "lat", "time"))[
             :,
             :,
             :,
-        ] .= 280
+        ] .= 280.00001
         NCDatasets.defVar(
             output,
             "xtsoil",
@@ -131,7 +131,7 @@ function write_gridded_fixture(directory)
             :,
             :,
             :,
-        ] .= 275
+        ] .= 275.00001
         NCDatasets.defVar(
             output,
             "xmoist",
@@ -142,7 +142,7 @@ function write_gridded_fixture(directory)
             :,
             :,
             :,
-        ] .= 0.3
+        ] .= 0.15000001
     end
     return (; grid, soil, phenology, parameters, forcing)
 end
@@ -200,6 +200,8 @@ end
             fixture.phenology,
             fixture.forcing,
             buffers,
+            ;
+            legacy_single_precision = true,
         )
         stage = TestbedNativeWorkflow.NativeStage(:prespin, 2, 1)
         TestbedNativeCASACReconstruction.update_forcing!(forcing, stage, 1, 0.0)
@@ -342,13 +344,34 @@ end
         )
         @test only(default_phenology).transition == (-50, -36, 367, 16)
         @test vec(parent(initial.casa_plant.c_leaf)) == [0.001, 0.0]
-        @test vec(parent(buffers.gpp)) == [1 / 1000 / 86400, 0]
-        @test vec(parent(buffers.soil_temperature)) == [275, 273.15]
-        @test vec(parent(buffers.liquid_water)) ≈ [0.2, 0]
-        @test vec(parent(buffers.water_stress)) == [1, 0]
+        f32(value) = Float64(Float32(value))
+        @test vec(parent(buffers.gpp)) == [f32(1.0000001) / 1000 / 86400, 0]
+        @test vec(parent(buffers.air_temperature)) == [f32(280.00001), 273.15]
+        @test vec(parent(buffers.soil_temperature)) == [f32(275.00001), 273.15]
+        @test vec(parent(buffers.liquid_water)) ≈ [f32(0.15000001), 0]
+        @test vec(parent(buffers.water_stress)) ≈
+              [(f32(0.15000001) - 0.1) / (0.2 - 0.1), 0]
         @test vec(parent(buffers.phase)) == [2, 2]
         @test forcing.spin_cache[1901].loaded[1]
         TestbedNativeCASACReconstruction.close_forcing!(forcing)
+
+        default_forcing = TestbedNativeCASACReconstruction.GriddedForcing(
+            grid,
+            soils,
+            built.parameters,
+            fixture.phenology,
+            fixture.forcing,
+            buffers,
+        )
+        TestbedNativeCASACReconstruction.update_forcing!(
+            default_forcing,
+            stage,
+            1,
+            0.0,
+        )
+        @test vec(parent(buffers.gpp)) == [1.0000001 / 1000 / 86400, 0]
+        @test vec(parent(buffers.air_temperature)) == [280.00001, 273.15]
+        TestbedNativeCASACReconstruction.close_forcing!(default_forcing)
 
         nitrogen_deposition =
             TestbedNativeCASACReconstruction.scalar_field(domain, zeros(2))
@@ -360,6 +383,7 @@ end
             fixture.forcing,
             buffers;
             nitrogen_deposition,
+            legacy_single_precision = true,
         )
         TestbedNativeCASACReconstruction.update_forcing!(
             nitrogen_forcing,
@@ -367,7 +391,8 @@ end
             1,
             0.0,
         )
-        @test vec(Array(parent(nitrogen_deposition))) == [2 / 1000 / 86400, 0]
+        @test vec(Array(parent(nitrogen_deposition))) ==
+              [f32(2.0000001) / 1000 / 86400, 0]
         @test @allocated(
             TestbedNativeCASACReconstruction.update_forcing!(
                 nitrogen_forcing,
