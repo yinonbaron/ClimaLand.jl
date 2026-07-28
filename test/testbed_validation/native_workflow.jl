@@ -274,7 +274,7 @@ function define_output!(
     stage_index = NCDatasets.defVar(output, "stage_index", Int32, ("time",))
     forcing = NCDatasets.defVar(output, "forcing_index", Int32, ("time",))
     storage_options =
-        (; chunksizes = (points, 1), deflatelevel, shuffle = deflatelevel > 0)
+        (; chunksizes = (points, 30), deflatelevel, shuffle = deflatelevel > 0)
     for (component, variable) in variables
         name = output_name(component, variable)
         state = NCDatasets.defVar(

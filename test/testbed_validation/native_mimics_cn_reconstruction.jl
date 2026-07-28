@@ -733,54 +733,69 @@ function compare_historical_outputs(
     fresh_grid,
     reference_root;
     archive_grid = fresh_grid,
+    compare_fresh = true,
     compare_archive = true,
     fresh_atol,
     fresh_rtol,
     archive_atol,
     archive_rtol,
 )
-    fresh_root = fresh_reference_root(reference_root)
-    compact_fresh_annual =
-        joinpath(fresh_root, "ann_casaclm_pool_flux_1901_2014.nc")
-    archive_root = joinpath(reference_root, "reference")
-    fresh_annual =
-        isfile(compact_fresh_annual) ?
-        compare_archive_annual(
-            native_output,
-            fresh_grid,
-            fresh_root;
-            atol = fresh_atol,
-            rtol = fresh_rtol,
-        ) :
-        compare_fresh_fortran(
-            native_output,
-            fresh_grid,
-            fresh_root,
-            1901:2014;
-            annual = true,
-            atol = fresh_atol,
-            rtol = fresh_rtol,
+    fresh_fortran = if compare_fresh
+        fresh_root = fresh_reference_root(reference_root)
+        compact_fresh_annual =
+            joinpath(fresh_root, "ann_casaclm_pool_flux_1901_2014.nc")
+        fresh_annual =
+            isfile(compact_fresh_annual) ?
+            compare_archive_annual(
+                native_output,
+                fresh_grid,
+                fresh_root;
+                atol = fresh_atol,
+                rtol = fresh_rtol,
+            ) :
+            compare_fresh_fortran(
+                native_output,
+                fresh_grid,
+                fresh_root,
+                1901:2014;
+                annual = true,
+                atol = fresh_atol,
+                rtol = fresh_rtol,
+            )
+        fresh_daily = Dict(
+            "1901_1905" => compare_fresh_fortran(
+                native_output,
+                fresh_grid,
+                fresh_root,
+                1901:1905;
+                annual = false,
+                atol = fresh_atol,
+                rtol = fresh_rtol,
+            ),
+            "2010_2014" => compare_fresh_fortran(
+                native_output,
+                fresh_grid,
+                fresh_root,
+                2010:2014;
+                annual = false,
+                atol = fresh_atol,
+                rtol = fresh_rtol,
+            ),
         )
-    fresh_daily = Dict(
-        "1901_1905" => compare_fresh_fortran(
-            native_output,
-            fresh_grid,
-            fresh_root,
-            1901:1905;
-            annual = false,
-            atol = fresh_atol,
-            rtol = fresh_rtol,
-        ),
-        "2010_2014" => compare_fresh_fortran(
-            native_output,
-            fresh_grid,
-            fresh_root,
-            2010:2014;
-            annual = false,
-            atol = fresh_atol,
-            rtol = fresh_rtol,
-        ),
-    )
+        Dict(
+            "required" => true,
+            "tolerance" => Dict("atol" => fresh_atol, "rtol" => fresh_rtol),
+            "annual" => fresh_annual,
+            "daily" => fresh_daily,
+            "all_match" =>
+                fresh_annual["all_match"] && all(
+                    record["all_match"] for record in values(fresh_daily)
+                ),
+        )
+    else
+        Dict("required" => false, "status" => "not_available")
+    end
+    archive_root = joinpath(reference_root, "reference")
     published_archive = if compare_archive
         archive_annual = compare_archive_annual(
             native_output,
@@ -825,14 +840,7 @@ function compare_historical_outputs(
     end
     return Dict(
         "output" => Dict("records" => 114 * 365),
-        "fresh_fortran" => Dict(
-            "tolerance" => Dict("atol" => fresh_atol, "rtol" => fresh_rtol),
-            "annual" => fresh_annual,
-            "daily" => fresh_daily,
-            "all_match" =>
-                fresh_annual["all_match"] &&
-                all(record["all_match"] for record in values(fresh_daily)),
-        ),
+        "fresh_fortran" => fresh_fortran,
         "published_archive" => published_archive,
     )
 end
@@ -1006,17 +1014,19 @@ function write_report(
     return path
 end
 
-function require_acceptance!(path; require_archive = true)
+function require_acceptance!(path; require_fresh = true, require_archive = true)
     report = TOML.parsefile(path)
     checks = Dict(
         "boundary comparisons" => all(
             comparison["all_match"] for
             comparison in values(report["boundary_comparison"])
         ),
-        "fresh Fortran comparison" =>
-            report["historical_comparison"]["fresh_fortran"]["all_match"],
         "carbon budget" => report["carbon_budget"]["all_close"],
         "nitrogen budget" => report["nitrogen_budget"]["all_close"],
+    )
+    require_fresh && (
+        checks["fresh Fortran comparison"] =
+            report["historical_comparison"]["fresh_fortran"]["all_match"]
     )
     require_archive && (
         checks["published archive comparison"] =
@@ -1164,6 +1174,7 @@ function run_gridded_case(
     archive_rtol = 1e-3,
     budget_rtol = 5e-12,
     reference_stage_initialization = false,
+    compare_fresh = true,
 )
     grid_path =
         isnothing(grid_path) ?
@@ -1349,6 +1360,7 @@ function run_gridded_case(
                 grid,
                 reference_root;
                 archive_grid,
+                compare_fresh,
                 compare_archive,
                 fresh_atol,
                 fresh_rtol,
@@ -1361,7 +1373,11 @@ function run_gridded_case(
                                    "fresh_fortran_predecessor_restart" :
                                    "native_checkpoint_handoff",
         )
-        require_acceptance!(result.report; require_archive = compare_archive)
+        require_acceptance!(
+            result.report;
+            require_fresh = compare_fresh,
+            require_archive = compare_archive,
+        )
         return result
     finally
         for stage in COMPLETE_STAGES

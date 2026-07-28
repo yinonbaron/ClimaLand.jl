@@ -177,6 +177,16 @@ end
         @test TestbedNativeMIMICSCNReconstruction.require_acceptance!(
             result.report,
         ) == result.report
+        archive_only_report = joinpath(output_root, "archive_only_report.toml")
+        report["historical_comparison"]["fresh_fortran"] =
+            Dict("required" => false, "status" => "not_available")
+        open(archive_only_report, "w") do io
+            TOML.print(io, report; sorted = true)
+        end
+        @test TestbedNativeMIMICSCNReconstruction.require_acceptance!(
+            archive_only_report;
+            require_fresh = false,
+        ) == archive_only_report
         @test Set(keys(report["historical_comparison"])) ==
               Set(("fresh_fortran", "published_archive"))
         NCDatasets.NCDataset(result.output) do output

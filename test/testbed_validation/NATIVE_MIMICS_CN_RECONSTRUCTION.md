@@ -192,6 +192,12 @@ files), with the complete historical stage as a fallback. Stage carbon and
 nitrogen budgets include the bounded-state adjustment needed to distinguish
 numerical clamping from external inputs or losses.
 
+Global historical output uses 30-day compressed NetCDF chunks to reduce disk
+use without changing recorded values. If fresh yearly daily files were not
+retained, `run_gridded_case(...; compare_fresh = false)` records that
+comparison as unavailable while still requiring fresh Fortran stage-boundary
+comparisons and the preserved annual/daily archive comparison.
+
 The automated synthetic case exercises the same four-stage CTS and checkpoint
 seam with two pinned fixture points. The full 4,263-cell scientific run remains
 outside ordinary package tests.
