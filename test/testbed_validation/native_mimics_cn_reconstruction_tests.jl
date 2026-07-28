@@ -130,7 +130,6 @@ end
 end
 
 @testset "native MIMICS-CN first-day plant stoichiometry" begin
-    fortran_plant_nitrogen_epsilon = 1e-13
     grid = [(; pft = 1), (; pft = 2)]
     parameters = Dict(
         1 => (; inactive = false, initial_leaf_phosphorus = 2e-3),
@@ -150,7 +149,7 @@ end
             initial_state,
         )
     @test fixed == [0.1, 0.2]
-    @test ratios == [2e-3 / (1e-9 + fortran_plant_nitrogen_epsilon), 0.2]
+    @test ratios == [2e-3 / 1e-9, 0.2]
 
     TestbedNativeMIMICSCNReconstruction.restore_plant_stoichiometry!(
         model,

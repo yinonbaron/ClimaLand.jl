@@ -1250,10 +1250,9 @@ end
         grams_per_kilogram *
         concentration_factor,
     )
-    leaching =
-        nitrogen_parameters.leach_rate *
-        seconds_per_day *
-        max(zero(n_mineral), n_mineral)
+    # Signed legacy leaching moves a negative pool toward zero and affects the
+    # next day's CASA N-supply gate.
+    leaching = nitrogen_parameters.leach_rate * seconds_per_day * n_mineral
     mineral_after_leaching = n_mineral - leaching
     working_mineral_nitrogen =
         nitrogen_parameters.mineral_nitrogen_available_fraction *

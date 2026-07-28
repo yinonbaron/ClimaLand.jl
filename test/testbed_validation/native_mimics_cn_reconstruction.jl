@@ -508,7 +508,6 @@ function use_initial_plant_stoichiometry!(
     parameters,
     initial_state,
 )
-    fortran_plant_nitrogen_epsilon = 1e-13
     field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
     values = vec(parent(field))
     fixed = copy(values)
@@ -516,9 +515,7 @@ function use_initial_plant_stoichiometry!(
     for (index, point) in enumerate(grid)
         parameter = parameters[point.pft]
         parameter.inactive && continue
-        values[index] =
-            parameter.initial_leaf_phosphorus /
-            (leaf_nitrogen[index] + fortran_plant_nitrogen_epsilon)
+        values[index] = parameter.initial_leaf_phosphorus / leaf_nitrogen[index]
     end
     return fixed
 end

@@ -71,8 +71,27 @@ continuous_rate_order = "SLA [m2 kg-1] * leaf C [kg m-2]"
 reason = "floating-point side-of-bound parity at discontinuous minimum/maximum LAI gates"
 fortran_state_storage = "grams; direct one-day map"
 native_state_storage = "kilograms; per-second tendency applied by ClimaTimeSteppers"
-first_traced_branch_mismatch = "selected cell 1715, long-spin day 102749"
+traced_threshold = "selected cell 1715 near 417.827 g leaf C; maximum-LAI allocation gate"
 deadband = "none; a tested 1e-5 g guard band postponed one flip but introduced other incorrect branches"
+
+[legacy_leaf_phosphorus_nitrogen]
+fortran_reconstruction = "Pleaf = Nleaf / (N:P) in casa_pdummy"
+fortran_respiration_ratio = "Pleaf / (Nleaf + 1e-10 g) in casa_rplant"
+native_compatibility_order = "(Nleaf / (N:P)) / (Nleaf + 1e-10 g)"
+stage_entry_ratio = "initial Pleaf / Nleaf; the kernel applies the denominator offset once"
+first_smooth_trace_difference = "selected cell 1715, day 49 NPP, approximately 3e-14 g C m-2 day-1 before correction"
+
+[legacy_signed_mineral_leaching]
+fortran_order = "NminLeach = Nsoilmin * fNminleach before the hourly MIMICS map"
+native_compatibility_order = "leach_rate * signed mineral N; no zero clamp in LegacyDaily MIMICS-CN"
+traced_negative_pool = "selected cell 9679, spin day 37847, -1.62219647e-4 g N m-2"
+omitted_flux_before_correction = "2.22219e-7 g N m-2"
+next_day_supply_fraction = "Fortran 0.4068642584; Julia before correction 0.4068565852"
+validation = "15-cycle daily trace below 1e-8 g m-2; 499-cycle selected-cell spin boundary passed"
+selected_chained_acceptance = "all four boundaries, fresh-Fortran annual/daily comparisons, and C/N budgets passed"
+selected_boundary_maximum_absolute_error = "2.05e-6 in stored reference units"
+selected_daily_maximum_absolute_error = "9.61e-4 in stored reference units"
+selected_annual_maximum_absolute_error = "0.0500 g C m-2 physical SOM; relative error 5.22e-6"
 
 [forcing_handoff]
 source_storage = "NetCDF"

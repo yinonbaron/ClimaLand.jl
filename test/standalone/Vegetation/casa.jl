@@ -105,6 +105,25 @@ end
     end
 end
 
+@testset "CASA legacy leaf P:N arithmetic" begin
+    for FT in (Float32, Float64)
+        parameters = plant_parameters(FT)
+        leaf_nitrogen_grams = FT(8.350719393850409)
+        expected =
+            (
+                leaf_nitrogen_grams /
+                inv(parameters.leaf_phosphorus_to_nitrogen)
+            ) / (leaf_nitrogen_grams + FT(1e-10))
+        actual = CASA.legacy_leaf_phosphorus_to_nitrogen(
+            parameters,
+            leaf_nitrogen_grams,
+        )
+
+        @test actual == expected
+        @test actual <= parameters.leaf_phosphorus_to_nitrogen
+    end
+end
+
 @testset "CASA plant mineral-N supply" begin
     for FT in (Float32, Float64)
         nitrogen_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
@@ -382,7 +401,7 @@ end
             one(FT),
             carbon_fluxes,
         )
-        @test inactive_legacy[7] == continuous_nitrogen[7]
+        @test inactive_legacy[7] ≈ continuous_nitrogen[7] rtol = eps(FT)
 
         fixed_wood_ratio_parameters = CASA.CASAPlantNitrogenParameters{FT}(;
             nitrogen_ratio_minimum = (FT(0.02), FT(0.006666667), FT(0.0244)),

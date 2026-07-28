@@ -65,38 +65,72 @@ orders can place a state on opposite sides of either comparison.
 
 `LegacyDaily` therefore evaluates the complete CASA carbon and nitrogen map in
 the legacy gram/day order, including LAI, before converting the result to SI
-tendencies. `ContinuousRate` retains the native SI calculation. This corrects
-the process-equation mismatch but does not make the two integrations bitwise
-identical: Fortran retains gram-valued state and applies the daily map directly,
-while ClimaTimeSteppers retains kilogram-valued state and reconstructs the
-update from a per-second tendency.
+tendencies. `ContinuousRate` retains the native SI calculation. The traced
+cell-1715 separation near `417.827` g leaf C is the maximum-LAI allocation
+gate, not the minimum-LAI turnover gate. A tested `1e-5` g guard band merely
+moved the first flip and introduced incorrect decisions in other cells, so no
+LAI deadband is used.
 
-A 20-cycle high-precision trace of selected cell 1715 found the first discrete
-branch mismatch on day 102,749. Immediately beforehand, accumulated smooth
-rounding was only `3.77e-5` g leaf C; Fortran was `2.99e-5` g above the
-minimum-LAI threshold and Julia was `7.81e-6` g below it. The different
-senescence decision created a `0.593` g leaf-C separation in one day. A
-`1e-5` g LAI guard band postponed the first flip but produced thousands of
-later incorrect branch decisions, so it was rejected and no LAI deadband is
-used.
+The remaining smooth drift originated earlier in CASA respiration.
+At the end of every C or C-N timestep, Fortran `casa_pdummy` reconstructs leaf
+P as `N / (N:P)`. On the next day, `casa_rplant` calculates the effective P:N
+ratio as that reconstructed P divided by `N + 1e-10 g`. The earlier Julia
+translation used the exact reciprocal table ratio and omitted both the
+denominator offset and the ordered reconstruction division. The first visible
+effect in a high-precision cell-1715 trace was an approximately `3e-14` g/day
+NPP difference on day 49. Although locally negligible, repeated forcing
+eventually put the two states on opposite sides of the maximum-LAI gate.
 
-Initializing all 37 Julia cells from the exact Fortran spin-continuation
-restart remains a useful diagnostic: every 1901--1905 daily comparison passes
-at `atol = 0.005` and `rtol = 0.001`, confirming the daily process equations
-independently of the full chained acceptance test. The chained comparison
-reports its measured errors explicitly; these tolerances are 0.1% relative,
-not 10%.
+The legacy kernel now evaluates exactly
+`(N / (N:P)) / (N + 1e-10 g)`. The operation order is intentional: replacing
+the first division with multiplication by a precomputed reciprocal restores a
+small long-run drift. At stage entry, the validation helper temporarily
+supplies the restart P:N value as `P / N`; the legacy kernel then applies the
+single Fortran denominator offset. Passing `P / (N + 1e-10 g)` into that
+kernel would apply the offset twice. After the first timestep, the configured
+N:P ratio is restored, matching the daily `casa_pdummy` reconstruction.
 
-The independently chained selected-cell run does not currently satisfy that
-acceptance threshold. Prespin passes, but the first long-spin boundary has one
-failing labile-C value and one failing mineral-N value. The continuation and
-historical boundaries pass, but the 1901--2014 fresh-Fortran comparison still
-fails: the annual comparison has seven leaf-N, two litter-metabolic-N, and one
-leaf-C failures, and the retained daily windows contain branch-sensitive leaf,
-litter-input, NPP, uptake, and DIN failures. The largest daily leaf-C
-difference is `0.889` g m⁻². Carbon and nitrogen budgets both close. Therefore
-this selected-cell result is recorded as a failed validation, and it must not
-be used to authorize the global run.
+An independent exchange-flux experiment prescribed every full-precision
+Fortran CASA-to-MIMICS carbon and nitrogen flux to the Julia soil module for
+all 35 active selected cells. The Julia MIMICS states then matched Fortran to
+`4.44e-16 kg m⁻²`. This established that the vegetation/coupling fluxes were
+sufficient to reproduce the reference soil trajectory, but it did not prove
+that every MIMICS boundary operation was already identical.
+
+After correcting the leaf P:N arithmetic, the remaining long-spin residual was
+traced to the mineral-N boundary between MIMICS and the next day's CASA
+N-supply gate. On selected cell 9679, the mineral pool reached
+`-1.62219647e-4` g N m⁻² on spin day 37,847. Fortran calculates leaching from
+the signed pool, so its negative leaching flux moves the pool back toward zero.
+The Julia translation used `max(0, Nmin)` and omitted that flux. The missing
+`2.22219e-7` g N m⁻² leaching adjustment changed the following day's mineral
+pool and moved the CASA N-supply fraction from `0.4068642584` to
+`0.4068565852`. That in turn changed the labile-GPP fraction from
+`0.3929997979` to `0.3930048820`, creating the first material labile-C
+separation.
+
+The legacy MIMICS-CN kernel now applies the leaching rate directly to signed
+mineral N, matching the Fortran update. This behavior is intentionally limited
+to reproducing the ordered legacy map; it should not be interpreted as a
+physical export from a negative pool. After the correction, neither labile C
+nor mineral N differed from Fortran by more than `1e-8` g m⁻² anywhere in a
+15-cycle daily trace, and the complete 499-cycle selected-cell spin boundary
+passed.
+
+The complete chained selected-cell acceptance run also passes: prespin, spin,
+spin continuation, and historical boundaries have zero failed values; the
+fresh-Fortran annual and both retained daily-window comparisons pass; and both
+elemental budgets close. Maximum boundary absolute errors range from
+`4.91e-7` to `2.05e-6` in the reference variables' stored units. The largest
+daily-window error is `9.61e-4`; the largest annual error is `0.0500` g C m⁻²
+for physical SOM, a relative error of `5.22e-6`.
+
+Initializing all 37 Julia cells from an exact Fortran stage restart remains a
+useful diagnostic. With the ordered P:N calculation, the first-day cell-9679
+NPP and plant-N uptake differ from the high-precision Fortran trace by only
+`8.7e-19` and `1.4e-20` g m⁻² day⁻¹, respectively. The chained comparison
+reports measured errors explicitly; its tolerances are 0.1% relative plus
+`0.005` in the reference variable's stored units, not 10%.
 
 Correct restart units also remain essential: applying the MIMICS `f18.10`
 format after converting its pools to grams makes that handoff 1000 times too

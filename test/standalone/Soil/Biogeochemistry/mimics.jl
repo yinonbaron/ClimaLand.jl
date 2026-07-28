@@ -388,6 +388,23 @@ for FT in (Float32, Float64)
         )
         @test length(combined) == 29
         @test combined_carbon_nitrogen_allocations(combined_arguments...) == 0
+        negative_mineral = FT(-1e-7)
+        negative_mineral_combined =
+            @inferred MIMICS.combined_carbon_nitrogen_fluxes(
+                combined_arguments[1],
+                combined_arguments[2],
+                combined_arguments[3]...,
+                combined_arguments[4]...,
+                negative_mineral,
+                combined_arguments[6]...,
+                combined_arguments[7]...,
+                combined_arguments[8]...,
+                combined_arguments[9]...,
+                combined_arguments[10],
+                combined_arguments[11],
+            )
+        @test negative_mineral_combined[21] ≈
+              nitrogen_parameters.leach_rate * negative_mineral rtol = eps(FT)
 
         zero_microbe_carbon =
             FT.((carbon[1], carbon[2], 0, 0, carbon[5], carbon[6], carbon[7]))

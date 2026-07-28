@@ -472,6 +472,23 @@ Compute LAI from the units and multiplication order used by legacy CASA.
     )
 end
 
+"""
+    legacy_leaf_phosphorus_to_nitrogen(parameters, leaf_nitrogen_grams)
+
+Reproduce the ordered `casa_pdummy`/`casa_rplant` leaf P:N calculation.
+The legacy C-N model reconstructs leaf P as `N / (N:P)` and subsequently
+divides it by `N + 1e-10 g`; preserving both operations prevents long-run
+rounding drift at CASA's discontinuous LAI allocation gates.
+"""
+@inline function legacy_leaf_phosphorus_to_nitrogen(
+    parameters,
+    leaf_nitrogen_grams,
+)
+    leaf_nitrogen_to_phosphorus = inv(parameters.leaf_phosphorus_to_nitrogen)
+    return (leaf_nitrogen_grams / leaf_nitrogen_to_phosphorus) /
+           (leaf_nitrogen_grams + oftype(leaf_nitrogen_grams, 1e-10))
+end
+
 @inline function normalize_fractions(fractions)
     total = sum(fractions)
     if total > zero(total)
@@ -1049,7 +1066,7 @@ the reference implementation.
         zero(root),
     )
     maintenance = wood + root
-    p_to_n = parameters.leaf_phosphorus_to_nitrogen
+    p_to_n = legacy_leaf_phosphorus_to_nitrogen(parameters, nitrogen_grams[1])
     growth_efficiency =
         oftype(gpp_daily, 0.65) +
         oftype(gpp_daily, 0.2) * p_to_n / (p_to_n + inv(oftype(gpp_daily, 15)))
