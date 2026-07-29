@@ -1,5 +1,5 @@
 schema_version = 1
-updated = "2026-07-19"
+updated = "2026-07-29"
 
 [[attempt]]
 id = "artifact_checksums"
@@ -376,3 +376,44 @@ projected_two_spin_hours = 38.2
 rejected_optimization = "-O3 was not faster; compiler automatic loop parallelization was slower; explicit eight-thread grid parallelism changed carbon-balance and respiration diagnostics despite an exact prognostic MIMICS restart"
 comparison = "runner pins zero absolute and relative tolerance for both CASA and MIMICS annual 1901-2014 histories and daily 1901-1905/2010-2014 windows"
 blocker = "the bounded production matrix has not completed because its two source-exact serial spins project to approximately 38 hours on the current host; no archive match or exhausted-matrix result is claimed"
+
+[[attempt]]
+id = "mimics_cn_bundled_ko4_fi30_global_run"
+issue = 43
+target = "complete 4,263-point legacy Fortran MIMICS-CN workflow"
+status = "complete_global_run"
+climaland_runner_commit = "4dfbf81a5f123d356b07cad247649d17853768d6"
+runner_sha256 = "c4098429ec8d68fb1e3086ee804164e2f31c121e28ed8d0fcf33f6437a5c2154"
+compatibility_patch_sha256 = "acf6d0e14aac9886ffe4b0dff5adc7b9e775287003c8a738af4c4aa26f08c10f"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+configuration = "100 repeats of 1901 prespin; two 499-cycle 1901-1920 spins; 1901-2014 history; bundled KO4/FI30 MIMICS parameters in every stage"
+command = "julia --startup-file=no --project=.buildkite test/testbed_validation/mimics_cn_reconstruction.jl run-case ../biogeochem_testbed .. ../mimics_cn_reconstruction_issue25 bundled_ko4_fi30"
+output_root = "../mimics_cn_reconstruction_issue25/bundled_ko4_fi30"
+parameter_file = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+parameter_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+netcdf_fortran = "4.6.3"
+compiler_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall -std=legacy"
+prespin_elapsed_seconds = 528.848526625
+spin_elapsed_seconds = 53312.524270375
+spin_continuation_elapsed_seconds = 54595.662617458
+historical_elapsed_seconds = 2258.598439875
+matrix_sha256 = "a05f93962e3cfe299ba446243d8367e73dd8b38f83400920c30d00b8b2c0c97a"
+workflow_sha256 = "748bd07a429e9dad0c20ca8deabb49976e5fcb0fb38926341fc40eb97d9f8d87"
+control_diff_report_sha256 = "3f0e23f0cdee6dbf1d2c23cb3ffebbb04f19a22a667e73599d90c3a58fa81985"
+build_metadata_sha256 = "d965045449bd54caea7b4fa4d4d075e3a57a0b20df382067093a34b4037343e7"
+workflow_metadata_sha256 = "1e056d2f218dd63346b02c5272e25ec00ae3a7dba875cafe86657e7fcbdf29eb"
+reconstruction_report_sha256 = "c23cee6a4e97ff35254f53f1fc48606ec68893b861b6ab44b1e537eebd79c42f"
+prespin_stage_metadata_sha256 = "01aa914eb674959f0c77d99704bc970fdb6545b5365abc8b6a2ed10dbfe81204"
+spin_stage_metadata_sha256 = "3d6f09c85084960a62fec9ece5c82ad86355bd564ec789c3cd45f2c5de9aa94d"
+spin_continuation_stage_metadata_sha256 = "c2486626c9f464ec269a1bdeb181629f29d9a7f4e8a2c08b44108d4f20982e57"
+historical_stage_metadata_sha256 = "f6c13e9ec92d16b55b368caaa5d5334697967587331f28da4263e220ab40c60a"
+prespin_casa_restart_sha256 = "bb66be3da72cc366c1b5c15efcd62e4b1258f56aef2cf06db1d8f2d7543797b5"
+prespin_mimics_restart_sha256 = "331a3090f68db2f32af613ba12bf921e41b9b574d6dd530719b61c1504b70e6d"
+spin_casa_restart_sha256 = "d9c4bc465da6e322287085b88c0d1119c8541c05ee806bdcdf0dbe0fa5ccf6a6"
+spin_mimics_restart_sha256 = "5e68829295be1546f5afcdddb65c3df71ab0fde19940a0e6e0ed9f44aad737bf"
+spin_continuation_casa_restart_sha256 = "f1e868ec2194c42e0fac2453d74e9d51df0e39da0b8f25cd9607d4fbf08107b5"
+spin_continuation_mimics_restart_sha256 = "d43518cc5656c0574ae7478c5c729586b8d79ef50646d3a278a4fa798f8fd1e1"
+historical_casa_restart_sha256 = "5b9f0c043fd86d846939f7330c0637000bd96ee792ac0fc888c00781eeb431c0"
+historical_mimics_restart_sha256 = "b507fa0ad8bc9b4ea009c7de618f5293abe6afb3533ffe87945a5a9e4202d659"
+scientific_result = "the run completed; the archive comparison is a mismatch and non-finite states appear after the continuation spin, but archive agreement is not the issue 43 acceptance criterion"

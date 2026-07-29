@@ -60,12 +60,12 @@ julia --startup-file=no --project=.buildkite \
   .. ../mimics_cn_reconstruction_issue25 archive_predecessor_ko6_fi30
 ```
 
-## Current execution status
+## Issue 25 execution status
 
-The production search has not completed on the current macOS ARM host, so no
-matching setup or exhausted-matrix result is claimed. The source-exact GNU
-Fortran 16.1.0 run completed the 100-year prespin in 517.05 seconds. Its CASA
-and MIMICS restart SHA-256 values are respectively
+The production search had not completed when the issue 25 workflow was first
+documented, so no matching setup or exhausted-matrix result was claimed. The
+source-exact GNU Fortran 16.1.0 run completed the 100-year prespin in 517.05
+seconds. Its CASA and MIMICS restart SHA-256 values are respectively
 `656a341ce5ff16f3119458ce55226e457e36e744b3a82a88cbfff354e2325a55` and
 `7f56eb039bd81d1cb0d5553b94ec9ef1eafada20d89046f4f450c49ed489ef22`.
 
@@ -75,11 +75,63 @@ historical comparison. Ordinary `-O3` compilation took 137.83 seconds and
 provided no speedup. Compiler automatic loop parallelization was slower than
 serial. An explicit eight-thread outer-grid loop took 68.00 seconds and kept
 the prognostic MIMICS restart exact, but changed CASA carbon-balance fields and
-the archived respiration diagnostic; it is therefore rejected.
+the archived respiration diagnostic; it was therefore rejected.
 
-The remaining execution blockers are the approximately 38-hour serial spin
-cost and the unpublished archive compiler. GNU Fortran 8.1.0, named by the
-legacy source Makefile, is unavailable on this host. The evidence matrix,
-workflow, comparisons, and tolerances are pinned; the final result must come
-from an uninterrupted production search rather than tolerance inflation or a
-diagnostic-changing acceleration.
+The recorded blockers were the approximately 38-hour serial spin cost and the
+unpublished archive compiler. GNU Fortran 8.1.0, named by the legacy source
+Makefile, was unavailable on the macOS ARM host. The evidence matrix,
+workflow, comparisons, and tolerances remained pinned for an uninterrupted
+production run rather than tolerance inflation or a diagnostic-changing
+acceleration.
+
+## Issue 43 global KO4/FI30 run
+
+The complete 4,263-point workflow ran successfully with
+`pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv` in every stage. Its
+SHA-256 is
+`52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b`.
+Run it from the ClimaLand checkout with:
+
+```sh
+julia --startup-file=no --project=.buildkite \
+  test/testbed_validation/mimics_cn_reconstruction.jl run-case \
+  ../biogeochem_testbed .. ../mimics_cn_reconstruction_issue25 \
+  bundled_ko4_fi30
+```
+
+The relative roots above require the testbed source checkout, the historical
+forcing directory, and the MIMICS-CN archive beside the ClimaLand checkout.
+The matrix and artifact manifest verify their expected identities. The runner
+is resumable: rerunning the command reuses a stage only when its executable,
+control, inputs, and declared outputs match the recorded fingerprints.
+
+The run used source commit
+`82c57f8aa1179865d9752b617493ef06f45c3266`, GNU Fortran 16.1.0,
+netCDF-Fortran 4.6.3, and the source flags plus `-std=legacy`. The exact
+runner is pinned by ClimaLand commit
+`4dfbf81a5f123d356b07cad247649d17853768d6`, runner SHA-256
+`c4098429ec8d68fb1e3086ee804164e2f31c121e28ed8d0fcf33f6437a5c2154`,
+and compatibility-patch SHA-256
+`acf6d0e14aac9886ffe4b0dff5adc7b9e775287003c8a738af4c4aa26f08c10f`.
+Recorded stage times were 528.85 seconds for prespin, 53,312.52 seconds for
+the first spin, 54,595.66 seconds for the continuation spin, and 2,258.60
+seconds for 1901--2014 history.
+
+Generated evidence is under
+`../mimics_cn_reconstruction_issue25/bundled_ko4_fi30/`:
+
+- `build/build_metadata.toml` records the source, compiler, flags, and patch.
+- `configuration/control_diff_report.toml` records every staged control and
+  confirms the KO4/FI30 parameter hash for all four stages.
+- `workflow_metadata.toml` records the executable fingerprint and completion
+  of every stage.
+- Each stage directory retains its materialized control, parameter tables,
+  restart hashes, output hashes, log, and `stage_metadata.toml`.
+- `reconstruction_report.toml` records restart-boundary diagnostics,
+  convergence diagnostics, and the optional archive comparison.
+
+The workflow status is complete. The archive comparison reports a mismatch
+and non-finite states after the continuation spin; these are scientific
+results of this configuration, not failures of the issue 43 execution
+criterion. Machine-readable hashes for the evidence above are retained in
+`provenance_attempts.toml`.
