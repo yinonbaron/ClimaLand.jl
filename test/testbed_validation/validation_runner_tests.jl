@@ -6,6 +6,8 @@ const VALIDATION_RUNNER = joinpath(@__DIR__, "validation_runner.jl")
 const VALIDATION_SCOPE_MANIFESTS = joinpath(@__DIR__, "validation", "scopes")
 const VALIDATION_COMPARISON_POLICY =
     joinpath(@__DIR__, "validation", "comparison_policy.toml")
+const VALIDATION_CASA_C_CALIBRATION =
+    joinpath(@__DIR__, "validation", "casa_c_full_grid_calibration.toml")
 include(VALIDATION_RUNNER)
 const VALIDATION_RUNNER_MODULE = TestbedValidationRunner
 
@@ -198,6 +200,23 @@ end
                 SHA.sha256(read(report["comparison_policy"]["path"])),
             )
             @test report["comparison_policy"]["budget_rtol"] == 5.0e-12
+            calibration = report["comparison_policy"]["calibration"]
+            @test calibration["source"] == "fresh_fortran_full_grid"
+            @test calibration["cell_count"] == 4263
+            @test calibration["path"] == abspath(VALIDATION_CASA_C_CALIBRATION)
+            @test calibration["sha256"] ==
+                  bytes2hex(SHA.sha256(read(calibration["path"])))
+            calibration_text = read(calibration["path"], String)
+            @test !occursin("/Users/", calibration_text)
+            @test !occursin("/tmp/", calibration_text)
+            calibration_document = TOML.parse(calibration_text)
+            provenance = calibration_document["source_provenance"]
+            @test provenance["git_head_advanced_during_run"]
+            @test provenance["execution_source_hashes_are_authoritative"]
+            leaf =
+                report["comparison_policy"]["fresh_fortran_boundary"]["prespin"]["casa_plant.c_leaf"]
+            @test leaf["atol"] > 0
+            @test leaf["rtol"] >= 0
         end
     end
 
@@ -210,6 +229,47 @@ end
     )
     @test reports["core"]["scope"]["cell_ids"] !=
           reports["smoke"]["scope"]["cell_ids"]
+end
+
+@testset "Validation Runner stages the Representative Scope before simulation" begin
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "CASA-C",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_CASA_C_REFERENCE" =>
+                    joinpath(output, "missing-reference.toml"),
+            ),
+        )
+
+        @test result.exitcode == 2
+        @test occursin("Pinned CASA-C reference is missing", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test report["scope"]["name"] == "representative"
+        @test report["scope"]["cell_count"] == 80
+        @test length(unique(report["scope"]["cell_ids"])) == 80
+        smoke =
+            TOML.parsefile(joinpath(VALIDATION_SCOPE_MANIFESTS, "smoke.toml"))
+        @test issubset(smoke["cell_ids"], report["scope"]["cell_ids"])
+        representative = TOML.parsefile(
+            joinpath(VALIDATION_SCOPE_MANIFESTS, "representative.toml"),
+        )
+        @test representative["selection"]["seed"] == 31432026
+        @test representative["selection"]["inactive_candidates_excluded"]
+        @test sum(
+            values(representative["selection"]["candidate_population"]),
+        ) == 2982
+        @test occursin(
+            "cellMissing == 0",
+            representative["selection"]["candidate_filter"],
+        )
+        @test sum(values(representative["selection"]["allocation"])) == 43
+        @test length(representative["selection"]["match"]) == 43
+    end
 end
 
 @testset "Validation Runner warns for temporary scope aliases" begin
@@ -242,7 +302,7 @@ end
 @testset "Validation Runner rejects unavailable defaults and invalid values" begin
     defaults = run_validation()
     @test defaults.exitcode == 2
-    @test occursin("Representative Scope is not available yet", defaults.stderr)
+    @test occursin("only CASA-C is available", defaults.stderr)
 
     invalid = run_validation("--scope", "unknown")
     @test invalid.exitcode == 2
@@ -333,6 +393,13 @@ end
                 "checkpoint_roundtrip",
             ])
             @test all(values(report["model"][1]["comparison"]))
+            scientific = TOML.parsefile(report["model"][1]["comparison_report"])
+            applied =
+                scientific["boundary_comparison"]["prespin"]["source"]["fresh_fortran"]["variable"]["casa_plant.c_leaf"]
+            policy =
+                report["comparison_policy"]["fresh_fortran_boundary"]["prespin"]["casa_plant.c_leaf"]
+            @test applied["atol"] == policy["atol"]
+            @test applied["rtol"] == policy["rtol"]
             @test report["outcome"] == "passed"
         end
     end

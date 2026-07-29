@@ -114,6 +114,15 @@ end
             for stage in result.stages
                 manifest = TOML.parsefile(stage.manifest)
                 @test manifest["state_updates"] == "ClimaTimeSteppers only"
+                if stage.name == :accelerated_spin
+                    parameter = manifest["provenance"]["parameter_file"]
+                    @test parameter["effective_passive_decay_rate_multiplier"] ==
+                          10.0
+                    @test occursin(
+                        "accelerated-spin parameter file",
+                        parameter["adjustment"],
+                    )
+                end
             end
             NCDatasets.NCDataset(result.output) do output
                 @test size(output["time"], 1) == 3

@@ -1239,6 +1239,7 @@ function run_gridded_case(
     historical_atol = 5e-3,
     historical_rtol = 1e-3,
     budget_rtol = 5e-12,
+    boundary_only = false,
 )
     grid_path =
         joinpath(source_root, "GRID_CN", "gridinfo_igbpz_CLM5_GSWP3.csv")
@@ -1279,7 +1280,12 @@ function run_gridded_case(
             499;
             write_output = false,
         ),
-        native_workflow().NativeStage(:historical, 114 * 365, 1),
+        native_workflow().NativeStage(
+            :historical,
+            114 * 365,
+            1;
+            write_output = !boundary_only,
+        ),
     )
     model_for_stage(stage) =
         stage.name == :accelerated_spin ? accelerated.model : normal.model
@@ -1305,6 +1311,7 @@ function run_gridded_case(
     budget = CarbonBudgetAccumulator(grid)
     stoichiometry = CarbonOnlyPlantStoichiometryTracker(grid, normal.parameters)
     function carbon_budget(stage, result, _, _, initial_state, _)
+        boundary_only && return Dict("skipped" => "boundary calibration only")
         name = String(stage.name)
         start_stock = area_weighted_carbon(initial_state, budget.area_m2)
         stop_stock = area_weighted_carbon(
@@ -1340,18 +1347,27 @@ function run_gridded_case(
                     model_for_stage(stage),
                 )
             end,
-            after_step! = function (stage, step, Y, p, time)
+            after_step! = boundary_only ?
+                          (_, _, Y, _, _) ->
+                update_stoichiometry!(stoichiometry, Y) :
+                          function (stage, step, Y, p, time)
                 accumulate_budget!(budget, stage, step, Y, p, time)
                 update_stoichiometry!(stoichiometry, Y)
             end,
-            diagnostics = casa_diagnostics(normal.model.casa_soil.parameters),
+            diagnostics = boundary_only ? () :
+                          casa_diagnostics(normal.model.casa_soil.parameters),
             provenance = stage -> gridded_provenance(
                 stage,
                 parameter_for_stage(stage),
                 reference_root,
             ),
             compare_boundary,
-            compare_historical = (path, _) -> compare_historical_outputs(
+            compare_historical = boundary_only ?
+                                 (_, _) -> Dict(
+                "output" => Dict("records" => 0),
+                "skipped" => "boundary calibration only",
+            ) :
+                                 (path, _) -> compare_historical_outputs(
                 path,
                 grid,
                 reference_root;

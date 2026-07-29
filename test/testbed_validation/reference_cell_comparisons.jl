@@ -23,14 +23,15 @@ struct ReferenceCellCollection
     files::Dict{String, String}
 end
 
-function selected_cell_collection(name, ids)
-    manifest = TOML.parsefile(SELECTED_CELL_MANIFEST)
+function selected_cell_collection(
+    name,
+    ids;
+    manifest_path = SELECTED_CELL_MANIFEST,
+)
+    manifest = TOML.parsefile(manifest_path)
     manifest["schema_version"] == 1 ||
         error("Unsupported selected-cell fixture schema")
-    files = selected_fixtures().verified_fixture_paths(
-        SELECTED_CELL_MANIFEST,
-        manifest,
-    )
+    files = selected_fixtures().verified_fixture_paths(manifest_path, manifest)
     metadata = Dict(Int(cell["id"]) => cell for cell in manifest["cell"])
     cells = map(sort!(unique!(Int.(collect(ids))))) do id
         haskey(metadata, id) || error("Selected fixture cell $id is unknown")

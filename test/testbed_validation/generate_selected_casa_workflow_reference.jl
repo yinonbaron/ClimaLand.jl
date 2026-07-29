@@ -1,3 +1,4 @@
+import Dates
 import TOML
 
 import NCDatasets
@@ -11,6 +12,8 @@ include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
 
 const Workflow = TestbedSelectedCASAWorkflow
 const NativeCASA = TestbedNativeCASACReconstruction
+const CASA_C_CALIBRATION_PATH =
+    joinpath(@__DIR__, "validation", "casa_c_full_grid_calibration.toml")
 
 const FORTRAN_BOUNDARY_VARIABLES = Dict(
     "casapool%clabile" => "casa_plant.c_labile",
@@ -118,7 +121,12 @@ function julia_boundaries(output_root, setup)
 end
 
 function julia_historical(output_root)
-    sample_days = [1, 56 * 365 + 183, 114 * 365]
+    years = (1901, 1957, 2014)
+    quarter_starts = (1, 91, 182, 274)
+    sample_days = sort!([
+        (year - 1901) * 365 + start + offset for year in years for
+        start in quarter_starts for offset in 0:6
+    ],)
     path = joinpath(output_root, "stages", "historical", "historical.nc")
     return NCDatasets.NCDataset(path) do output
         historical = Dict{String, Any}("sample_days" => sample_days)
@@ -152,6 +160,22 @@ function measured_fortran_tolerance(fortran, julia)
     return tolerance
 end
 
+function calibrated_fortran_tolerance(path = CASA_C_CALIBRATION_PATH)
+    calibration = TOML.parsefile(path)
+    calibration["source"] == "fresh_fortran_full_grid" &&
+        calibration["cell_count"] == 4263 ||
+        error("CASA-C calibration must use the full fresh-Fortran grid")
+    return Dict(
+        stage => Dict(
+            name => Dict(
+                "atol" => values["derived_policy"]["atol"],
+                "rtol" => values["derived_policy"]["rtol"],
+                "method" => calibration["calibration_id"],
+            ) for (name, values) in stage_values
+        ) for (stage, stage_values) in calibration["variable"]
+    )
+end
+
 function generate_reference(
     configuration,
     collection,
@@ -175,7 +199,31 @@ function generate_reference(
     reference["historical_coverage"] = Dict(
         "pfts" => metadata.pfts,
         "forcing_regimes" => metadata.regimes,
-        "dates" => ["1901-01-01", "1957-07-02", "2014-12-31"],
+        "dates" =>
+            string.([
+                Dates.Date(year, month, 1) + Dates.Day(offset) for
+                year in (1901, 1957, 2014) for month in (1, 4, 7, 10) for
+                offset in 0:6
+            ],),
+        "final_boundary" => "2014-12-31",
+    )
+    provenance = Dict(
+        "fresh_fortran_boundary_sha256" => Dict(
+            stage => TestbedNativeWorkflow.sha256sum(
+                joinpath(fortran_root, "stages", directory, "casa_final.csv"),
+            ) for (stage, directory) in STAGE_DIRECTORIES
+        ),
+        "native_julia_report_sha256" => TestbedNativeWorkflow.sha256sum(
+            joinpath(output_root, "reconstruction_report.toml"),
+        ),
+        "accelerated_spin_parameter_adjustment" => Dict(
+            "effective_passive_decay_rate_multiplier" => 10.0,
+            "equivalence" => "archived accelerated-spin parameter file",
+        ),
+    )
+    configuration == :carbon_only && (
+        provenance["fresh_fortran_calibration_sha256"] =
+            TestbedNativeWorkflow.sha256sum(CASA_C_CALIBRATION_PATH)
     )
     configurations = get!(reference, "configuration", Dict{String, Any}())
     configurations[String(configuration)] = Dict(
@@ -188,6 +236,8 @@ function generate_reference(
         ),
         "tolerance" => Dict(
             "fresh_fortran_boundary" =>
+                configuration == :carbon_only ?
+                calibrated_fortran_tolerance() :
                 measured_fortran_tolerance(fortran, julia),
             "native_julia_boundary" => Dict(
                 "atol" => 256eps(Float64),
@@ -205,22 +255,7 @@ function generate_reference(
                 "method" => "256 machine eps for pinned Float64 native history",
             ),
         ),
-        "provenance" => Dict(
-            "fresh_fortran_boundary_sha256" => Dict(
-                stage => TestbedNativeWorkflow.sha256sum(
-                    joinpath(
-                        fortran_root,
-                        "stages",
-                        directory,
-                        "casa_final.csv",
-                    ),
-                ) for (stage, directory) in STAGE_DIRECTORIES
-            ),
-            "native_julia_report_sha256" =>
-                TestbedNativeWorkflow.sha256sum(
-                    joinpath(output_root, "reconstruction_report.toml"),
-                ),
-        ),
+        "provenance" => provenance,
     )
     mkpath(dirname(path))
     open(path, "w") do io
@@ -229,16 +264,30 @@ function generate_reference(
     return path
 end
 
-length(ARGS) == 5 || error(
-    "usage: generate_selected_casa_workflow_reference.jl CONFIGURATION TIER OUTPUT_ROOT FORTRAN_ROOT REFERENCE_PATH",
-)
-configuration = Symbol(ARGS[1])
-tier = Symbol(ARGS[2])
-collection =
-    tier == :core ? TestbedReferenceCellComparisons.ordinary_cell_collection() :
-    tier == :extended ?
-    TestbedReferenceCellComparisons.extended_cell_collection() :
-    error("TIER must be core or extended")
-println(
-    generate_reference(configuration, collection, ARGS[3], ARGS[4], ARGS[5]),
-)
+function main(args = ARGS)
+    length(args) == 5 || error(
+        "usage: generate_selected_casa_workflow_reference.jl CONFIGURATION TIER OUTPUT_ROOT FORTRAN_ROOT REFERENCE_PATH",
+    )
+    configuration = Symbol(args[1])
+    tier = Symbol(args[2])
+    collection =
+        tier in (:core, :ordinary) ?
+        TestbedReferenceCellComparisons.core_cell_collection() :
+        tier in (:smoke, :extended) ?
+        TestbedReferenceCellComparisons.smoke_cell_collection() :
+        error("TIER must be core/ordinary or smoke/extended")
+    println(
+        generate_reference(
+            configuration,
+            collection,
+            args[3],
+            args[4],
+            args[5],
+        ),
+    )
+    return 0
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    exit(main())
+end

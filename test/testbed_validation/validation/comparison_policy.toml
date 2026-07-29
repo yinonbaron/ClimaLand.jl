@@ -1,5 +1,5 @@
-schema_version = 1
-policy_id = "casa-c-core-smoke-v1"
+schema_version = 2
+policy_id = "casa-c-fresh-fortran-full-grid-v1"
 
 [acceptance]
 eligible_nonfinite = "fail"
@@ -24,53 +24,5 @@ method = "256 machine eps for pinned Float64 native history"
 rtol = 5.684341886080802e-14
 
 [model."CASA-C".fresh_fortran_boundary]
-method = "1.05 times the measured fresh-Fortran/native-Julia maximum plus 64 eps"
-rtol = 0.0
-
-[model."CASA-C".fresh_fortran_boundary.prespin]
-"casa_plant.c_fine_root" = 4.5615713428759366e-10
-"casa_plant.c_labile" = 1.4210854715202004e-14
-"casa_plant.c_leaf" = 5.249111888205871e-10
-"casa_plant.c_wood" = 5.026032479094056e-10
-"casa_soil.c_litter_cwd" = 4.5254207603484535e-10
-"casa_soil.c_litter_metabolic" = 5.142238836131075e-10
-"casa_soil.c_litter_structural" = 5.305971884084216e-10
-"casa_soil.c_soil_microbial" = 4.980762066675304e-10
-"casa_soil.c_soil_passive" = 5.13768183552088e-10
-"casa_soil.c_soil_slow" = 5.00356120425316e-10
-
-[model."CASA-C".fresh_fortran_boundary.accelerated_spin]
-"casa_plant.c_fine_root" = 8.226979986147854e-10
-"casa_plant.c_labile" = 1.4210854715202004e-14
-"casa_plant.c_leaf" = 4.787786984272562e-6
-"casa_plant.c_wood" = 4.151260757367937e-9
-"casa_soil.c_litter_cwd" = 7.316810879398617e-10
-"casa_soil.c_litter_metabolic" = 2.5916805274285507e-6
-"casa_soil.c_litter_structural" = 2.273647679133174e-6
-"casa_soil.c_soil_microbial" = 7.915112583742208e-8
-"casa_soil.c_soil_passive" = 5.111453965644941e-9
-"casa_soil.c_soil_slow" = 4.440987046994138e-8
-
-[model."CASA-C".fresh_fortran_boundary.normal_spin]
-"casa_plant.c_fine_root" = 8.226979986147854e-10
-"casa_plant.c_labile" = 1.4210854715202004e-14
-"casa_plant.c_leaf" = 4.869279179671362e-8
-"casa_plant.c_wood" = 4.151260757367937e-9
-"casa_soil.c_litter_cwd" = 7.316810879398617e-10
-"casa_soil.c_litter_metabolic" = 5.032573777846717e-10
-"casa_soil.c_litter_structural" = 5.8584162959529615e-9
-"casa_soil.c_soil_microbial" = 3.448364345845691e-9
-"casa_soil.c_soil_passive" = 5.387101507312031e-8
-"casa_soil.c_soil_slow" = 4.4409870936235056e-8
-
-[model."CASA-C".fresh_fortran_boundary.historical]
-"casa_plant.c_fine_root" = 5.795305224598479e-9
-"casa_plant.c_labile" = 1.4210854715202004e-14
-"casa_plant.c_leaf" = 4.2014645675369015e-7
-"casa_plant.c_wood" = 4.211245551999365e-7
-"casa_soil.c_litter_cwd" = 7.862162766068825e-8
-"casa_soil.c_litter_metabolic" = 4.0612926623411354e-7
-"casa_soil.c_litter_structural" = 1.6222119457742829e-7
-"casa_soil.c_soil_microbial" = 1.2937135443243704e-7
-"casa_soil.c_soil_passive" = 5.1706533144013635e-8
-"casa_soil.c_soil_slow" = 5.764427692483975e-7
+calibration_manifest = "casa_c_full_grid_calibration.toml"
+method = "mixed absolute-relative envelope calibrated from all 4,263 current-Julia/fresh-Fortran cell pairs"

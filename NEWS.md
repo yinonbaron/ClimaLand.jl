@@ -7,6 +7,13 @@ main
   nesting, reviewed Eligibility Gaps, fail-closed nonfinite handling, and
   temporary warnings for the `ordinary` and `extended` aliases. Issue
   [#47](https://github.com/yinonbaron/ClimaLand.jl/issues/47).
+- ![][badge-✨feature] Add the deterministic 80-cell Representative Scope,
+  source-pinned reduced forcing and CASA-C oracle artifacts, and complete
+  pinned CASA-C execution through the Validation Runner, using mixed
+  absolute-relative tolerances calibrated across all 4,263 cells at every
+  fresh-Fortran boundary. The verified public run covers 80/80 cells and
+  passes every scientific and checkpoint check. Issue
+  [#48](https://github.com/yinonbaron/ClimaLand.jl/issues/48).
 - ![][badge-✨feature] Add the Validation Runner's first complete tracer:
   a pinned 11-cell Core CASA-C comparison with fail-closed input verification,
   compact reports, and trustworthy command exit status. Issue

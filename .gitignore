@@ -1,4 +1,5 @@
 *Artifacts.toml
+!test/testbed_validation/validation/Artifacts.toml
 *.DS_Store
 *.txt
 *#

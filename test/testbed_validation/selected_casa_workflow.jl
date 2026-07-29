@@ -882,14 +882,19 @@ function stage_provenance(setup, stage)
     else
         setup.files["casa_c_parameters"]
     end
+    parameter_file = Dict{String, Any}(
+        "source" => abspath(parameter_path),
+        "sha256" => native_workflow().sha256sum(parameter_path),
+    )
+    if stage.name == :accelerated_spin
+        parameter_file["effective_passive_decay_rate_multiplier"] = 10.0
+        parameter_file["adjustment"] = "applied during model construction; equivalent to the archived accelerated-spin parameter file"
+    end
     return Dict(
         "model" => "ClimaLand integrated CASA",
         "configuration" => String(setup.configuration),
         "pft" => "selected-cell $(setup.collection.name) collection",
-        "parameter_file" => Dict(
-            "source" => abspath(parameter_path),
-            "sha256" => native_workflow().sha256sum(parameter_path),
-        ),
+        "parameter_file" => parameter_file,
         "forcing" => [
             Dict(
                 "stage" => String(stage.name),

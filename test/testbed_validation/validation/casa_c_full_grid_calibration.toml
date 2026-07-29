@@ -1,0 +1,4024 @@
+calibration_id = "casa-c-fresh-fortran-full-grid-v1"
+cell_count = 4263
+schema_version = 1
+source = "fresh_fortran_full_grid"
+units = "kg C m^-2"
+
+[method]
+acceptance = "e_i <= atol + rtol*x_i for every eligible pair"
+error = "e_i = abs(Julia_i - Fortran_i)"
+nonfinite = "fail calibration; exclusions require a reviewed scope-manifest gap"
+raw_absolute = "a(r) = max(5e-10 kg C m^-2 + 64eps(Float64), max_i(e_i - r*x_i))"
+reference_magnitude = "x_i = abs(Fortran_i)"
+safety_margin = "multiply both raw envelope coefficients by 1.05, then add 64eps(Float64) to atol"
+selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x)"
+
+[source_provenance]
+execution_source_diff_sha256 = "a4da2b9d4d4be80ff8e6f3257c1b48aff5cbc4b9219535f3777477667a23efb2"
+execution_source_dirty = true
+execution_source_hashes_are_authoritative = true
+git_dirty = true
+git_head_advanced_during_run = true
+git_head_at_manifest_generation = "5f46c3d8519d93afca7eca61e50efcfd9f026b2f"
+git_revision_basis = "f3e400632a0b08d3cb92d8ac501bbb806e282867"
+revision_note = "repository HEAD may advance concurrently; exact execution source is identified by the recorded source hashes and diff hash"
+
+    [source_provenance.fortran.accelerated_spin.boundary]
+    id = "fortran/stages/02-accelerated_spin/casa_final.csv"
+    sha256 = "011510453a9f66140524f58e35c66aea45ab67a0e8b117de3a2d05ad6cb7d25f"
+
+    [source_provenance.fortran.accelerated_spin.grid]
+    id = "fortran/stages/02-accelerated_spin/grid.csv"
+    sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+
+    [source_provenance.fortran.accelerated_spin.metadata]
+    id = "fortran/stages/02-accelerated_spin/stage_metadata.toml"
+    sha256 = "03ceee177e388aecfb96b92d5067f7a2522679132519a6faf0b3c8849c654892"
+
+    [source_provenance.fortran.accelerated_spin.parameters]
+    id = "fortran/stages/02-accelerated_spin/casa_parameters.csv"
+    sha256 = "9dac2d263b43eb5a2df71ed7dbef398bc58ae55421829af8db97018fa93509e2"
+
+    [source_provenance.fortran.accelerated_spin.phenology]
+    id = "fortran/stages/02-accelerated_spin/phenology.txt"
+    sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+    [source_provenance.fortran.accelerated_spin.soil]
+    id = "fortran/stages/02-accelerated_spin/soil.csv"
+    sha256 = "0aa206e5ce635472b4aa3e9d268cb89e2a898f8c8c7567e8f451521bcc395123"
+
+    [source_provenance.fortran.historical.boundary]
+    id = "fortran/stages/04-historical/casa_final.csv"
+    sha256 = "e3029a1047005bce0f742440cb111f6a43ba255e8f3ccbdcd1ec9064b074e88b"
+
+    [source_provenance.fortran.historical.grid]
+    id = "fortran/stages/04-historical/grid.csv"
+    sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+
+    [source_provenance.fortran.historical.metadata]
+    id = "fortran/stages/04-historical/stage_metadata.toml"
+    sha256 = "b6b7cf20deff4d0bb67ffcf03b23a194e2e3af84c1abbb28e0167acd7f3f074c"
+
+    [source_provenance.fortran.historical.parameters]
+    id = "fortran/stages/04-historical/casa_parameters.csv"
+    sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+
+    [source_provenance.fortran.historical.phenology]
+    id = "fortran/stages/04-historical/phenology.txt"
+    sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+    [source_provenance.fortran.historical.soil]
+    id = "fortran/stages/04-historical/soil.csv"
+    sha256 = "0aa206e5ce635472b4aa3e9d268cb89e2a898f8c8c7567e8f451521bcc395123"
+
+    [source_provenance.fortran.normal_spin.boundary]
+    id = "fortran/stages/03-normal_spin/casa_final.csv"
+    sha256 = "9c16b1f67ca054e536597a8c1af37fc8bab5b8059063ac26ada19ad3140055f8"
+
+    [source_provenance.fortran.normal_spin.grid]
+    id = "fortran/stages/03-normal_spin/grid.csv"
+    sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+
+    [source_provenance.fortran.normal_spin.metadata]
+    id = "fortran/stages/03-normal_spin/stage_metadata.toml"
+    sha256 = "40b73509772454c7665d105dd9927123ba1c91027afa70454dde976806a19551"
+
+    [source_provenance.fortran.normal_spin.parameters]
+    id = "fortran/stages/03-normal_spin/casa_parameters.csv"
+    sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+
+    [source_provenance.fortran.normal_spin.phenology]
+    id = "fortran/stages/03-normal_spin/phenology.txt"
+    sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+    [source_provenance.fortran.normal_spin.soil]
+    id = "fortran/stages/03-normal_spin/soil.csv"
+    sha256 = "0aa206e5ce635472b4aa3e9d268cb89e2a898f8c8c7567e8f451521bcc395123"
+
+    [source_provenance.fortran.prespin.boundary]
+    id = "fortran/stages/01-prespin/casa_final.csv"
+    sha256 = "38eac061032b7d25034d28a22337dfe885d29863b30ff98dd007c1f63578fabe"
+
+    [source_provenance.fortran.prespin.grid]
+    id = "fortran/stages/01-prespin/grid.csv"
+    sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+
+    [source_provenance.fortran.prespin.metadata]
+    id = "fortran/stages/01-prespin/stage_metadata.toml"
+    sha256 = "cd89813743f4e82f3a8f3ae54928e8d7c5ccd21bf5720802e4fe28b53b05e4b6"
+
+    [source_provenance.fortran.prespin.parameters]
+    id = "fortran/stages/01-prespin/casa_parameters.csv"
+    sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+
+    [source_provenance.fortran.prespin.phenology]
+    id = "fortran/stages/01-prespin/phenology.txt"
+    sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+    [source_provenance.fortran.prespin.soil]
+    id = "fortran/stages/01-prespin/soil.csv"
+    sha256 = "0aa206e5ce635472b4aa3e9d268cb89e2a898f8c8c7567e8f451521bcc395123"
+
+    [source_provenance.grid]
+    id = "fortran/stages/01-prespin/grid.csv"
+    sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+
+    [source_provenance.julia.accelerated_spin.checkpoint]
+    id = "julia/accelerated_spin/final_checkpoint.hdf5"
+    sha256 = "3ecd56a69e32fb1d2ab8356f51161aae1ceb9f9d4d3f2e9e840ad77a6b619ef1"
+
+    [source_provenance.julia.accelerated_spin.workflow]
+    id = "julia/accelerated_spin/workflow.toml"
+    sha256 = "767ff9d0050d397efa7e243e725fe2a461d684a5401bfbc8d193b94e4ad396c1"
+
+    [source_provenance.julia.historical.checkpoint]
+    id = "julia/historical/final_checkpoint.hdf5"
+    sha256 = "98b18bae73ab79217aa45805dea599527be390fff7fc206ab186b7668b767915"
+
+    [source_provenance.julia.historical.workflow]
+    id = "julia/historical/workflow.toml"
+    sha256 = "461e702bdf8448e4d0b1ad9f7b2f704ececeef907fc6fff50e5c6b48d2db438f"
+
+    [source_provenance.julia.normal_spin.checkpoint]
+    id = "julia/normal_spin/final_checkpoint.hdf5"
+    sha256 = "57b58311d42ca73f3f982fdf793b9673fee0dbc0622fc63c883ae74a3dbf7f11"
+
+    [source_provenance.julia.normal_spin.workflow]
+    id = "julia/normal_spin/workflow.toml"
+    sha256 = "b99eba37f896ac617ed8f29780614114dde3003cc872de42f80176e757997bbb"
+
+    [source_provenance.julia.prespin.checkpoint]
+    id = "julia/prespin/final_checkpoint.hdf5"
+    sha256 = "70b37287697f6ccb9cfbcaf4afc6c8f8076153dd053510e97c0fb2a1dcaffad3"
+
+    [source_provenance.julia.prespin.workflow]
+    id = "julia/prespin/workflow.toml"
+    sha256 = "de08c6642eba8a32a317ce3b4cab3006a9f4e4863fbd2d6becb63f719eddf6c8"
+
+    [source_provenance.model_source."src/integrated/casa_biogeochemistry.jl"]
+    id = "src/integrated/casa_biogeochemistry.jl"
+    sha256 = "b5abde6026a7e878ca3b492f39a5be9d42f5c92b91be43a54b30fa2eaaab8906"
+
+    [source_provenance.model_source."src/standalone/Soil/Biogeochemistry/casa.jl"]
+    id = "src/standalone/Soil/Biogeochemistry/casa.jl"
+    sha256 = "b2cb093cffa6bd74521a62903d7fbeb3fc044f4668b45a9ba199875d7fb9c2a5"
+
+    [source_provenance.model_source."src/standalone/Vegetation/casa.jl"]
+    id = "src/standalone/Vegetation/casa.jl"
+    sha256 = "cf396c4d093da9a6e8dae4b237eba8a259090c9894ea20c9a1a2283498d3ac7b"
+
+    [source_provenance.model_source."test/testbed_validation/native_casa_c_reconstruction.jl"]
+    id = "test/testbed_validation/native_casa_c_reconstruction.jl"
+    sha256 = "0fee930b7d48c8a27960a397e9bf6c0de15045fff28cd5dd6e4cb84f7ee66630"
+
+    [source_provenance.model_source."test/testbed_validation/native_workflow.jl"]
+    id = "test/testbed_validation/native_workflow.jl"
+    sha256 = "58dc03e7a1ea7278335f631461174c1c26816b3a249f567daf73bc707972a145"
+
+[variable.accelerated_spin."casa_plant.c_fine_root"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 2464]
+active_constraint_objective_slopes = [-1.1373571006106027, 0.5965971403893972]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_plant.c_fine_root".absolute_error_kg_c_m2]
+    maximum = 3.384193036914951e-8
+    mean = 1.8835110015822354e-10
+    median = 1.375379810042432e-10
+    minimum = 0.0
+    p90 = 4.2857701771162334e-10
+    p95 = 4.747002638194608e-10
+    p99 = 6.549626692083436e-10
+    p999 = 2.1874280331514004e-9
+
+    [variable.accelerated_spin."casa_plant.c_fine_root".absolute_reference_kg_c_m2]
+    maximum = 5.749159146
+    mean = 0.6015347393893972
+    median = 0.219766518
+    minimum = 0.0
+    p90 = 1.7158028894000004
+    p95 = 2.5990517964000044
+    p99 = 4.233284207980001
+    p999 = 4.783068429106028
+
+    [variable.accelerated_spin."casa_plant.c_fine_root".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.8478693476545306e-9
+    raw_atol = 1.7598620350474432e-9
+    raw_objective = 1.2858009815433208e-8
+    raw_rtol = 1.844972044615614e-8
+    rtol = 1.9372206468463945e-8
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_plant.c_fine_root".relative_error]
+    defined_pair_count = 2952
+    maximum = 0.11303269777090491
+    mean = 7.714066271923131e-5
+    median = 4.2656380655500496e-10
+    minimum = 8.260461036901548e-13
+    p90 = 5.67020129183169e-9
+    p95 = 7.965755550901726e-8
+    p99 = 2.431761219217015e-5
+    p999 = 0.023308605840015807
+    undefined_zero_reference_count = 1311
+
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 3.384193036914951e-8
+    cell_id = 1099
+    fortran_kg_c_m2 = 1.73889184
+    julia_kg_c_m2 = 1.7388918061580696
+    pft = 8
+    rank = 1
+    relative_error = 1.9461779962777622e-8
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.803420384722699e-9
+    cell_id = 10968
+    fortran_kg_c_m2 = 1.501364069
+    julia_kg_c_m2 = 1.5013640718034205
+    pft = 5
+    rank = 2
+    relative_error = 1.8672488856017102e-9
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.676737498319426e-9
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.2857771040000001
+    julia_kg_c_m2 = 1.2857771066767376
+    pft = 5
+    rank = 3
+    relative_error = 2.081805228909587e-9
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.3763349066285855e-9
+    cell_id = 11066
+    fortran_kg_c_m2 = 1.5556771790000001
+    julia_kg_c_m2 = 1.555677181376335
+    pft = 5
+    rank = 4
+    relative_error = 1.5275244367575732e-9
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.2743766869837145e-9
+    cell_id = 1392
+    fortran_kg_c_m2 = 1.595186469
+    julia_kg_c_m2 = 1.5951864712743766
+    pft = 8
+    rank = 5
+    relative_error = 1.425774811398375e-9
+    [[variable.accelerated_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 1.9425115960203243e-9
+    cell_id = 10967
+    fortran_kg_c_m2 = 0.901353603
+    julia_kg_c_m2 = 0.9013536049425116
+    pft = 5
+    rank = 6
+    relative_error = 2.1551049327977494e-9
+
+[variable.accelerated_spin."casa_plant.c_labile"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.accelerated_spin."casa_plant.c_labile".absolute_error_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.accelerated_spin."casa_plant.c_labile".absolute_reference_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.accelerated_spin."casa_plant.c_labile".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_plant.c_labile".relative_error]
+    defined_pair_count = 0
+    undefined_zero_reference_count = 4263
+
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 10
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 15
+    rank = 1
+    relative_error = "undefined_zero_reference"
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 12
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 2
+    relative_error = "undefined_zero_reference"
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 51
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 3
+    relative_error = "undefined_zero_reference"
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 52
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 4
+    relative_error = "undefined_zero_reference"
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 53
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 5
+    relative_error = "undefined_zero_reference"
+    [[variable.accelerated_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 54
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 9
+    rank = 6
+    relative_error = "undefined_zero_reference"
+
+[variable.accelerated_spin."casa_plant.c_leaf"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [63]
+active_constraint_objective_slopes = [0.061997000462350474]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_plant.c_leaf".absolute_error_kg_c_m2]
+    maximum = 5.682160683817723e-6
+    mean = 3.339439874599604e-8
+    median = 1.5236883976754712e-10
+    minimum = 0.0
+    p90 = 4.454625140981606e-10
+    p95 = 4.84196303884854e-10
+    p99 = 1.0101302956783762e-6
+    p999 = 5.1116056293185745e-6
+
+    [variable.accelerated_spin."casa_plant.c_leaf".absolute_reference_kg_c_m2]
+    maximum = 0.5377290450000001
+    mean = 0.06403457246235048
+    median = 0.018940444
+    minimum = 0.0
+    p90 = 0.1958131972
+    p95 = 0.2301720812
+    p99 = 0.42426411376000006
+    p999 = 0.45262079465000066
+
+    [variable.accelerated_spin."casa_plant.c_leaf".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.966268732219464e-6
+    raw_atol = 5.682160683817723e-6
+    raw_objective = 5.682160683817723e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_plant.c_leaf".relative_error]
+    defined_pair_count = 2970
+    maximum = 0.002788691974476349
+    mean = 2.265230956162423e-5
+    median = 3.991734214643456e-9
+    minimum = 4.84269479108154e-13
+    p90 = 4.218751840672096e-8
+    p95 = 1.8912456043732953e-7
+    p99 = 0.0008202407618879924
+    p999 = 0.0025167652539574634
+    undefined_zero_reference_count = 1293
+
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.682160683817723e-6
+    cell_id = 63
+    fortran_kg_c_m2 = 0.002037572
+    julia_kg_c_m2 = 0.002043254160683818
+    pft = 16
+    rank = 1
+    relative_error = 0.002788691974476349
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.610456543231682e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 0.010063456
+    julia_kg_c_m2 = 0.010057845543456768
+    pft = 7
+    rank = 2
+    relative_error = 0.0005575079319899329
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.265959238406979e-6
+    cell_id = 539
+    fortran_kg_c_m2 = 0.002037417
+    julia_kg_c_m2 = 0.002042682959238407
+    pft = 16
+    rank = 3
+    relative_error = 0.0025846251594086917
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.128179171530987e-6
+    cell_id = 13597
+    fortran_kg_c_m2 = 0.0020376210000000003
+    julia_kg_c_m2 = 0.0020427491791715313
+    pft = 16
+    rank = 4
+    relative_error = 0.00251674829201848
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.1277081787215635e-6
+    cell_id = 1118
+    fortran_kg_c_m2 = 0.002036991
+    julia_kg_c_m2 = 0.0020421187081787217
+    pft = 16
+    rank = 5
+    relative_error = 0.0025172954513405133
+    [[variable.accelerated_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 5.066248066496349e-6
+    cell_id = 13791
+    fortran_kg_c_m2 = 0.0020373730000000003
+    julia_kg_c_m2 = 0.0020424392480664967
+    pft = 16
+    rank = 6
+    relative_error = 0.0024866571150674657
+
+[variable.accelerated_spin."casa_plant.c_wood"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 13503]
+active_constraint_objective_slopes = [-0.8084029202681207, 1.3364804987318795]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_plant.c_wood".absolute_error_kg_c_m2]
+    maximum = 3.021507510858612e-7
+    mean = 3.6042947272361183e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.60037563598803e-10
+    p95 = 9.025156177955302e-10
+    p99 = 3.89845840498282e-9
+    p999 = 3.0995913520740765e-8
+
+    [variable.accelerated_spin."casa_plant.c_wood".absolute_reference_kg_c_m2]
+    maximum = 15.567139503
+    mean = 1.3370353387318794
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.90503028760001
+    p95 = 8.1298375641
+    p99 = 10.789405505360001
+    p999 = 12.56428281574623
+
+    [variable.accelerated_spin."casa_plant.c_wood".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 7.227435668866255e-10
+    raw_atol = 6.88313672411343e-10
+    raw_objective = 1.885594539539784e-7
+    raw_rtol = 1.4051321968778682e-7
+    rtol = 1.4753888067217617e-7
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_plant.c_wood".relative_error]
+    defined_pair_count = 1974
+    maximum = 0.38277342795046765
+    mean = 0.00027827419580770155
+    median = 2.2477614203233633e-10
+    minimum = 5.389348475777887e-14
+    p90 = 3.221956313664579e-8
+    p95 = 8.12966397680079e-7
+    p99 = 0.0003211647643842217
+    p999 = 0.03849896782515847
+    undefined_zero_reference_count = 2289
+
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.021507510858612e-7
+    cell_id = 1099
+    fortran_kg_c_m2 = 2.145438259
+    julia_kg_c_m2 = 2.145438561150751
+    pft = 8
+    rank = 1
+    relative_error = 1.4083404629257205e-7
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 6.003007690935647e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 9.390564241
+    julia_kg_c_m2 = 9.390564180969923
+    pft = 5
+    rank = 2
+    relative_error = 6.392595308305337e-9
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.397942454659187e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 11.414655736
+    julia_kg_c_m2 = 11.414655692020576
+    pft = 5
+    rank = 3
+    relative_error = 3.852891016930786e-9
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.606565712743759e-8
+    cell_id = 10968
+    fortran_kg_c_m2 = 11.094656257
+    julia_kg_c_m2 = 11.094656220934343
+    pft = 5
+    rank = 4
+    relative_error = 3.2507232573954264e-9
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.4324530773233164e-8
+    cell_id = 10967
+    fortran_kg_c_m2 = 6.5869584969999995
+    julia_kg_c_m2 = 6.586958462675469
+    pft = 5
+    rank = 5
+    relative_error = 5.2109833072223116e-9
+    [[variable.accelerated_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 2.1619884771340026e-8
+    cell_id = 1392
+    fortran_kg_c_m2 = 1.957406395
+    julia_kg_c_m2 = 1.9574063733801152
+    pft = 8
+    rank = 6
+    relative_error = 1.1045169172107475e-8
+
+[variable.accelerated_spin."casa_soil.c_litter_cwd"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099]
+active_constraint_objective_slopes = [0.17719421968191407]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_litter_cwd".absolute_error_kg_c_m2]
+    maximum = 3.260891451306591e-8
+    mean = 1.4518856561997333e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.074240889107017e-10
+    p95 = 4.6410989803341545e-10
+    p99 = 6.056425658207416e-10
+    p999 = 7.27950627033051e-9
+
+    [variable.accelerated_spin."casa_soil.c_litter_cwd".absolute_reference_kg_c_m2]
+    maximum = 7.525825605
+    mean = 0.3780753066819141
+    median = 0.0
+    minimum = 0.0
+    p90 = 1.3110966892000004
+    p95 = 2.1514137644000004
+    p99 = 5.436948523880009
+    p999 = 7.246193772272006
+
+    [variable.accelerated_spin."casa_soil.c_litter_cwd".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.423937444957393e-8
+    raw_atol = 3.260891451306591e-8
+    raw_objective = 3.260891451306591e-8
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_litter_cwd".relative_error]
+    defined_pair_count = 1973
+    maximum = 0.08946506176902999
+    mean = 0.00012910596962165114
+    median = 8.243645092503846e-10
+    minimum = 1.0129028009801875e-13
+    p90 = 1.3730720503679652e-7
+    p95 = 3.0439982715125e-6
+    p99 = 0.0006634745059099679
+    p999 = 0.032063749720819996
+    undefined_zero_reference_count = 2290
+
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 3.260891451306591e-8
+    cell_id = 1099
+    fortran_kg_c_m2 = 0.200881087
+    julia_kg_c_m2 = 0.20088111960891453
+    pft = 8
+    rank = 1
+    relative_error = 1.62329440765451e-7
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 1.584935427345613e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.8202285589999998
+    julia_kg_c_m2 = 1.8202285431506455
+    pft = 5
+    rank = 2
+    relative_error = 8.707342929595321e-9
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 1.222220102903293e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 2.2677004689999998
+    julia_kg_c_m2 = 2.2677004567777987
+    pft = 5
+    rank = 3
+    relative_error = 5.3896893333636e-9
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 8.568767029260016e-9
+    cell_id = 10968
+    fortran_kg_c_m2 = 1.9690210750000001
+    julia_kg_c_m2 = 1.969021066431233
+    pft = 5
+    rank = 4
+    relative_error = 4.351790408977728e-9
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.622724451650242e-9
+    cell_id = 10967
+    fortran_kg_c_m2 = 1.166745062
+    julia_kg_c_m2 = 1.1667450543772755
+    pft = 5
+    rank = 5
+    relative_error = 6.533324802406785e-9
+    [[variable.accelerated_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 6.312731393176563e-9
+    cell_id = 11064
+    fortran_kg_c_m2 = 0.492392149
+    julia_kg_c_m2 = 0.4923921426872686
+    pft = 7
+    rank = 6
+    relative_error = 1.2820536245342455e-8
+
+[variable.accelerated_spin."casa_soil.c_litter_metabolic"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1118]
+active_constraint_objective_slopes = [0.04806035532043163]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_litter_metabolic".absolute_error_kg_c_m2]
+    maximum = 3.196256088951385e-6
+    mean = 1.0396770843860223e-8
+    median = 1.3360855477539957e-10
+    minimum = 0.0
+    p90 = 4.3101905933262683e-10
+    p95 = 4.726520425046843e-10
+    p99 = 6.995450859710743e-8
+    p999 = 2.70763800188435e-6
+
+    [variable.accelerated_spin."casa_soil.c_litter_metabolic".absolute_reference_kg_c_m2]
+    maximum = 0.43040418199999997
+    mean = 0.04806892332043163
+    median = 0.025387533
+    minimum = 0.0
+    p90 = 0.12762579699999999
+    p95 = 0.16795290480000008
+    p99 = 0.31666930294
+    p999 = 0.40436079449600026
+
+    [variable.accelerated_spin."casa_soil.c_litter_metabolic".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.356068907609809e-6
+    raw_atol = 3.196256088951385e-6
+    raw_objective = 3.196256088951385e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_litter_metabolic".relative_error]
+    defined_pair_count = 2947
+    maximum = 4.415255123453245
+    mean = 0.004331367761926787
+    median = 4.260393080946214e-9
+    minimum = 1.498041414760562e-12
+    p90 = 9.806842722170975e-8
+    p95 = 6.111610058684777e-6
+    p99 = 0.05946941156446105
+    p999 = 0.6163347280536471
+    undefined_zero_reference_count = 1316
+
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 3.196256088951385e-6
+    cell_id = 1118
+    fortran_kg_c_m2 = 8.568e-6
+    julia_kg_c_m2 = 5.371743911048615e-6
+    pft = 16
+    rank = 1
+    relative_error = 0.37304576201580125
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 3.126000627404897e-6
+    cell_id = 1212
+    fortran_kg_c_m2 = 7.079999999999999e-7
+    julia_kg_c_m2 = 3.834000627404897e-6
+    pft = 16
+    rank = 2
+    relative_error = 4.415255123453245
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.92177313805917e-6
+    cell_id = 63
+    fortran_kg_c_m2 = 1.8784e-5
+    julia_kg_c_m2 = 1.586222686194083e-5
+    pft = 16
+    rank = 3
+    relative_error = 0.1555458442322812
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.7806936845401765e-6
+    cell_id = 2076
+    fortran_kg_c_m2 = 1.492e-6
+    julia_kg_c_m2 = 4.272693684540177e-6
+    pft = 16
+    rank = 4
+    relative_error = 1.8637357134987778
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.721035023438134e-6
+    cell_id = 1789
+    fortran_kg_c_m2 = 4.309000000000001e-6
+    julia_kg_c_m2 = 7.030035023438135e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.6314771463072949
+    [[variable.accelerated_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.6699013533854684e-6
+    cell_id = 256
+    fortran_kg_c_m2 = 0.00012417599999999998
+    julia_kg_c_m2 = 0.00012684590135338545
+    pft = 16
+    rank = 6
+    relative_error = 0.021500945056898826
+
+[variable.accelerated_spin."casa_soil.c_litter_structural"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [63]
+active_constraint_objective_slopes = [0.424561936531316]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_litter_structural".absolute_error_kg_c_m2]
+    maximum = 2.9734381656289834e-6
+    mean = 1.0200915817271645e-8
+    median = 1.4134132753085282e-10
+    minimum = 0.0
+    p90 = 4.4724556835795683e-10
+    p95 = 4.832951150390841e-10
+    p99 = 1.1650922431602629e-7
+    p999 = 2.2381497799548506e-6
+
+    [variable.accelerated_spin."casa_soil.c_litter_structural".absolute_reference_kg_c_m2]
+    maximum = 5.043625307
+    mean = 0.424633070531316
+    median = 0.178477851
+    minimum = 0.0
+    p90 = 1.1834887726000003
+    p95 = 1.5594091832000005
+    p99 = 3.6245718034600003
+    p999 = 4.902259866868006
+
+    [variable.accelerated_spin."casa_soil.c_litter_structural".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.1221100881212874e-6
+    raw_atol = 2.9734381656289834e-6
+    raw_objective = 2.9734381656289834e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_litter_structural".relative_error]
+    defined_pair_count = 2950
+    maximum = 1.6005086199546574
+    mean = 0.002523260632638259
+    median = 5.281599775895435e-10
+    minimum = 4.2900485367487964e-13
+    p90 = 1.4407998010787358e-8
+    p95 = 1.2797298242591163e-6
+    p99 = 0.026884663906961835
+    p999 = 0.5716323781716037
+    undefined_zero_reference_count = 1313
+
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.9734381656289834e-6
+    cell_id = 63
+    fortran_kg_c_m2 = 7.1134e-5
+    julia_kg_c_m2 = 6.816056183437102e-5
+    pft = 16
+    rank = 1
+    relative_error = 0.04180051966189141
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.655779492612995e-6
+    cell_id = 1118
+    fortran_kg_c_m2 = 3.5849e-5
+    julia_kg_c_m2 = 3.319322050738701e-5
+    pft = 16
+    rank = 2
+    relative_error = 0.07408238702928938
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.5584557033412603e-6
+    cell_id = 1212
+    fortran_kg_c_m2 = 4.5139999999999995e-6
+    julia_kg_c_m2 = 7.07245570334126e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.5667823888660303
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.4556685116300077e-6
+    cell_id = 256
+    fortran_kg_c_m2 = 0.0005621119999999999
+    julia_kg_c_m2 = 0.0005645676685116299
+    pft = 16
+    rank = 4
+    relative_error = 0.004368646304704415
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.2639844889452764e-6
+    cell_id = 447
+    fortran_kg_c_m2 = 5.1871e-5
+    julia_kg_c_m2 = 4.960701551105472e-5
+    pft = 16
+    rank = 5
+    relative_error = 0.043646439994318144
+    [[variable.accelerated_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.165378729439727e-6
+    cell_id = 923
+    fortran_kg_c_m2 = 2.0031000000000002e-5
+    julia_kg_c_m2 = 1.7865621270560275e-5
+    pft = 16
+    rank = 6
+    relative_error = 0.1081013793340186
+
+[variable.accelerated_spin."casa_soil.c_soil_microbial"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.3114631669690359]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_soil_microbial".absolute_error_kg_c_m2]
+    maximum = 2.0106468736259022e-6
+    mean = 2.746006668026001e-9
+    median = 1.4292123040604565e-10
+    minimum = 0.0
+    p90 = 4.394362068671498e-10
+    p95 = 4.779464563703373e-10
+    p99 = 3.5135181740863116e-8
+    p999 = 6.833220966031492e-7
+
+    [variable.accelerated_spin."casa_soil.c_soil_microbial".absolute_reference_kg_c_m2]
+    maximum = 4.024207157
+    mean = 0.3115182109690359
+    median = 0.111642241
+    minimum = 0.0
+    p90 = 0.7197402310000001
+    p95 = 1.6167752013000014
+    p99 = 3.0156145216600008
+    p999 = 3.7102695027220136
+
+    [variable.accelerated_spin."casa_soil.c_soil_microbial".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 2.111179231518052e-6
+    raw_atol = 2.0106468736259022e-6
+    raw_objective = 2.0106468736259022e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_soil_microbial".relative_error]
+    defined_pair_count = 2950
+    maximum = 0.9806409463759872
+    mean = 0.0017943155704720835
+    median = 9.419297470552436e-10
+    minimum = 2.2206324661139868e-13
+    p90 = 4.7734573971677673e-8
+    p95 = 2.375480618130106e-6
+    p99 = 0.012839675194401223
+    p999 = 0.3608871649530517
+    undefined_zero_reference_count = 1313
+
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 2.0106468736259022e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 5.5044000000000004e-5
+    julia_kg_c_m2 = 5.7054646873625906e-5
+    pft = 7
+    rank = 1
+    relative_error = 0.03652799348931586
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0316342755875386e-6
+    cell_id = 636
+    fortran_kg_c_m2 = 1.052e-6
+    julia_kg_c_m2 = 2.0836342755875387e-6
+    pft = 16
+    rank = 2
+    relative_error = 0.9806409463759872
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0167234265032481e-6
+    cell_id = 2076
+    fortran_kg_c_m2 = 4.708999999999999e-6
+    julia_kg_c_m2 = 3.692276573496751e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.21591068730160295
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 8.864186492723718e-7
+    cell_id = 1789
+    fortran_kg_c_m2 = 1.4787e-5
+    julia_kg_c_m2 = 1.3900581350727627e-5
+    pft = 16
+    rank = 4
+    relative_error = 0.05994580707867531
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 7.874471587877523e-7
+    cell_id = 1884
+    fortran_kg_c_m2 = 2.599e-6
+    julia_kg_c_m2 = 1.8115528412122477e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.3029808229271844
+    [[variable.accelerated_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 3.9002325731937086e-7
+    cell_id = 354
+    fortran_kg_c_m2 = 3.4231e-5
+    julia_kg_c_m2 = 3.462102325731937e-5
+    pft = 16
+    rank = 6
+    relative_error = 0.011393861041727408
+
+[variable.accelerated_spin."casa_soil.c_soil_passive"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 13597]
+active_constraint_objective_slopes = [-0.0037631682134647293, 0.18284557878653526]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_soil_passive".absolute_error_kg_c_m2]
+    maximum = 2.5044879489732885e-7
+    mean = 5.825462604908016e-10
+    median = 1.563162932427531e-10
+    minimum = 0.0
+    p90 = 4.903126506894805e-10
+    p95 = 1.5689305021826528e-9
+    p99 = 8.975744435202358e-9
+    p999 = 3.8797646154721e-8
+
+    [variable.accelerated_spin."casa_soil.c_soil_passive".absolute_reference_kg_c_m2]
+    maximum = 2.307578533
+    mean = 0.18284560978653527
+    median = 0.075036271
+    minimum = 0.0
+    p90 = 0.4441674950000002
+    p95 = 0.7609969122000015
+    p99 = 1.5320577061200003
+    p999 = 1.9434463482320254
+
+    [variable.accelerated_spin."casa_soil.c_soil_passive".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.0298551526782878e-8
+    raw_atol = 9.80813077707444e-9
+    raw_objective = 2.455960151525069e-7
+    raw_rtol = 1.2895463262733246e-6
+    rtol = 1.354023642586991e-6
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_soil_passive".relative_error]
+    defined_pair_count = 2952
+    maximum = 0.6498811930307734
+    mean = 0.001199923172396754
+    median = 1.878370849295618e-9
+    minimum = 1.4116589158308559e-14
+    p90 = 9.656066021621383e-8
+    p95 = 1.8835117007157932e-6
+    p99 = 0.0027532023327477974
+    p999 = 0.31950227202434545
+    undefined_zero_reference_count = 1311
+
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 2.5044879489732885e-7
+    cell_id = 1099
+    fortran_kg_c_m2 = 0.186608778
+    julia_kg_c_m2 = 0.1866085275512051
+    pft = 8
+    rank = 1
+    relative_error = 1.3421061837580268e-6
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 9.265961603555084e-8
+    cell_id = 11366
+    fortran_kg_c_m2 = 0.360381258
+    julia_kg_c_m2 = 0.36038116534038395
+    pft = 7
+    rank = 2
+    relative_error = 2.5711552412514984e-7
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.940154879617964e-8
+    cell_id = 1094
+    fortran_kg_c_m2 = 0.419247906
+    julia_kg_c_m2 = 0.4192478565984512
+    pft = 9
+    rank = 3
+    relative_error = 1.1783374010740947e-7
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.326803648702082e-8
+    cell_id = 11064
+    fortran_kg_c_m2 = 1.1734922120000002
+    julia_kg_c_m2 = 1.1734921687319637
+    pft = 7
+    rank = 4
+    relative_error = 3.687117481016637e-8
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 3.9583319483282864e-8
+    cell_id = 12138
+    fortran_kg_c_m2 = 0.235557129
+    julia_kg_c_m2 = 0.23555708941668052
+    pft = 14
+    rank = 5
+    relative_error = 1.680412715646694e-7
+    [[variable.accelerated_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 3.658456632082974e-8
+    cell_id = 1578
+    fortran_kg_c_m2 = 0.480250285
+    julia_kg_c_m2 = 0.4802502484154337
+    pft = 9
+    rank = 6
+    relative_error = 7.617812516411049e-8
+
+[variable.accelerated_spin."casa_soil.c_soil_slow"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [13791]
+active_constraint_objective_slopes = [4.719214590749941]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.accelerated_spin."casa_soil.c_soil_slow".absolute_error_kg_c_m2]
+    maximum = 1.7475025320313208e-6
+    mean = 8.443898379976024e-9
+    median = 1.750937173028433e-10
+    minimum = 0.0
+    p90 = 1.684662009893146e-9
+    p95 = 1.1752009479450325e-8
+    p99 = 2.1184376030115209e-7
+    p999 = 9.942021207771788e-7
+
+    [variable.accelerated_spin."casa_soil.c_soil_slow".absolute_reference_kg_c_m2]
+    maximum = 59.657672478
+    mean = 4.719223686749942
+    median = 1.731550772
+    minimum = 0.0
+    p90 = 12.2563856282
+    p95 = 24.06069551800001
+    p99 = 41.89938088816
+    p999 = 54.95517207611228
+
+    [variable.accelerated_spin."casa_soil.c_soil_slow".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.8348776728437417e-6
+    raw_atol = 1.7475025320313208e-6
+    raw_objective = 1.7475025320313208e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.accelerated_spin."casa_soil.c_soil_slow".relative_error]
+    defined_pair_count = 2953
+    maximum = 0.6441177502384009
+    mean = 0.0012819041149287086
+    median = 1.1026627600320036e-10
+    minimum = 4.1073652973079605e-14
+    p90 = 1.1440428618452715e-8
+    p95 = 1.463234642234901e-7
+    p99 = 0.0038404493651617907
+    p999 = 0.4206752780652056
+    undefined_zero_reference_count = 1310
+
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.7475025320313208e-6
+    cell_id = 13791
+    fortran_kg_c_m2 = 9.096e-6
+    julia_kg_c_m2 = 7.34849746796868e-6
+    pft = 16
+    rank = 1
+    relative_error = 0.19211769261558054
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.6926473271894338e-6
+    cell_id = 11366
+    fortran_kg_c_m2 = 7.7241212290000005
+    julia_kg_c_m2 = 7.724119536352673
+    pft = 7
+    rank = 2
+    relative_error = 2.1913785102626768e-7
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.1637878121681649e-6
+    cell_id = 928
+    fortran_kg_c_m2 = 0.000104275
+    julia_kg_c_m2 = 0.00010311121218783184
+    pft = 16
+    rank = 3
+    relative_error = 0.01116075581077118
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.1252737096664865e-6
+    cell_id = 13597
+    fortran_kg_c_m2 = 1.7470000000000002e-6
+    julia_kg_c_m2 = 6.217262903335138e-7
+    pft = 16
+    rank = 4
+    relative_error = 0.6441177502384009
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0001225090921828e-6
+    cell_id = 1884
+    fortran_kg_c_m2 = 6.1293e-5
+    julia_kg_c_m2 = 6.229312250909218e-5
+    pft = 16
+    rank = 5
+    relative_error = 0.016317075507679225
+    [[variable.accelerated_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 9.775256071264948e-7
+    cell_id = 1094
+    fortran_kg_c_m2 = 10.675048285999999
+    julia_kg_c_m2 = 10.675047308474392
+    pft = 9
+    rank = 6
+    relative_error = 9.157107124362986e-8
+
+[variable.historical."casa_plant.c_fine_root"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [12138]
+active_constraint_objective_slopes = [-0.05323073364461639]
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.historical."casa_plant.c_fine_root".absolute_error_kg_c_m2]
+    maximum = 1.0643082665184878e-6
+    mean = 9.056130001118101e-10
+    median = 1.588815615530259e-10
+    minimum = 0.0
+    p90 = 4.981441148466104e-10
+    p95 = 1.8718304933829094e-9
+    p99 = 6.83972173565197e-9
+    p999 = 3.6375981007809695e-8
+
+    [variable.historical."casa_plant.c_fine_root".absolute_reference_kg_c_m2]
+    maximum = 5.805561095
+    mean = 0.6833259333553836
+    median = 0.26441331500000004
+    minimum = 0.0
+    p90 = 1.8929355728000001
+    p95 = 2.7622204043000016
+    p99 = 4.8639069803
+    p999 = 5.4130711494620005
+
+    [variable.historical."casa_plant.c_fine_root".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 9.874271570742196e-7
+    raw_rtol = 1.4442992643601082e-6
+    rtol = 1.5165142275781136e-6
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_plant.c_fine_root".relative_error]
+    defined_pair_count = 2951
+    maximum = 0.10597270210229912
+    mean = 7.5097178921624e-5
+    median = 4.889639566840893e-10
+    minimum = 4.2113828478025477e-13
+    p90 = 8.02738797793644e-9
+    p95 = 5.3069650841219316e-8
+    p99 = 3.537549812922906e-5
+    p999 = 0.020019979778324783
+    undefined_zero_reference_count = 1312
+
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0643082665184878e-6
+    cell_id = 12138
+    fortran_kg_c_m2 = 0.736556667
+    julia_kg_c_m2 = 0.7365556026917335
+    pft = 14
+    rank = 1
+    relative_error = 1.4449781180495211e-6
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 7.727680277902493e-7
+    cell_id = 622
+    fortran_kg_c_m2 = 2.31871079
+    julia_kg_c_m2 = 2.3187115627680277
+    pft = 8
+    rank = 2
+    relative_error = 3.3327486598285477e-7
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 5.293121962957059e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.349825169
+    julia_kg_c_m2 = 1.3498251160687804
+    pft = 5
+    rank = 3
+    relative_error = 3.921338914489495e-8
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 3.815361893089175e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 1.645666303
+    julia_kg_c_m2 = 1.6456662648463811
+    pft = 5
+    rank = 4
+    relative_error = 2.318429857945007e-8
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 3.801395376257233e-8
+    cell_id = 11086
+    fortran_kg_c_m2 = 4.436124445000001
+    julia_kg_c_m2 = 4.436124483013955
+    pft = 2
+    rank = 5
+    relative_error = 8.569181102531563e-9
+    [[variable.historical."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 3.17621493550746e-8
+    cell_id = 807
+    fortran_kg_c_m2 = 0.920431145
+    julia_kg_c_m2 = 0.9204311767621494
+    pft = 9
+    rank = 6
+    relative_error = 3.450790374447248e-8
+
+[variable.historical."casa_plant.c_labile"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.historical."casa_plant.c_labile".absolute_error_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.historical."casa_plant.c_labile".absolute_reference_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.historical."casa_plant.c_labile".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_plant.c_labile".relative_error]
+    defined_pair_count = 0
+    undefined_zero_reference_count = 4263
+
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 10
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 15
+    rank = 1
+    relative_error = "undefined_zero_reference"
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 12
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 2
+    relative_error = "undefined_zero_reference"
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 51
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 3
+    relative_error = "undefined_zero_reference"
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 52
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 4
+    relative_error = "undefined_zero_reference"
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 53
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 5
+    relative_error = "undefined_zero_reference"
+    [[variable.historical."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 54
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 9
+    rank = 6
+    relative_error = "undefined_zero_reference"
+
+[variable.historical."casa_plant.c_leaf"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.05903714894604739]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_plant.c_leaf".absolute_error_kg_c_m2]
+    maximum = 1.539111329368001e-5
+    mean = 3.4827985838878764e-8
+    median = 1.5545734144417622e-10
+    minimum = 0.0
+    p90 = 4.653020468925463e-10
+    p95 = 5.429830530079981e-10
+    p99 = 1.0225967498945398e-6
+    p999 = 4.431916534739021e-6
+
+    [variable.historical."casa_plant.c_leaf".absolute_reference_kg_c_m2]
+    maximum = 0.582247795
+    mean = 0.06910457894604739
+    median = 0.021423156999999998
+    minimum = 0.0
+    p90 = 0.19592428280000002
+    p95 = 0.23087502470000001
+    p99 = 0.44933600338
+    p999 = 0.48256770276200234
+
+    [variable.historical."casa_plant.c_leaf".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.6160668972574863e-5
+    raw_atol = 1.539111329368001e-5
+    raw_objective = 1.539111329368001e-5
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_plant.c_leaf".relative_error]
+    defined_pair_count = 2970
+    maximum = 0.005274981630846479
+    mean = 2.2315404370473025e-5
+    median = 3.502122718217441e-9
+    minimum = 2.460279262071172e-13
+    p90 = 4.4195701089323285e-8
+    p95 = 2.3246344289687874e-7
+    p99 = 0.0006826604663118247
+    p999 = 0.002171744956834823
+    undefined_zero_reference_count = 1293
+
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 1.539111329368001e-5
+    cell_id = 2075
+    fortran_kg_c_m2 = 0.01006743
+    julia_kg_c_m2 = 0.01005203888670632
+    pft = 7
+    rank = 1
+    relative_error = 0.0015288026133462073
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0777589269027246e-5
+    cell_id = 3141
+    fortran_kg_c_m2 = 0.002043152
+    julia_kg_c_m2 = 0.0020323744107309727
+    pft = 16
+    rank = 2
+    relative_error = 0.005274981630846479
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.647113529027743e-6
+    cell_id = 353
+    fortran_kg_c_m2 = 0.002037603
+    julia_kg_c_m2 = 0.0020422501135290276
+    pft = 16
+    rank = 3
+    relative_error = 0.0022806766229867856
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.551038779022302e-6
+    cell_id = 541
+    fortran_kg_c_m2 = 0.002043311
+    julia_kg_c_m2 = 0.0020387599612209776
+    pft = 16
+    rank = 4
+    relative_error = 0.0022272863891117417
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.433116778829963e-6
+    cell_id = 924
+    fortran_kg_c_m2 = 0.002042941
+    julia_kg_c_m2 = 0.00203850788322117
+    pft = 16
+    rank = 5
+    relative_error = 0.002169968089548334
+    [[variable.historical."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.428535694513385e-6
+    cell_id = 158
+    fortran_kg_c_m2 = 0.002041715
+    julia_kg_c_m2 = 0.0020372864643054866
+    pft = 16
+    rank = 6
+    relative_error = 0.002169027359113973
+
+[variable.historical."casa_plant.c_wood"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [622, 11172]
+active_constraint_objective_slopes = [-1.0983403766812105, 1.4445763243187895]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_plant.c_wood".absolute_error_kg_c_m2]
+    maximum = 6.634580586251104e-6
+    mean = 4.633529901727727e-9
+    median = 0.0
+    minimum = 0.0
+    p90 = 2.308134022625812e-9
+    p95 = 9.795656094949154e-9
+    p99 = 7.100749670918566e-8
+    p999 = 3.139541047403517e-7
+
+    [variable.historical."casa_plant.c_wood".absolute_reference_kg_c_m2]
+    maximum = 16.205926141
+    mean = 1.4445871303187894
+    median = 0.0
+    minimum = 0.0
+    p90 = 5.354957599600006
+    p95 = 8.845415815
+    p99 = 11.3602392669
+    p999 = 13.260785053346059
+
+    [variable.historical."casa_plant.c_wood".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.297516800067679e-10
+    raw_atol = 5.045118753829073e-10
+    raw_objective = 3.769192723481159e-6
+    raw_rtol = 2.608834131572325e-6
+    rtol = 2.7392758381509413e-6
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_plant.c_wood".relative_error]
+    defined_pair_count = 1972
+    maximum = 0.04518950390690156
+    mean = 6.379597712404599e-5
+    median = 3.680852117483893e-10
+    minimum = 3.75666113363858e-13
+    p90 = 1.1107701254331671e-7
+    p95 = 6.630623393984002e-7
+    p99 = 0.0001803007988298222
+    p999 = 0.020220601071816884
+    undefined_zero_reference_count = 2291
+
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 6.634580586251104e-6
+    cell_id = 622
+    fortran_kg_c_m2 = 2.542927507
+    julia_kg_c_m2 = 2.5429208724194137
+    pft = 8
+    rank = 1
+    relative_error = 2.609032529628893e-6
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.369306667584283e-7
+    cell_id = 807
+    fortran_kg_c_m2 = 0.916988949
+    julia_kg_c_m2 = 0.9169885120693333
+    pft = 9
+    rank = 2
+    relative_error = 4.764841138324648e-7
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.2273504874401624e-7
+    cell_id = 11065
+    fortran_kg_c_m2 = 9.594963535000002
+    julia_kg_c_m2 = 9.594963112264953
+    pft = 5
+    rank = 3
+    relative_error = 4.405801514534012e-8
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.0107236481956576e-7
+    cell_id = 1394
+    fortran_kg_c_m2 = 0.31338456000000003
+    julia_kg_c_m2 = 0.3133841589276352
+    pft = 16
+    rank = 4
+    relative_error = 1.2798089504459496e-6
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.3144254452111e-7
+    cell_id = 11066
+    fortran_kg_c_m2 = 11.616706316
+    julia_kg_c_m2 = 11.616705984557456
+    pft = 5
+    rank = 5
+    relative_error = 2.8531542031376426e-8
+    [[variable.historical."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 2.6469277436547145e-7
+    cell_id = 1392
+    fortran_kg_c_m2 = 2.334484433
+    julia_kg_c_m2 = 2.3344841683072257
+    pft = 8
+    rank = 6
+    relative_error = 1.1338382497814302e-7
+
+[variable.historical."casa_soil.c_litter_cwd"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [622]
+active_constraint_objective_slopes = [0.1252434374578935]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_litter_cwd".absolute_error_kg_c_m2]
+    maximum = 7.353246796459878e-7
+    mean = 6.54618010965171e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.738555603456264e-10
+    p95 = 1.159726736865711e-9
+    p99 = 9.482229962887178e-9
+    p999 = 5.763845394724476e-8
+
+    [variable.historical."casa_soil.c_litter_cwd".absolute_reference_kg_c_m2]
+    maximum = 7.151776786
+    mean = 0.3588149894578935
+    median = 0.0
+    minimum = 0.0
+    p90 = 1.2256831172000013
+    p95 = 2.0583717508
+    p99 = 5.2230569826
+    p999 = 6.664452254442012
+
+    [variable.historical."casa_soil.c_litter_cwd".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 7.72090927839142e-7
+    raw_atol = 7.353246796459878e-7
+    raw_objective = 7.353246796459878e-7
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_litter_cwd".relative_error]
+    defined_pair_count = 1972
+    maximum = 0.37307795790343895
+    mean = 0.00044481910442184297
+    median = 1.3313445015909569e-9
+    minimum = 3.7207609193906373e-13
+    p90 = 1.8634338845615908e-7
+    p95 = 1.913416383112198e-6
+    p99 = 0.0005111780574121932
+    p999 = 0.13419091829982388
+    undefined_zero_reference_count = 2291
+
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.353246796459878e-7
+    cell_id = 622
+    fortran_kg_c_m2 = 0.233571552
+    julia_kg_c_m2 = 0.23357081667532034
+    pft = 8
+    rank = 1
+    relative_error = 3.14817739296431e-6
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.742594143600456e-8
+    cell_id = 807
+    fortran_kg_c_m2 = 0.120826112
+    julia_kg_c_m2 = 0.12082603457405856
+    pft = 9
+    rank = 2
+    relative_error = 6.408047081412713e-7
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.725379802536736e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.7999625989999999
+    julia_kg_c_m2 = 1.7999625217462019
+    pft = 5
+    rank = 3
+    relative_error = 4.291966847993788e-8
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.48779418399681e-8
+    cell_id = 1394
+    fortran_kg_c_m2 = 0.04825769
+    julia_kg_c_m2 = 0.04825761512205816
+    pft = 16
+    rank = 4
+    relative_error = 1.5516271466779306e-6
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 6.23535831856259e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 2.2051546899999996
+    julia_kg_c_m2 = 2.2051546276464165
+    pft = 5
+    rank = 5
+    relative_error = 2.8276285318390023e-8
+    [[variable.historical."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.4356906703235666e-8
+    cell_id = 11366
+    fortran_kg_c_m2 = 0.183655973
+    julia_kg_c_m2 = 0.1836559286430933
+    pft = 7
+    rank = 6
+    relative_error = 2.415217211761235e-7
+
+[variable.historical."casa_soil.c_litter_metabolic"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [3141]
+active_constraint_objective_slopes = [0.0490077079099226]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_litter_metabolic".absolute_error_kg_c_m2]
+    maximum = 5.675755447472823e-6
+    mean = 9.199730117023492e-9
+    median = 1.4223178190775343e-10
+    minimum = 0.0
+    p90 = 4.44999309623384e-10
+    p95 = 4.783519526449162e-10
+    p99 = 5.7901104890014447e-8
+    p999 = 2.081944330033518e-6
+
+    [variable.historical."casa_soil.c_litter_metabolic".absolute_reference_kg_c_m2]
+    maximum = 0.44883697
+    mean = 0.0494403699099226
+    median = 0.027062667999999998
+    minimum = 0.0
+    p90 = 0.13080355100000005
+    p95 = 0.17238041710000007
+    p99 = 0.31892579190000037
+    p999 = 0.39775850977600014
+
+    [variable.historical."casa_soil.c_litter_metabolic".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.959543234057319e-6
+    raw_atol = 5.675755447472823e-6
+    raw_objective = 5.675755447472823e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_litter_metabolic".relative_error]
+    defined_pair_count = 2944
+    maximum = 3.6328420847639014
+    mean = 0.004046311107276452
+    median = 4.338123504500978e-9
+    minimum = 5.364722728012512e-12
+    p90 = 9.382318279995381e-8
+    p95 = 3.43628672844348e-6
+    p99 = 0.03258282084799191
+    p999 = 0.7330295063014447
+    undefined_zero_reference_count = 1319
+
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 5.675755447472823e-6
+    cell_id = 3141
+    fortran_kg_c_m2 = 0.000432662
+    julia_kg_c_m2 = 0.0004383377554474728
+    pft = 16
+    rank = 1
+    relative_error = 0.013118220337059467
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.4890301050981115e-6
+    cell_id = 13792
+    fortran_kg_c_m2 = 8.809000000000002e-6
+    julia_kg_c_m2 = 1.1298030105098113e-5
+    pft = 16
+    rank = 2
+    relative_error = 0.28255535305915663
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.3533921014340373e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 3.794e-6
+    julia_kg_c_m2 = 6.147392101434037e-6
+    pft = 7
+    rank = 3
+    relative_error = 0.6202931210948965
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.1745411877600106e-6
+    cell_id = 828
+    fortran_kg_c_m2 = 2.517e-6
+    julia_kg_c_m2 = 4.691541187760011e-6
+    pft = 16
+    rank = 4
+    relative_error = 0.8639416717361981
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.087648542265989e-6
+    cell_id = 446
+    fortran_kg_c_m2 = 8.562e-6
+    julia_kg_c_m2 = 6.4743514577340114e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.24382720652487605
+    [[variable.historical."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.0658767398519538e-6
+    cell_id = 1502
+    fortran_kg_c_m2 = 2.8013e-5
+    julia_kg_c_m2 = 2.5947123260148047e-5
+    pft = 16
+    rank = 6
+    relative_error = 0.07374707242537228
+
+[variable.historical."casa_soil.c_litter_structural"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.42953220282336385]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_litter_structural".absolute_error_kg_c_m2]
+    maximum = 1.2945836508094725e-5
+    mean = 1.4272952426638433e-8
+    median = 1.593594978199775e-10
+    minimum = 0.0
+    p90 = 4.710103862493043e-10
+    p95 = 7.167042829740246e-10
+    p99 = 9.087823081257611e-8
+    p999 = 2.368701446699451e-6
+
+    [variable.historical."casa_soil.c_litter_structural".absolute_reference_kg_c_m2]
+    maximum = 5.441552807
+    mean = 0.4295622028233638
+    median = 0.187121916
+    minimum = 0.0
+    p90 = 1.1541192106000007
+    p95 = 1.4973835853
+    p99 = 3.684781314120003
+    p999 = 4.806721909406001
+
+    [variable.historical."casa_soil.c_litter_structural".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.3593128347710317e-5
+    raw_atol = 1.2945836508094725e-5
+    raw_objective = 1.2945836508094725e-5
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_litter_structural".relative_error]
+    defined_pair_count = 2950
+    maximum = 1.0565407626120809
+    mean = 0.001992470627095446
+    median = 5.549184335006311e-10
+    minimum = 9.800062250685216e-14
+    p90 = 2.4149170148538515e-8
+    p95 = 1.1284915804783905e-6
+    p99 = 0.02087308345720723
+    p999 = 0.4016377005916205
+    undefined_zero_reference_count = 1313
+
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 1.2945836508094725e-5
+    cell_id = 2075
+    fortran_kg_c_m2 = 2.9999999999999997e-5
+    julia_kg_c_m2 = 4.294583650809472e-5
+    pft = 7
+    rank = 1
+    relative_error = 0.4315278836031575
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 9.478072516722058e-6
+    cell_id = 12138
+    fortran_kg_c_m2 = 0.438499794
+    julia_kg_c_m2 = 0.4384903159274833
+    pft = 14
+    rank = 2
+    relative_error = 2.161477073971455e-5
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 5.199467006627382e-6
+    cell_id = 3141
+    fortran_kg_c_m2 = 0.002838883
+    julia_kg_c_m2 = 0.0028440824670066273
+    pft = 16
+    rank = 3
+    relative_error = 0.0018315185960912732
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.667765425595504e-6
+    cell_id = 158
+    fortran_kg_c_m2 = 2.525e-6
+    julia_kg_c_m2 = 5.192765425595504e-6
+    pft = 16
+    rank = 4
+    relative_error = 1.0565407626120809
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.4156120609248295e-6
+    cell_id = 252
+    fortran_kg_c_m2 = 6.227e-6
+    julia_kg_c_m2 = 3.8113879390751704e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.3879254955716765
+    [[variable.historical."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.236563915026244e-6
+    cell_id = 13792
+    fortran_kg_c_m2 = 6.2285e-5
+    julia_kg_c_m2 = 6.452156391502625e-5
+    pft = 16
+    rank = 6
+    relative_error = 0.0359085480456971
+
+[variable.historical."casa_soil.c_soil_microbial"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.3059160124065214]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_soil_microbial".absolute_error_kg_c_m2]
+    maximum = 5.1816356111070855e-6
+    mean = 4.708235711759329e-9
+    median = 1.5613987880414015e-10
+    minimum = 0.0
+    p90 = 4.737468924098653e-10
+    p95 = 9.942862738990263e-10
+    p99 = 4.979937822058326e-8
+    p999 = 6.308384009056659e-7
+
+    [variable.historical."casa_soil.c_soil_microbial".absolute_reference_kg_c_m2]
+    maximum = 3.740974141
+    mean = 0.30597221340652137
+    median = 0.115595932
+    minimum = 0.0
+    p90 = 0.7176076846000001
+    p95 = 1.5589065732
+    p99 = 2.79314873758
+    p999 = 3.4658303841920093
+
+    [variable.historical."casa_soil.c_soil_microbial".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.440717405873295e-6
+    raw_atol = 5.1816356111070855e-6
+    raw_objective = 5.1816356111070855e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_soil_microbial".relative_error]
+    defined_pair_count = 2949
+    maximum = 0.3086295022875055
+    mean = 0.0010462819350292429
+    median = 1.0627380818101685e-9
+    minimum = 1.431572448157136e-13
+    p90 = 5.137497195668539e-8
+    p95 = 1.465793378028114e-6
+    p99 = 0.012353988356139623
+    p999 = 0.2300987892999363
+    undefined_zero_reference_count = 1314
+
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 5.1816356111070855e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 5.6201e-5
+    julia_kg_c_m2 = 6.138263561110708e-5
+    pft = 7
+    rank = 1
+    relative_error = 0.09219828136700567
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 3.8766514231514115e-6
+    cell_id = 12138
+    fortran_kg_c_m2 = 0.21925842599999998
+    julia_kg_c_m2 = 0.21925454934857683
+    pft = 14
+    rank = 2
+    relative_error = 1.768074091324277e-5
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 1.1409434644742902e-6
+    cell_id = 540
+    fortran_kg_c_m2 = 4.711e-6
+    julia_kg_c_m2 = 3.57005653552571e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.2421871077211399
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 6.774417575210746e-7
+    cell_id = 158
+    fortran_kg_c_m2 = 2.1949999999999997e-6
+    julia_kg_c_m2 = 2.8724417575210743e-6
+    pft = 16
+    rank = 4
+    relative_error = 0.3086295022875055
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 6.508078538624678e-7
+    cell_id = 1022
+    fortran_kg_c_m2 = 5.226e-6
+    julia_kg_c_m2 = 5.876807853862467e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.12453269304677915
+    [[variable.historical."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 5.745885677677211e-7
+    cell_id = 828
+    fortran_kg_c_m2 = 1.0980999999999999e-5
+    julia_kg_c_m2 = 1.0406411432232278e-5
+    pft = 16
+    rank = 6
+    relative_error = 0.05232570510588482
+
+[variable.historical."casa_soil.c_soil_passive"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 2075]
+active_constraint_objective_slopes = [-0.05627606899014759, 1.8219074160098523]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_soil_passive".absolute_error_kg_c_m2]
+    maximum = 2.9586824306093717e-6
+    mean = 5.0312038291633685e-9
+    median = 2.948787880541204e-10
+    minimum = 0.0
+    p90 = 2.8288839715173722e-9
+    p95 = 1.6117445822416705e-8
+    p99 = 9.578594197812186e-8
+    p999 = 4.033794931204187e-7
+
+    [variable.historical."casa_soil.c_soil_passive".absolute_reference_kg_c_m2]
+    maximum = 23.086244381
+    mean = 1.8222725320098523
+    median = 0.741441317
+    minimum = 0.0
+    p90 = 4.441920404
+    p95 = 7.450019582700004
+    p99 = 15.24139650508001
+    p999 = 19.470996274268213
+
+    [variable.historical."casa_soil.c_soil_passive".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.9687366879136168e-8
+    raw_atol = 1.8749859684077573e-8
+    raw_objective = 2.870610262500598e-6
+    raw_rtol = 1.5650021348184936e-6
+    rtol = 1.6432522415594183e-6
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_soil_passive".relative_error]
+    defined_pair_count = 2955
+    maximum = 0.4660772877541487
+    mean = 0.0006554007887023764
+    median = 4.702665393612781e-10
+    minimum = 1.8777238255358316e-13
+    p90 = 3.3608094201734385e-8
+    p95 = 3.336417090506838e-7
+    p99 = 0.0005386300609983204
+    p999 = 0.16116986386573265
+    undefined_zero_reference_count = 1308
+
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 2.9586824306093717e-6
+    cell_id = 1099
+    fortran_kg_c_m2 = 1.8785486009999999
+    julia_kg_c_m2 = 1.8785456423175693
+    pft = 8
+    rank = 1
+    relative_error = 1.5749831700039003e-6
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 9.310856241562249e-7
+    cell_id = 11366
+    fortran_kg_c_m2 = 3.607720199
+    julia_kg_c_m2 = 3.607719267914376
+    pft = 7
+    rank = 2
+    relative_error = 2.5808144002251236e-7
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 5.028277847429763e-7
+    cell_id = 1094
+    fortran_kg_c_m2 = 4.191832528
+    julia_kg_c_m2 = 4.191832025172215
+    pft = 9
+    rank = 3
+    relative_error = 1.1995416834624464e-7
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.322626239172678e-7
+    cell_id = 11064
+    fortran_kg_c_m2 = 11.734658664000001
+    julia_kg_c_m2 = 11.734658231737377
+    pft = 7
+    rank = 4
+    relative_error = 3.6836403707538445e-8
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.069597550060422e-7
+    cell_id = 622
+    fortran_kg_c_m2 = 1.630816297
+    julia_kg_c_m2 = 1.630816703959755
+    pft = 8
+    rank = 5
+    relative_error = 2.495435909946896e-7
+    [[variable.historical."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 3.9329463330517456e-7
+    cell_id = 1578
+    fortran_kg_c_m2 = 4.819187337000001
+    julia_kg_c_m2 = 4.819186943705367
+    pft = 9
+    rank = 6
+    relative_error = 8.16101566099327e-8
+
+[variable.historical."casa_soil.c_soil_slow"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [622]
+active_constraint_objective_slopes = [0.4465781596279603]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.historical."casa_soil.c_soil_slow".absolute_error_kg_c_m2]
+    maximum = 2.8639247346973207e-5
+    mean = 2.9089115006313857e-8
+    median = 2.254836317661102e-10
+    minimum = 0.0
+    p90 = 1.5473146276219233e-8
+    p95 = 8.775943285410652e-8
+    p99 = 4.1381377969542985e-7
+    p999 = 1.7800949127247043e-6
+
+    [variable.historical."casa_soil.c_soil_slow".absolute_reference_kg_c_m2]
+    maximum = 59.083112958
+    mean = 4.72660866162796
+    median = 1.805025388
+    minimum = 0.0
+    p90 = 12.050290766200003
+    p95 = 23.82174154100001
+    p99 = 41.68604203838
+    p999 = 54.312537051526135
+
+    [variable.historical."casa_soil.c_soil_slow".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.0071209728532722e-5
+    raw_atol = 2.8639247346973207e-5
+    raw_objective = 2.8639247346973207e-5
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.historical."casa_soil.c_soil_slow".relative_error]
+    defined_pair_count = 2952
+    maximum = 0.6637176771332906
+    mean = 0.0008941785561356155
+    median = 2.0914260828650884e-10
+    minimum = 1.333144767168766e-14
+    p90 = 6.305541467738522e-8
+    p95 = 5.010315584327199e-7
+    p99 = 0.003912495184915561
+    p999 = 0.34781176222463184
+    undefined_zero_reference_count = 1311
+
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 2.8639247346973207e-5
+    cell_id = 622
+    fortran_kg_c_m2 = 4.280030502
+    julia_kg_c_m2 = 4.280059141247347
+    pft = 8
+    rank = 1
+    relative_error = 6.691365244614607e-6
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.644280785928487e-5
+    cell_id = 12138
+    fortran_kg_c_m2 = 4.420497394
+    julia_kg_c_m2 = 4.420480951192141
+    pft = 14
+    rank = 2
+    relative_error = 3.7196736913820857e-6
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 3.631203173905034e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 0.001214623
+    julia_kg_c_m2 = 0.001210991796826095
+    pft = 7
+    rank = 3
+    relative_error = 0.002989572216156811
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 2.261671166792212e-6
+    cell_id = 807
+    fortran_kg_c_m2 = 9.295093141999999
+    julia_kg_c_m2 = 9.295090880328832
+    pft = 9
+    rank = 4
+    relative_error = 2.433188277127446e-7
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.787121229668287e-6
+    cell_id = 11366
+    fortran_kg_c_m2 = 8.141230105
+    julia_kg_c_m2 = 8.14122831787877
+    pft = 7
+    rank = 5
+    relative_error = 2.195148898408746e-7
+    [[variable.historical."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.760303226066797e-6
+    cell_id = 353
+    fortran_kg_c_m2 = 5.097e-6
+    julia_kg_c_m2 = 3.3366967739332027e-6
+    pft = 16
+    rank = 6
+    relative_error = 0.3453606486299386
+
+[variable.normal_spin."casa_plant.c_fine_root"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [256, 1099]
+active_constraint_objective_slopes = [0.5969733833298145, -1.1373571026701854]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_plant.c_fine_root".absolute_error_kg_c_m2]
+    maximum = 3.384193036914951e-8
+    mean = 1.9346818625205871e-10
+    median = 1.3723054637093668e-10
+    minimum = 0.0
+    p90 = 4.2728278693004997e-10
+    p95 = 4.744258874644913e-10
+    p99 = 6.536492678111545e-10
+    p999 = 2.3496218530816582e-9
+
+    [variable.normal_spin."casa_plant.c_fine_root".absolute_reference_kg_c_m2]
+    maximum = 5.749159146
+    mean = 0.6015347373298146
+    median = 0.219766518
+    minimum = 0.0
+    p90 = 1.7158028894000004
+    p95 = 2.5990517964000044
+    p99 = 4.23328402136
+    p999 = 4.783068429106028
+
+    [variable.normal_spin."casa_plant.c_fine_root".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.4720789211238356e-9
+    raw_atol = 1.4019663907324956e-9
+    raw_objective = 1.2623920949301088e-8
+    raw_rtol = 1.8655538678252133e-8
+    rtol = 1.958831561216474e-8
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_plant.c_fine_root".relative_error]
+    defined_pair_count = 2952
+    maximum = 0.11303269776738548
+    mean = 7.714027956476513e-5
+    median = 4.2519517635031285e-10
+    minimum = 9.760897623204419e-14
+    p90 = 5.8563266379212146e-9
+    p95 = 6.260211889336849e-8
+    p99 = 2.4406979184725934e-5
+    p999 = 0.023308605839959307
+    undefined_zero_reference_count = 1311
+
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 3.384193036914951e-8
+    cell_id = 1099
+    fortran_kg_c_m2 = 1.73889184
+    julia_kg_c_m2 = 1.7388918061580696
+    pft = 8
+    rank = 1
+    relative_error = 1.9461779962777622e-8
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.746373728435003e-8
+    cell_id = 11500
+    fortran_kg_c_m2 = 1.432759649
+    julia_kg_c_m2 = 1.4327596764637374
+    pft = 1
+    rank = 2
+    relative_error = 1.9168419004205242e-8
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.803420384722699e-9
+    cell_id = 10968
+    fortran_kg_c_m2 = 1.501364069
+    julia_kg_c_m2 = 1.5013640718034205
+    pft = 5
+    rank = 3
+    relative_error = 1.8672488856017102e-9
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.676737498319426e-9
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.2857771040000001
+    julia_kg_c_m2 = 1.2857771066767376
+    pft = 5
+    rank = 4
+    relative_error = 2.081805228909587e-9
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.3763349066285855e-9
+    cell_id = 11066
+    fortran_kg_c_m2 = 1.5556771790000001
+    julia_kg_c_m2 = 1.555677181376335
+    pft = 5
+    rank = 5
+    relative_error = 1.5275244367575732e-9
+    [[variable.normal_spin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 2.2743766869837145e-9
+    cell_id = 1392
+    fortran_kg_c_m2 = 1.595186469
+    julia_kg_c_m2 = 1.5951864712743766
+    pft = 8
+    rank = 6
+    relative_error = 1.425774811398375e-9
+
+[variable.normal_spin."casa_plant.c_labile"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.normal_spin."casa_plant.c_labile".absolute_error_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.normal_spin."casa_plant.c_labile".absolute_reference_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.normal_spin."casa_plant.c_labile".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_plant.c_labile".relative_error]
+    defined_pair_count = 0
+    undefined_zero_reference_count = 4263
+
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 10
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 15
+    rank = 1
+    relative_error = "undefined_zero_reference"
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 12
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 2
+    relative_error = "undefined_zero_reference"
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 51
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 3
+    relative_error = "undefined_zero_reference"
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 52
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 4
+    relative_error = "undefined_zero_reference"
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 53
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 5
+    relative_error = "undefined_zero_reference"
+    [[variable.normal_spin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 54
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 9
+    rank = 6
+    relative_error = "undefined_zero_reference"
+
+[variable.normal_spin."casa_plant.c_leaf"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.05395911180928927]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_plant.c_leaf".absolute_error_kg_c_m2]
+    maximum = 1.3542104915404557e-5
+    mean = 3.351919740028511e-8
+    median = 1.5271325870536145e-10
+    minimum = 0.0
+    p90 = 4.4482173014448454e-10
+    p95 = 4.848973965410064e-10
+    p99 = 1.1229889650016528e-6
+    p999 = 4.172433290257075e-6
+
+    [variable.normal_spin."casa_plant.c_leaf".absolute_reference_kg_c_m2]
+    maximum = 0.5377290450000001
+    mean = 0.06403559880928927
+    median = 0.018940444
+    minimum = 0.0
+    p90 = 0.19579344459999998
+    p95 = 0.2301720812
+    p99 = 0.42426411376000006
+    p999 = 0.45262079465000066
+
+    [variable.normal_spin."casa_plant.c_leaf".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.4219210175385641e-5
+    raw_atol = 1.3542104915404557e-5
+    raw_objective = 1.3542104915404557e-5
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_plant.c_leaf".relative_error]
+    defined_pair_count = 2970
+    maximum = 0.0029974577499730154
+    mean = 2.167149426609424e-5
+    median = 3.994449372391281e-9
+    minimum = 4.84269479108154e-13
+    p90 = 4.2690801761737154e-8
+    p95 = 1.9099472667301705e-7
+    p99 = 0.0009004331851514068
+    p999 = 0.002062087040224492
+    undefined_zero_reference_count = 1293
+
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 1.3542104915404557e-5
+    cell_id = 2075
+    fortran_kg_c_m2 = 0.010076487
+    julia_kg_c_m2 = 0.010062944895084596
+    pft = 7
+    rank = 1
+    relative_error = 0.0013439311652369082
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 6.124609501871863e-6
+    cell_id = 352
+    fortran_kg_c_m2 = 0.002043268
+    julia_kg_c_m2 = 0.002037143390498128
+    pft = 16
+    rank = 2
+    relative_error = 0.0029974577499730154
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.819938917078725e-6
+    cell_id = 13791
+    fortran_kg_c_m2 = 0.002038011
+    julia_kg_c_m2 = 0.002042830938917079
+    pft = 16
+    rank = 3
+    relative_error = 0.002365021050955429
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.78849410592971e-6
+    cell_id = 256
+    fortran_kg_c_m2 = 0.002039013
+    julia_kg_c_m2 = 0.00204380149410593
+    pft = 16
+    rank = 4
+    relative_error = 0.0023484372615229575
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.184458938554653e-6
+    cell_id = 636
+    fortran_kg_c_m2 = 0.00203829
+    julia_kg_c_m2 = 0.0020424744589385545
+    pft = 16
+    rank = 5
+    relative_error = 0.0020529261972313325
+    [[variable.normal_spin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.138559517571482e-6
+    cell_id = 13786
+    fortran_kg_c_m2 = 0.002043177
+    julia_kg_c_m2 = 0.0020390384404824287
+    pft = 16
+    rank = 6
+    relative_error = 0.0020255511478307958
+
+[variable.normal_spin."casa_plant.c_wood"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 1405]
+active_constraint_objective_slopes = [-0.8084029207956835, 1.3368325912043166]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_plant.c_wood".absolute_error_kg_c_m2]
+    maximum = 3.021507510858612e-7
+    mean = 3.7441573280402755e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.610646475722291e-10
+    p95 = 9.443454906943337e-10
+    p99 = 3.916968451811446e-9
+    p999 = 3.5609483651555746e-8
+
+    [variable.normal_spin."casa_plant.c_wood".absolute_reference_kg_c_m2]
+    maximum = 15.567139503
+    mean = 1.3370353382043165
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.90503028760001
+    p95 = 8.1298375641
+    p99 = 10.789405492340002
+    p999 = 12.56428281574623
+
+    [variable.normal_spin."casa_plant.c_wood".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.301128518679949e-10
+    raw_atol = 5.048558485840759e-10
+    raw_objective = 1.8849032681921089e-7
+    raw_rtol = 1.4059873033954184e-7
+    rtol = 1.4762866685651893e-7
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_plant.c_wood".relative_error]
+    defined_pair_count = 1974
+    maximum = 0.38277342791592395
+    mean = 0.0002782737911458834
+    median = 2.2668854746509097e-10
+    minimum = 1.1290402784230005e-13
+    p90 = 3.221956313664579e-8
+    p95 = 7.583832788571056e-7
+    p99 = 0.00032115830420608544
+    p999 = 0.038498967817500805
+    undefined_zero_reference_count = 2289
+
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.021507510858612e-7
+    cell_id = 1099
+    fortran_kg_c_m2 = 2.145438259
+    julia_kg_c_m2 = 2.145438561150751
+    pft = 8
+    rank = 1
+    relative_error = 1.4083404629257205e-7
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 6.003007690935647e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 9.390564241
+    julia_kg_c_m2 = 9.390564180969923
+    pft = 5
+    rank = 2
+    relative_error = 6.392595308305337e-9
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 5.871930763845512e-8
+    cell_id = 11500
+    fortran_kg_c_m2 = 7.581984767
+    julia_kg_c_m2 = 7.581984825719307
+    pft = 1
+    rank = 3
+    relative_error = 7.744582644642911e-9
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.397942454659187e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 11.414655736
+    julia_kg_c_m2 = 11.414655692020576
+    pft = 5
+    rank = 4
+    relative_error = 3.852891016930786e-9
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.606565712743759e-8
+    cell_id = 10968
+    fortran_kg_c_m2 = 11.094656257
+    julia_kg_c_m2 = 11.094656220934343
+    pft = 5
+    rank = 5
+    relative_error = 3.2507232573954264e-9
+    [[variable.normal_spin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 3.43245369904821e-8
+    cell_id = 10967
+    fortran_kg_c_m2 = 6.5869584969999995
+    julia_kg_c_m2 = 6.5869584626754625
+    pft = 5
+    rank = 6
+    relative_error = 5.210984251094804e-9
+
+[variable.normal_spin."casa_soil.c_litter_cwd"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099]
+active_constraint_objective_slopes = [0.17719421966056753]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_litter_cwd".absolute_error_kg_c_m2]
+    maximum = 3.260891451306591e-8
+    mean = 1.4710818482824313e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 4.0748268509416266e-10
+    p95 = 4.6381904983405776e-10
+    p99 = 6.133146540632252e-10
+    p999 = 7.531951060624307e-9
+
+    [variable.normal_spin."casa_soil.c_litter_cwd".absolute_reference_kg_c_m2]
+    maximum = 7.525825605
+    mean = 0.37807530666056754
+    median = 0.0
+    minimum = 0.0
+    p90 = 1.3110966892000004
+    p95 = 2.1514137095000003
+    p99 = 5.436948523880009
+    p999 = 7.246193772272006
+
+    [variable.normal_spin."casa_soil.c_litter_cwd".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.423937444957393e-8
+    raw_atol = 3.260891451306591e-8
+    raw_objective = 3.260891451306591e-8
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_litter_cwd".relative_error]
+    defined_pair_count = 1973
+    maximum = 0.08946506176952507
+    mean = 0.00012910472668673485
+    median = 8.476433236776706e-10
+    minimum = 1.0129028009801875e-13
+    p90 = 1.3902783653463913e-7
+    p95 = 2.998955148357352e-6
+    p99 = 0.0006634700950514698
+    p999 = 0.032063737168792454
+    undefined_zero_reference_count = 2290
+
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 3.260891451306591e-8
+    cell_id = 1099
+    fortran_kg_c_m2 = 0.200881087
+    julia_kg_c_m2 = 0.20088111960891453
+    pft = 8
+    rank = 1
+    relative_error = 1.62329440765451e-7
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 1.584935427345613e-8
+    cell_id = 11065
+    fortran_kg_c_m2 = 1.8202285589999998
+    julia_kg_c_m2 = 1.8202285431506455
+    pft = 5
+    rank = 2
+    relative_error = 8.707342929595321e-9
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 1.222220102903293e-8
+    cell_id = 11066
+    fortran_kg_c_m2 = 2.2677004689999998
+    julia_kg_c_m2 = 2.2677004567777987
+    pft = 5
+    rank = 3
+    relative_error = 5.3896893333636e-9
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 8.568767029260016e-9
+    cell_id = 10968
+    fortran_kg_c_m2 = 1.9690210750000001
+    julia_kg_c_m2 = 1.969021066431233
+    pft = 5
+    rank = 4
+    relative_error = 4.351790408977728e-9
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.622725783917872e-9
+    cell_id = 10967
+    fortran_kg_c_m2 = 1.166745062
+    julia_kg_c_m2 = 1.1667450543772742
+    pft = 5
+    rank = 5
+    relative_error = 6.533325944273739e-9
+    [[variable.normal_spin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 7.276257374400075e-9
+    cell_id = 11500
+    fortran_kg_c_m2 = 2.158058385
+    julia_kg_c_m2 = 2.1580583922762573
+    pft = 1
+    rank = 6
+    relative_error = 3.371668452056303e-9
+
+[variable.normal_spin."casa_soil.c_litter_metabolic"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [352]
+active_constraint_objective_slopes = [0.04806617504902652]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_litter_metabolic".absolute_error_kg_c_m2]
+    maximum = 3.051440984651797e-6
+    mean = 8.276256241052222e-9
+    median = 1.3238740659282655e-10
+    minimum = 0.0
+    p90 = 4.3118230930172536e-10
+    p95 = 4.733687122837616e-10
+    p99 = 1.996825026146567e-8
+    p999 = 1.8590305351894154e-6
+
+    [variable.normal_spin."casa_soil.c_litter_metabolic".absolute_reference_kg_c_m2]
+    maximum = 0.43040418199999997
+    mean = 0.04806848604902652
+    median = 0.025321054
+    minimum = 0.0
+    p90 = 0.12762579699999999
+    p95 = 0.16795290480000008
+    p99 = 0.31666930294
+    p999 = 0.40436079449600026
+
+    [variable.normal_spin."casa_soil.c_litter_metabolic".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.2040130480952417e-6
+    raw_atol = 3.051440984651797e-6
+    raw_objective = 3.051440984651797e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_litter_metabolic".relative_error]
+    defined_pair_count = 2947
+    maximum = 3.105434147239913
+    mean = 0.0042383344793918715
+    median = 4.257899522279092e-9
+    minimum = 1.7586981119190396e-12
+    p90 = 9.743609345619219e-8
+    p95 = 5.051494062578848e-6
+    p99 = 0.04679315574481244
+    p999 = 0.8380435254369683
+    undefined_zero_reference_count = 1316
+
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 3.051440984651797e-6
+    cell_id = 352
+    fortran_kg_c_m2 = 2.311e-6
+    julia_kg_c_m2 = 5.362440984651797e-6
+    pft = 16
+    rank = 1
+    relative_error = 1.3203985221340533
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 3.05075783058108e-6
+    cell_id = 1212
+    fortran_kg_c_m2 = 3.764e-6
+    julia_kg_c_m2 = 7.1324216941892e-7
+    pft = 16
+    rank = 2
+    relative_error = 0.810509519282965
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.633521401496482e-6
+    cell_id = 256
+    fortran_kg_c_m2 = 0.00012681200000000002
+    julia_kg_c_m2 = 0.00012417847859850354
+    pft = 16
+    rank = 3
+    relative_error = 0.020767130882696286
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 2.0090422155928368e-6
+    cell_id = 1887
+    fortran_kg_c_m2 = 7.571e-6
+    julia_kg_c_m2 = 5.561957784407163e-6
+    pft = 16
+    rank = 4
+    relative_error = 0.26536021867558274
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 1.8810305776124477e-6
+    cell_id = 1786
+    fortran_kg_c_m2 = 5.4921e-5
+    julia_kg_c_m2 = 5.6802030577612446e-5
+    pft = 16
+    rank = 5
+    relative_error = 0.0342497510535578
+    [[variable.normal_spin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 1.7970609500435317e-6
+    cell_id = 828
+    fortran_kg_c_m2 = 4.8e-6
+    julia_kg_c_m2 = 6.5970609500435315e-6
+    pft = 16
+    rank = 6
+    relative_error = 0.3743876979257358
+
+[variable.normal_spin."casa_soil.c_litter_structural"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [352]
+active_constraint_objective_slopes = [0.4246183498088202]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_litter_structural".absolute_error_kg_c_m2]
+    maximum = 3.036473760046846e-6
+    mean = 1.0333468351996808e-8
+    median = 1.4134132753085282e-10
+    minimum = 0.0
+    p90 = 4.434224099014728e-10
+    p95 = 4.820930987747829e-10
+    p99 = 1.001569938749045e-7
+    p999 = 2.158463120375845e-6
+
+    [variable.normal_spin."casa_soil.c_litter_structural".absolute_reference_kg_c_m2]
+    maximum = 5.043625307
+    mean = 0.4246326818088202
+    median = 0.178477851
+    minimum = 0.0
+    p90 = 1.1834887726000003
+    p95 = 1.5594067186000005
+    p99 = 3.6245718034600003
+    p999 = 4.902259866868006
+
+    [variable.normal_spin."casa_soil.c_litter_structural".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.1882974622600433e-6
+    raw_atol = 3.036473760046846e-6
+    raw_objective = 3.036473760046846e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_litter_structural".relative_error]
+    defined_pair_count = 2950
+    maximum = 1.1188895519039732
+    mean = 0.0023237536039389982
+    median = 5.310730909398377e-10
+    minimum = 4.2900485367487964e-13
+    p90 = 1.4478128538559159e-8
+    p95 = 1.371520604903578e-6
+    p99 = 0.025262882117102585
+    p999 = 0.3672394020512661
+    undefined_zero_reference_count = 1313
+
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 3.036473760046846e-6
+    cell_id = 352
+    fortran_kg_c_m2 = 1.4332e-5
+    julia_kg_c_m2 = 1.7368473760046845e-5
+    pft = 16
+    rank = 1
+    relative_error = 0.2118667150465285
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.5044780806131684e-6
+    cell_id = 1887
+    fortran_kg_c_m2 = 2.4611000000000002e-5
+    julia_kg_c_m2 = 2.2106521919386834e-5
+    pft = 16
+    rank = 2
+    relative_error = 0.10176254847885775
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.4327228411575225e-6
+    cell_id = 158
+    fortran_kg_c_m2 = 2.4659999999999998e-6
+    julia_kg_c_m2 = 4.898722841157522e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.986505612797049
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.417773695285682e-6
+    cell_id = 256
+    fortran_kg_c_m2 = 0.000564496
+    julia_kg_c_m2 = 0.0005620782263047144
+    pft = 16
+    rank = 4
+    relative_error = 0.004283066124978178
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.213163533666059e-6
+    cell_id = 1693
+    fortran_kg_c_m2 = 1.978e-6
+    julia_kg_c_m2 = 4.191163533666059e-6
+    pft = 16
+    rank = 5
+    relative_error = 1.1188895519039732
+    [[variable.normal_spin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 2.0043833302680695e-6
+    cell_id = 729
+    fortran_kg_c_m2 = 5.6249999999999995e-6
+    julia_kg_c_m2 = 3.62061666973193e-6
+    pft = 16
+    rank = 6
+    relative_error = 0.35633481426987906
+
+[variable.normal_spin."casa_soil.c_soil_microbial"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [0.31146426284705614]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_soil_microbial".absolute_error_kg_c_m2]
+    maximum = 1.2838624045984933e-6
+    mean = 2.7973954203090952e-9
+    median = 1.416941564080787e-10
+    minimum = 0.0
+    p90 = 4.391306623885427e-10
+    p95 = 4.765302624720747e-10
+    p99 = 2.4997277591240056e-8
+    p999 = 6.465754578116479e-7
+
+    [variable.normal_spin."casa_soil.c_soil_microbial".absolute_reference_kg_c_m2]
+    maximum = 4.024207157
+    mean = 0.31151815584705617
+    median = 0.111642241
+    minimum = 0.0
+    p90 = 0.7197402310000001
+    p95 = 1.6167752013000014
+    p99 = 3.0156145216600008
+    p999 = 3.7102695027220136
+
+    [variable.normal_spin."casa_soil.c_soil_microbial".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.3480555390392727e-6
+    raw_atol = 1.2838624045984933e-6
+    raw_objective = 1.2838624045984933e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_soil_microbial".relative_error]
+    defined_pair_count = 2950
+    maximum = 0.5869069409853894
+    mean = 0.0015364302789560448
+    median = 9.493536962568268e-10
+    minimum = 2.2206324661139868e-13
+    p90 = 4.76457869084701e-8
+    p95 = 1.6565317210195283e-6
+    p99 = 0.018023400760256825
+    p999 = 0.32063268974535963
+    undefined_zero_reference_count = 1313
+
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 1.2838624045984933e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 5.3893e-5
+    julia_kg_c_m2 = 5.5176862404598494e-5
+    pft = 7
+    rank = 1
+    relative_error = 0.023822433425463294
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0182835426096506e-6
+    cell_id = 1693
+    fortran_kg_c_m2 = 1.735e-6
+    julia_kg_c_m2 = 2.7532835426096505e-6
+    pft = 16
+    rank = 2
+    relative_error = 0.5869069409853894
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 8.110588944422977e-7
+    cell_id = 1212
+    fortran_kg_c_m2 = 3.433e-6
+    julia_kg_c_m2 = 4.244058894442298e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.23625368320486387
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 7.294146843965928e-7
+    cell_id = 158
+    fortran_kg_c_m2 = 2.138e-6
+    julia_kg_c_m2 = 2.867414684396593e-6
+    pft = 16
+    rank = 4
+    relative_error = 0.34116683086837823
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 6.694873881247138e-7
+    cell_id = 1022
+    fortran_kg_c_m2 = 3.4810000000000002e-6
+    julia_kg_c_m2 = 2.8115126118752864e-6
+    pft = 16
+    rank = 5
+    relative_error = 0.19232616722916226
+    [[variable.normal_spin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 5.820372724258943e-7
+    cell_id = 729
+    fortran_kg_c_m2 = 2.3990000000000002e-6
+    julia_kg_c_m2 = 1.816962727574106e-6
+    pft = 16
+    rank = 6
+    relative_error = 0.24261662043597093
+
+[variable.normal_spin."casa_soil.c_soil_passive"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1099, 2075]
+active_constraint_objective_slopes = [-0.04679675370349501, 1.8206015172965049]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_soil_passive".absolute_error_kg_c_m2]
+    maximum = 3.3626156223931503e-6
+    mean = 5.151917540408962e-9
+    median = 2.591800107865083e-10
+    minimum = 0.0
+    p90 = 2.8606644608686393e-9
+    p95 = 1.627955796834615e-8
+    p99 = 9.480654957982917e-8
+    p999 = 4.2779786897995767e-7
+
+    [variable.normal_spin."casa_soil.c_soil_passive".absolute_reference_kg_c_m2]
+    maximum = 23.083762845000003
+    mean = 1.8209670542965049
+    median = 0.737917521
+    minimum = 0.0
+    p90 = 4.438882294800002
+    p95 = 7.4544563814000036
+    p99 = 15.241487626400009
+    p999 = 19.47417312603622
+
+    [variable.normal_spin."casa_soil.c_soil_passive".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 1.6021328705841267e-8
+    raw_atol = 1.5258394757130048e-8
+    raw_objective = 3.2787477098292844e-6
+    raw_rtol = 1.792173728443945e-6
+    rtol = 1.8817824148661423e-6
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_soil_passive".relative_error]
+    defined_pair_count = 2955
+    maximum = 0.4517824765863463
+    mean = 0.000627142114478448
+    median = 4.2367757550357875e-10
+    minimum = 5.069716431901547e-14
+    p90 = 3.1041059207052925e-8
+    p95 = 3.731921355642221e-7
+    p99 = 0.00055799631046299
+    p999 = 0.12889443774373546
+    undefined_zero_reference_count = 1308
+
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 3.3626156223931503e-6
+    cell_id = 1099
+    fortran_kg_c_m2 = 1.8677638079999999
+    julia_kg_c_m2 = 1.8677604453843775
+    pft = 8
+    rank = 1
+    relative_error = 1.8003430669287016e-6
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 9.354398713412593e-7
+    cell_id = 11366
+    fortran_kg_c_m2 = 3.6035018759999997
+    julia_kg_c_m2 = 3.6035009405601284
+    pft = 7
+    rank = 2
+    relative_error = 2.5959189242316336e-7
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 5.957056283811824e-7
+    cell_id = 12138
+    fortran_kg_c_m2 = 2.354425476
+    julia_kg_c_m2 = 2.3544248802943715
+    pft = 14
+    rank = 3
+    relative_error = 2.5301528311409694e-7
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 5.108011835730508e-7
+    cell_id = 1094
+    fortran_kg_c_m2 = 4.193066702
+    julia_kg_c_m2 = 4.193066191198817
+    pft = 9
+    rank = 4
+    relative_error = 1.218204287876961e-7
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.3385029613318693e-7
+    cell_id = 11064
+    fortran_kg_c_m2 = 11.734554648
+    julia_kg_c_m2 = 11.734554214149703
+    pft = 7
+    rank = 5
+    relative_error = 3.697202911804846e-8
+    [[variable.normal_spin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.1074942913610357e-7
+    cell_id = 1578
+    fortran_kg_c_m2 = 4.800591819
+    julia_kg_c_m2 = 4.800591408250571
+    pft = 9
+    rank = 6
+    relative_error = 8.556224828580944e-8
+
+[variable.normal_spin."casa_soil.c_soil_slow"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [2075]
+active_constraint_objective_slopes = [4.71795349582313]
+finite_pair_count = 4263
+floor_constraint_active = false
+
+    [variable.normal_spin."casa_soil.c_soil_slow".absolute_error_kg_c_m2]
+    maximum = 3.481570588178542e-6
+    mean = 9.046467205051836e-9
+    median = 1.7489243386847875e-10
+    minimum = 0.0
+    p90 = 1.643028735287544e-9
+    p95 = 1.0529309191426376e-8
+    p99 = 2.1940252876152823e-7
+    p999 = 1.0135926560000444e-6
+
+    [variable.normal_spin."casa_soil.c_soil_slow".absolute_reference_kg_c_m2]
+    maximum = 59.657775326
+    mean = 4.719220057823129
+    median = 1.731550772
+    minimum = 0.0
+    p90 = 12.2563856282
+    p95 = 24.06069551800001
+    p99 = 41.89939054962
+    p999 = 54.955204182710276
+
+    [variable.normal_spin."casa_soil.c_soil_slow".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 3.655649131798324e-6
+    raw_atol = 3.481570588178542e-6
+    raw_objective = 3.481570588178542e-6
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.normal_spin."casa_soil.c_soil_slow".relative_error]
+    defined_pair_count = 2953
+    maximum = 6.5444225302022
+    mean = 0.003044158251206602
+    median = 1.0863226070547533e-10
+    minimum = 5.670896164357256e-16
+    p90 = 1.1192236110261e-8
+    p95 = 1.2939318275301004e-7
+    p99 = 0.003505564667497919
+    p999 = 0.193042939307698
+    undefined_zero_reference_count = 1310
+
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 3.481570588178542e-6
+    cell_id = 2075
+    fortran_kg_c_m2 = 0.001266562
+    julia_kg_c_m2 = 0.0012700435705881785
+    pft = 7
+    rank = 1
+    relative_error = 0.00274883549970593
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.6926473271894338e-6
+    cell_id = 11366
+    fortran_kg_c_m2 = 7.7241212290000005
+    julia_kg_c_m2 = 7.724119536352673
+    pft = 7
+    rank = 2
+    relative_error = 2.1913785102626768e-7
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.625664223528568e-6
+    cell_id = 13791
+    fortran_kg_c_m2 = 8.876e-6
+    julia_kg_c_m2 = 7.2503357764714315e-6
+    pft = 16
+    rank = 3
+    relative_error = 0.18315279670218207
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.1472097018132373e-6
+    cell_id = 353
+    fortran_kg_c_m2 = 2.3566e-5
+    julia_kg_c_m2 = 2.471320970181324e-5
+    pft = 16
+    rank = 4
+    relative_error = 0.04868071381707703
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 1.0263969489554273e-6
+    cell_id = 13788
+    fortran_kg_c_m2 = 1.634e-6
+    julia_kg_c_m2 = 6.076030510445727e-7
+    pft = 16
+    rank = 5
+    relative_error = 0.628149907561461
+    [[variable.normal_spin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 9.775256017974243e-7
+    cell_id = 1094
+    fortran_kg_c_m2 = 10.675048285999999
+    julia_kg_c_m2 = 10.675047308474397
+    pft = 9
+    rank = 6
+    relative_error = 9.157107074442177e-8
+
+[variable.prespin."casa_plant.c_fine_root"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_plant.c_fine_root".absolute_error_kg_c_m2]
+    maximum = 4.999468061761547e-10
+    mean = 1.7408418885349157e-10
+    median = 1.4184065033617799e-10
+    minimum = 0.0
+    p90 = 4.277915632844298e-10
+    p95 = 4.6335524514495855e-10
+    p99 = 4.912082641334026e-10
+    p999 = 4.996681988167496e-10
+
+    [variable.prespin."casa_plant.c_fine_root".absolute_reference_kg_c_m2]
+    maximum = 5.514633122999999
+    mean = 0.5735168485205256
+    median = 0.213558257
+    minimum = 0.0
+    p90 = 1.6893138858000005
+    p95 = 2.4850028927000007
+    p99 = 3.89633408132
+    p999 = 4.443067432230027
+
+    [variable.prespin."casa_plant.c_fine_root".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_plant.c_fine_root".relative_error]
+    defined_pair_count = 2952
+    maximum = 0.3122326898113266
+    mean = 0.0002886628391008491
+    median = 4.4800808456872275e-10
+    minimum = 1.9170422317612978e-13
+    p90 = 6.096927846049849e-9
+    p95 = 8.354975793384726e-8
+    p99 = 1.4976137840197481e-5
+    p999 = 0.12086106872262778
+    undefined_zero_reference_count = 1311
+
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.999468061761547e-10
+    cell_id = 991
+    fortran_kg_c_m2 = 0.27767644
+    julia_kg_c_m2 = 0.2776764395000532
+    pft = 10
+    rank = 1
+    relative_error = 1.8004653407979253e-9
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99912555795845e-10
+    cell_id = 247
+    fortran_kg_c_m2 = 0.847309274
+    julia_kg_c_m2 = 0.8473092744999126
+    pft = 9
+    rank = 2
+    relative_error = 5.900000992976799e-10
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99826846578344e-10
+    cell_id = 11177
+    fortran_kg_c_m2 = 1.531871877
+    julia_kg_c_m2 = 1.5318718774998268
+    pft = 10
+    rank = 3
+    relative_error = 3.262850203616239e-10
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997626201763694e-10
+    cell_id = 11893
+    fortran_kg_c_m2 = 0.158930244
+    julia_kg_c_m2 = 0.15893024449976262
+    pft = 18
+    rank = 4
+    relative_error = 3.1445406965861667e-9
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997178226773258e-10
+    cell_id = 3537
+    fortran_kg_c_m2 = 1.948320572
+    julia_kg_c_m2 = 1.9483205715002823
+    pft = 1
+    rank = 5
+    relative_error = 2.5648644779455e-10
+    [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
+    absolute_error_kg_c_m2 = 4.995284186293247e-10
+    cell_id = 1510
+    fortran_kg_c_m2 = 0.902311725
+    julia_kg_c_m2 = 0.9023117245004716
+    pft = 9
+    rank = 6
+    relative_error = 5.536095839044148e-10
+
+[variable.prespin."casa_plant.c_labile"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_plant.c_labile".absolute_error_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.prespin."casa_plant.c_labile".absolute_reference_kg_c_m2]
+    maximum = 0.0
+    mean = 0.0
+    median = 0.0
+    minimum = 0.0
+    p90 = 0.0
+    p95 = 0.0
+    p99 = 0.0
+    p999 = 0.0
+
+    [variable.prespin."casa_plant.c_labile".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_plant.c_labile".relative_error]
+    defined_pair_count = 0
+    undefined_zero_reference_count = 4263
+
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 10
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 15
+    rank = 1
+    relative_error = "undefined_zero_reference"
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 12
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 2
+    relative_error = "undefined_zero_reference"
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 51
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 17
+    rank = 3
+    relative_error = "undefined_zero_reference"
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 52
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 4
+    relative_error = "undefined_zero_reference"
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 53
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 8
+    rank = 5
+    relative_error = "undefined_zero_reference"
+    [[variable.prespin."casa_plant.c_labile".top_outlier]]
+    absolute_error_kg_c_m2 = 0.0
+    cell_id = 54
+    fortran_kg_c_m2 = 0.0
+    julia_kg_c_m2 = 0.0
+    pft = 9
+    rank = 6
+    relative_error = "undefined_zero_reference"
+
+[variable.prespin."casa_plant.c_leaf"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_plant.c_leaf".absolute_error_kg_c_m2]
+    maximum = 4.997697811148782e-10
+    mean = 1.7543780549292048e-10
+    median = 1.434801999433688e-10
+    minimum = 0.0
+    p90 = 4.316512369761938e-10
+    p95 = 4.653805452115023e-10
+    p99 = 4.922660839894178e-10
+    p999 = 4.985903774290535e-10
+
+    [variable.prespin."casa_plant.c_leaf".absolute_reference_kg_c_m2]
+    maximum = 0.523150958
+    mean = 0.06243334269716163
+    median = 0.018831216
+    minimum = 0.0
+    p90 = 0.1955878486
+    p95 = 0.23003071390000007
+    p99 = 0.42225979504
+    p999 = 0.44649172486400013
+
+    [variable.prespin."casa_plant.c_leaf".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_plant.c_leaf".relative_error]
+    defined_pair_count = 2970
+    maximum = 2.438174621946012e-7
+    mean = 1.7692676191091418e-8
+    median = 4.245996119041717e-9
+    minimum = 1.29992486654632e-12
+    p90 = 3.9742608816525945e-8
+    p95 = 1.0336736386812486e-7
+    p99 = 2.123580740976878e-7
+    p999 = 2.41511349778216e-7
+    undefined_zero_reference_count = 1293
+
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997697811148782e-10
+    cell_id = 3899
+    fortran_kg_c_m2 = 0.096297724
+    julia_kg_c_m2 = 0.09629772449976978
+    pft = 5
+    rank = 1
+    relative_error = 5.189840012364968e-9
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.996989211303315e-10
+    cell_id = 11372
+    fortran_kg_c_m2 = 0.195878714
+    julia_kg_c_m2 = 0.19587871449969893
+    pft = 2
+    rank = 2
+    relative_error = 2.551062904825542e-9
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.996653368838366e-10
+    cell_id = 1324
+    fortran_kg_c_m2 = 0.089259256
+    julia_kg_c_m2 = 0.08925925649966533
+    pft = 12
+    rank = 3
+    relative_error = 5.597910617626442e-9
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.989795659993135e-10
+    cell_id = 8433
+    fortran_kg_c_m2 = 0.023325801
+    julia_kg_c_m2 = 0.023325800501020434
+    pft = 7
+    rank = 4
+    relative_error = 2.139174410342065e-8
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.986064339185248e-10
+    cell_id = 9387
+    fortran_kg_c_m2 = 0.417795663
+    julia_kg_c_m2 = 0.41779566250139355
+    pft = 1
+    rank = 5
+    relative_error = 1.1934217563156581e-9
+    [[variable.prespin."casa_plant.c_leaf".top_outlier]]
+    absolute_error_kg_c_m2 = 4.985451496075655e-10
+    cell_id = 9871
+    fortran_kg_c_m2 = 0.41744290100000003
+    julia_kg_c_m2 = 0.4174429005014549
+    pft = 1
+    rank = 6
+    relative_error = 1.1942834538886203e-9
+
+[variable.prespin."casa_plant.c_wood"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_plant.c_wood".absolute_error_kg_c_m2]
+    maximum = 4.998277347567637e-10
+    mean = 1.1468332708759783e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 3.9246668137593584e-10
+    p95 = 4.4959064156042257e-10
+    p99 = 4.899371219835303e-10
+    p999 = 4.98620184807841e-10
+
+    [variable.prespin."casa_plant.c_wood".absolute_reference_kg_c_m2]
+    maximum = 14.380655858
+    mean = 1.3668697115960593
+    median = 0.0
+    minimum = 0.0
+    p90 = 5.164467587400001
+    p95 = 8.100993829000002
+    p99 = 10.51490241024
+    p999 = 11.69383877832804
+
+    [variable.prespin."casa_plant.c_wood".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_plant.c_wood".relative_error]
+    defined_pair_count = 1973
+    maximum = 0.24764344241224318
+    mean = 0.0003543585752201766
+    median = 1.181791505844991e-10
+    minimum = 7.549316608522308e-14
+    p90 = 3.163956276185145e-8
+    p95 = 5.684597068029779e-7
+    p99 = 0.0002621316374049105
+    p999 = 0.08285938230561841
+    undefined_zero_reference_count = 2290
+
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.998277347567637e-10
+    cell_id = 4563
+    fortran_kg_c_m2 = 5.126140337
+    julia_kg_c_m2 = 5.126140337499828
+    pft = 2
+    rank = 1
+    relative_error = 9.750566740224688e-11
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.995065125412701e-10
+    cell_id = 1881
+    fortran_kg_c_m2 = 0.001971611
+    julia_kg_c_m2 = 0.0019716114995065124
+    pft = 16
+    rank = 2
+    relative_error = 2.533494246792446e-7
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.994733515673033e-10
+    cell_id = 5168
+    fortran_kg_c_m2 = 6.232622287
+    julia_kg_c_m2 = 6.2326222865005265
+    pft = 3
+    rank = 3
+    relative_error = 8.013855622361467e-11
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99462362094083e-10
+    cell_id = 1402
+    fortran_kg_c_m2 = 0.0012468300000000002
+    julia_kg_c_m2 = 0.0012468304994623623
+    pft = 16
+    rank = 4
+    relative_error = 4.005857752011765e-7
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.986747681456905e-10
+    cell_id = 5409
+    fortran_kg_c_m2 = 0.297313728
+    julia_kg_c_m2 = 0.29731372849867477
+    pft = 7
+    rank = 5
+    relative_error = 1.6772678863509809e-9
+    [[variable.prespin."casa_plant.c_wood".top_outlier]]
+    absolute_error_kg_c_m2 = 4.984664347951195e-10
+    cell_id = 2468
+    fortran_kg_c_m2 = 0.236900794
+    julia_kg_c_m2 = 0.23690079350153356
+    pft = 7
+    rank = 6
+    relative_error = 2.1041146649559966e-9
+
+[variable.prespin."casa_soil.c_litter_cwd"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_litter_cwd".absolute_error_kg_c_m2]
+    maximum = 4.999294793243958e-10
+    mean = 1.1410729912266665e-10
+    median = 0.0
+    minimum = 0.0
+    p90 = 3.8966789794869787e-10
+    p95 = 4.4290118378365055e-10
+    p99 = 4.90292199062381e-10
+    p999 = 4.984181801725997e-10
+
+    [variable.prespin."casa_soil.c_litter_cwd".absolute_reference_kg_c_m2]
+    maximum = 6.656152525
+    mean = 0.36100807728524503
+    median = 0.0
+    minimum = 0.0
+    p90 = 1.4725635736000005
+    p95 = 2.1288764214
+    p99 = 4.296706017660002
+    p999 = 5.238574725316041
+
+    [variable.prespin."casa_soil.c_litter_cwd".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_litter_cwd".relative_error]
+    defined_pair_count = 1971
+    maximum = 0.45345138257840845
+    mean = 0.0006438975602935879
+    median = 7.380086134862679e-10
+    minimum = 1.934258851688102e-13
+    p90 = 1.4364989931373248e-7
+    p95 = 3.710628194747609e-6
+    p99 = 0.0007981001275733201
+    p999 = 0.12231667856653637
+    undefined_zero_reference_count = 2292
+
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.999294793243958e-10
+    cell_id = 3237
+    fortran_kg_c_m2 = 0.002342997
+    julia_kg_c_m2 = 0.002342997499929479
+    pft = 16
+    rank = 1
+    relative_error = 2.133717966025547e-7
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99872501681306e-10
+    cell_id = 1791
+    fortran_kg_c_m2 = 0.000357815
+    julia_kg_c_m2 = 0.0003578145001274983
+    pft = 7
+    rank = 2
+    relative_error = 1.3970138246895912e-6
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.994988866968697e-10
+    cell_id = 562
+    fortran_kg_c_m2 = 1.758180508
+    julia_kg_c_m2 = 1.7581805084994988
+    pft = 1
+    rank = 3
+    relative_error = 2.840998887338761e-10
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99191797815636e-10
+    cell_id = 1598
+    fortran_kg_c_m2 = 0.000182002
+    julia_kg_c_m2 = 0.0001820015008082022
+    pft = 16
+    rank = 4
+    relative_error = 2.7427819354492587e-6
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.985079016250893e-10
+    cell_id = 10254
+    fortran_kg_c_m2 = 1.75664643
+    julia_kg_c_m2 = 1.756646429501492
+    pft = 1
+    rank = 5
+    relative_error = 2.837838583289008e-10
+    [[variable.prespin."casa_soil.c_litter_cwd".top_outlier]]
+    absolute_error_kg_c_m2 = 4.981654533331437e-10
+    cell_id = 5514
+    fortran_kg_c_m2 = 0.187096822
+    julia_kg_c_m2 = 0.18709682150183454
+    pft = 8
+    rank = 6
+    relative_error = 2.6626077771280564e-9
+
+[variable.prespin."casa_soil.c_litter_metabolic"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_litter_metabolic".absolute_error_kg_c_m2]
+    maximum = 4.999432534624759e-10
+    mean = 1.72994906273802e-10
+    median = 1.4052868591019063e-10
+    minimum = 0.0
+    p90 = 4.247837359638852e-10
+    p95 = 4.6226987116676497e-10
+    p99 = 4.917385210134739e-10
+    p999 = 4.991622107215766e-10
+
+    [variable.prespin."casa_soil.c_litter_metabolic".absolute_reference_kg_c_m2]
+    maximum = 0.492836346
+    mean = 0.046315602880600514
+    median = 0.023413519999999997
+    minimum = 0.0
+    p90 = 0.12389392839999999
+    p95 = 0.16215540850000001
+    p99 = 0.3197205799600004
+    p999 = 0.43990909477600154
+
+    [variable.prespin."casa_soil.c_litter_metabolic".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_litter_metabolic".relative_error]
+    defined_pair_count = 2944
+    maximum = 0.3488252768822347
+    mean = 0.000533150458409464
+    median = 4.643364146624457e-9
+    minimum = 5.365343890623561e-13
+    p90 = 1.0076313896050697e-7
+    p95 = 3.351038262240454e-6
+    p99 = 0.0012909743103877796
+    p999 = 0.16186718468174763
+    undefined_zero_reference_count = 1319
+
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.999432534624759e-10
+    cell_id = 4683
+    fortran_kg_c_m2 = 0.079944781
+    julia_kg_c_m2 = 0.07994478149994326
+    pft = 8
+    rank = 1
+    relative_error = 6.253607142440929e-9
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99782798479842e-10
+    cell_id = 10915
+    fortran_kg_c_m2 = 0.14486506700000001
+    julia_kg_c_m2 = 0.14486506650021722
+    pft = 14
+    rank = 2
+    relative_error = 3.4499883845692206e-9
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.994912261579998e-10
+    cell_id = 10065
+    fortran_kg_c_m2 = 0.088853241
+    julia_kg_c_m2 = 0.08885324050050877
+    pft = 8
+    rank = 3
+    relative_error = 5.621530745940936e-9
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.994559314741576e-10
+    cell_id = 4103
+    fortran_kg_c_m2 = 0.006079185
+    julia_kg_c_m2 = 0.0060791854994559314
+    pft = 7
+    rank = 4
+    relative_error = 8.215837015556486e-8
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.99279631527294e-10
+    cell_id = 1331
+    fortran_kg_c_m2 = 0.07837175499999999
+    julia_kg_c_m2 = 0.07837175450072036
+    pft = 1
+    rank = 5
+    relative_error = 6.3706577902625015e-9
+    [[variable.prespin."casa_soil.c_litter_metabolic".top_outlier]]
+    absolute_error_kg_c_m2 = 4.98831460513105e-10
+    cell_id = 2570
+    fortran_kg_c_m2 = 0.010747687
+    julia_kg_c_m2 = 0.010747687498831461
+    pft = 10
+    rank = 6
+    relative_error = 4.641291289122069e-8
+
+[variable.prespin."casa_soil.c_litter_structural"]
+active_constraint = "cell_pair"
+active_constraint_cell_ids = [1881]
+active_constraint_objective_slopes = [0.40594208987426694]
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_litter_structural".absolute_error_kg_c_m2]
+    maximum = 4.999917808338333e-10
+    mean = 1.7053262167714909e-10
+    median = 1.3382411845341835e-10
+    minimum = 0.0
+    p90 = 4.284714263946832e-10
+    p95 = 4.6270215492404647e-10
+    p99 = 4.926911145730628e-10
+    p999 = 4.98925931638472e-10
+
+    [variable.prespin."casa_soil.c_litter_structural".absolute_reference_kg_c_m2]
+    maximum = 5.29566915
+    mean = 0.40620307787426696
+    median = 0.166448432
+    minimum = 0.0
+    p90 = 1.1534358632000004
+    p95 = 1.5260098509
+    p99 = 3.0439252730200006
+    p999 = 4.835948777042056
+
+    [variable.prespin."casa_soil.c_litter_structural".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_litter_structural".relative_error]
+    defined_pair_count = 2949
+    maximum = 0.4933173265784293
+    mean = 0.0004144096305981932
+    median = 5.685183406467118e-10
+    minimum = 8.644349854411479e-14
+    p90 = 1.734098160144851e-8
+    p95 = 8.126598467009323e-7
+    p99 = 0.0003232999081729542
+    p999 = 0.11332659648972125
+    undefined_zero_reference_count = 1314
+
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.999917808338333e-10
+    cell_id = 1881
+    fortran_kg_c_m2 = 0.000260988
+    julia_kg_c_m2 = 0.00026098750000821914
+    pft = 16
+    rank = 1
+    relative_error = 1.9157654023703516e-6
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997656435990647e-10
+    cell_id = 1884
+    fortran_kg_c_m2 = 2.362e-6
+    julia_kg_c_m2 = 2.361500234356401e-6
+    pft = 16
+    rank = 2
+    relative_error = 0.00021158579322568362
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.996172711657643e-10
+    cell_id = 2847
+    fortran_kg_c_m2 = 0.047196966
+    julia_kg_c_m2 = 0.04719696649961727
+    pft = 7
+    rank = 3
+    relative_error = 1.0585792128370375e-8
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.992917190804746e-10
+    cell_id = 4880
+    fortran_kg_c_m2 = 3.774447003
+    julia_kg_c_m2 = 3.7744470025007084
+    pft = 3
+    rank = 4
+    relative_error = 1.3228208494744486e-10
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.989664237342595e-10
+    cell_id = 908
+    fortran_kg_c_m2 = 0.397991221
+    julia_kg_c_m2 = 0.39799122149896643
+    pft = 8
+    rank = 5
+    relative_error = 1.2537121358620609e-9
+    [[variable.prespin."casa_soil.c_litter_structural".top_outlier]]
+    absolute_error_kg_c_m2 = 4.988118737503378e-10
+    cell_id = 9783
+    fortran_kg_c_m2 = 0.053177879
+    julia_kg_c_m2 = 0.05317787949881187
+    pft = 18
+    rank = 6
+    relative_error = 9.380063348339594e-9
+
+[variable.prespin."casa_soil.c_soil_microbial"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_soil_microbial".absolute_error_kg_c_m2]
+    maximum = 4.998011449153239e-10
+    mean = 1.7511340072510296e-10
+    median = 1.4485705863986897e-10
+    minimum = 0.0
+    p90 = 4.271238529529598e-10
+    p95 = 4.656631288901814e-10
+    p99 = 4.931935454477454e-10
+    p999 = 4.993487148219345e-10
+
+    [variable.prespin."casa_soil.c_soil_microbial".absolute_reference_kg_c_m2]
+    maximum = 3.954850887
+    mean = 0.2923108280858551
+    median = 0.10578309799999999
+    minimum = 0.0
+    p90 = 0.7168629402000002
+    p95 = 1.4607603001000002
+    p99 = 2.6791927548800007
+    p999 = 3.403543519750012
+
+    [variable.prespin."casa_soil.c_soil_microbial".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_soil_microbial".relative_error]
+    defined_pair_count = 2948
+    maximum = 0.3851082191283338
+    mean = 0.00046071141643076036
+    median = 9.642980884083563e-10
+    minimum = 1.2008804793114334e-13
+    p90 = 4.342242180504426e-8
+    p95 = 1.3122368371824577e-6
+    p99 = 0.0002945994705865597
+    p999 = 0.15066261056835473
+    undefined_zero_reference_count = 1315
+
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.998011449153239e-10
+    cell_id = 5605
+    fortran_kg_c_m2 = 0.178259929
+    julia_kg_c_m2 = 0.17825992949980116
+    pft = 9
+    rank = 1
+    relative_error = 2.8037773139431905e-9
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997404851048159e-10
+    cell_id = 9592
+    fortran_kg_c_m2 = 0.091740173
+    julia_kg_c_m2 = 0.09174017349974048
+    pft = 18
+    rank = 2
+    relative_error = 5.447346225353379e-9
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997365021797151e-10
+    cell_id = 5603
+    fortran_kg_c_m2 = 0.144812489
+    julia_kg_c_m2 = 0.1448124894997365
+    pft = 7
+    rank = 3
+    relative_error = 3.450921295743457e-9
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.996157480243422e-10
+    cell_id = 449
+    fortran_kg_c_m2 = 0.000132755
+    julia_kg_c_m2 = 0.00013275450038425197
+    pft = 16
+    rank = 4
+    relative_error = 3.7634420400312024e-6
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.994023528048785e-10
+    cell_id = 1134
+    fortran_kg_c_m2 = 0.418381885
+    julia_kg_c_m2 = 0.41838188450059766
+    pft = 14
+    rank = 5
+    relative_error = 1.1936519498325759e-9
+    [[variable.prespin."casa_soil.c_soil_microbial".top_outlier]]
+    absolute_error_kg_c_m2 = 4.991976276791377e-10
+    cell_id = 10149
+    fortran_kg_c_m2 = 0.378694895
+    julia_kg_c_m2 = 0.3786948954991976
+    pft = 10
+    rank = 6
+    relative_error = 1.3182053264254796e-9
+
+[variable.prespin."casa_soil.c_soil_passive"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_soil_passive".absolute_error_kg_c_m2]
+    maximum = 4.998048641624564e-10
+    mean = 1.7175192766509936e-10
+    median = 1.3434892087715866e-10
+    minimum = 0.0
+    p90 = 4.257537877805362e-10
+    p95 = 4.6209063242486086e-10
+    p99 = 4.92443428257161e-10
+    p999 = 4.984295888521562e-10
+
+    [variable.prespin."casa_soil.c_soil_passive".absolute_reference_kg_c_m2]
+    maximum = 12.363985213
+    mean = 1.9974760988885762
+    median = 0.528416372
+    minimum = 0.0
+    p90 = 5.101684329
+    p95 = 5.4662838724
+    p99 = 11.664227907039999
+    p999 = 11.965831681936013
+
+    [variable.prespin."casa_soil.c_soil_passive".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_soil_passive".relative_error]
+    defined_pair_count = 2970
+    maximum = 2.53904438932571e-8
+    mean = 6.343394252234022e-10
+    median = 1.0622582733962072e-10
+    minimum = 1.5162733352549047e-14
+    p90 = 1.40981903209258e-9
+    p95 = 3.1877277172914458e-9
+    p99 = 9.267879875942974e-9
+    p999 = 1.915220857001495e-8
+    undefined_zero_reference_count = 1293
+
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.998048641624564e-10
+    cell_id = 5506
+    fortran_kg_c_m2 = 1.370237751
+    julia_kg_c_m2 = 1.370237750500195
+    pft = 7
+    rank = 1
+    relative_error = 3.6475776834910485e-10
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.992894986344254e-10
+    cell_id = 2384
+    fortran_kg_c_m2 = 4.408580658
+    julia_kg_c_m2 = 4.4085806575007105
+    pft = 1
+    rank = 2
+    relative_error = 1.1325402377030195e-10
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.989824942125409e-10
+    cell_id = 11067
+    fortran_kg_c_m2 = 0.20252247
+    julia_kg_c_m2 = 0.20252246950101752
+    pft = 14
+    rank = 3
+    relative_error = 2.463837687800968e-9
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.988454094245753e-10
+    cell_id = 3615
+    fortran_kg_c_m2 = 4.726771252
+    julia_kg_c_m2 = 4.726771251501154
+    pft = 4
+    rank = 4
+    relative_error = 1.0553618587180478e-10
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.984916368577785e-10
+    cell_id = 10625
+    fortran_kg_c_m2 = 0.27061744
+    julia_kg_c_m2 = 0.27061743950150835
+    pft = 14
+    rank = 5
+    relative_error = 1.8420528878618412e-9
+    [[variable.prespin."casa_soil.c_soil_passive".top_outlier]]
+    absolute_error_kg_c_m2 = 4.982548124088382e-10
+    cell_id = 4777
+    fortran_kg_c_m2 = 0.08072178099999999
+    julia_kg_c_m2 = 0.0807217814982548
+    pft = 14
+    rank = 6
+    relative_error = 6.172495282392719e-9
+
+[variable.prespin."casa_soil.c_soil_slow"]
+active_constraint = "absolute_floor"
+active_constraint_cell_ids = []
+active_constraint_objective_slopes = []
+finite_pair_count = 4263
+floor_constraint_active = true
+
+    [variable.prespin."casa_soil.c_soil_slow".absolute_error_kg_c_m2]
+    maximum = 4.999540460445817e-10
+    mean = 1.7177867196935886e-10
+    median = 1.4020162808492387e-10
+    minimum = 0.0
+    p90 = 4.228178696052964e-10
+    p95 = 4.6256382284889524e-10
+    p99 = 4.910944007008311e-10
+    p999 = 4.988705007424876e-10
+
+    [variable.prespin."casa_soil.c_soil_slow".absolute_reference_kg_c_m2]
+    maximum = 19.024909225
+    mean = 3.248736401107672
+    median = 2.095452898
+    minimum = 0.0
+    p90 = 8.709341286
+    p95 = 11.5667423247
+    p99 = 16.795533036220007
+    p999 = 18.460943016930006
+
+    [variable.prespin."casa_soil.c_soil_slow".derived_policy]
+    absolute_floor = 5.000142108547152e-10
+    atol = 5.250291322521663e-10
+    raw_atol = 5.000142108547152e-10
+    raw_objective = 5.000142108547152e-10
+    raw_rtol = 0.0
+    rtol = 0.0
+    validation_failed_pairs = 0
+
+    [variable.prespin."casa_soil.c_soil_slow".relative_error]
+    defined_pair_count = 2965
+    maximum = 0.4121010469129624
+    mean = 0.0001666374549130345
+    median = 6.043397167557168e-11
+    minimum = 2.1777315737827622e-14
+    p90 = 4.795901491497639e-9
+    p95 = 9.225814047538555e-8
+    p99 = 4.2376079234540704e-5
+    p999 = 0.0030597051774981657
+    undefined_zero_reference_count = 1298
+
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.999540460445817e-10
+    cell_id = 2368
+    fortran_kg_c_m2 = 0.005741313
+    julia_kg_c_m2 = 0.005741313499954046
+    pft = 16
+    rank = 1
+    relative_error = 8.708008883065281e-8
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.997784408544703e-10
+    cell_id = 245
+    fortran_kg_c_m2 = 1.956042788
+    julia_kg_c_m2 = 1.9560427875002215
+    pft = 8
+    rank = 2
+    relative_error = 2.555048611004466e-10
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.995506230898172e-10
+    cell_id = 900
+    fortran_kg_c_m2 = 3.691631686
+    julia_kg_c_m2 = 3.6916316855004494
+    pft = 10
+    rank = 3
+    relative_error = 1.3531973543956012e-10
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.995133195961898e-10
+    cell_id = 3540
+    fortran_kg_c_m2 = 7.7415443779999995
+    julia_kg_c_m2 = 7.741544378499513
+    pft = 7
+    rank = 4
+    relative_error = 6.452373004741947e-11
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.988879170886307e-10
+    cell_id = 5406
+    fortran_kg_c_m2 = 0.043907203000000006
+    julia_kg_c_m2 = 0.04390720250111209
+    pft = 12
+    rank = 5
+    relative_error = 1.1362325153998778e-8
+    [[variable.prespin."casa_soil.c_soil_slow".top_outlier]]
+    absolute_error_kg_c_m2 = 4.988214424850312e-10
+    cell_id = 3149
+    fortran_kg_c_m2 = 0.067194446
+    julia_kg_c_m2 = 0.06719444550117856
+    pft = 12
+    rank = 6
+    relative_error = 7.4235516799265105e-9

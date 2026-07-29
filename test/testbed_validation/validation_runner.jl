@@ -1,5 +1,6 @@
 module TestbedValidationRunner
 
+import Pkg
 import SHA
 import TOML
 
@@ -15,9 +16,22 @@ const DEPRECATED_SCOPE_ALIASES =
 const AVAILABLE_SCOPE_METADATA = Dict(
     "core" => (; cell_count = 11, selection_key = "core_cell_ids"),
     "smoke" => (; cell_count = 37, selection_key = "extended_cell_ids"),
+    "representative" => (; cell_count = 80, selection_key = nothing),
 )
 const MODELS = ("CORPSE", "MIMICS-C", "MIMICS-CN", "CASA-C", "CASA-CN")
 const REFERENCE_MODES = ("pinned", "fresh")
+const CASA_C_BOUNDARY_VARIABLES = Set((
+    "casa_plant.c_labile",
+    "casa_plant.c_leaf",
+    "casa_plant.c_wood",
+    "casa_plant.c_fine_root",
+    "casa_soil.c_litter_metabolic",
+    "casa_soil.c_litter_structural",
+    "casa_soil.c_litter_cwd",
+    "casa_soil.c_soil_microbial",
+    "casa_soil.c_soil_slow",
+    "casa_soil.c_soil_passive",
+),)
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = "CLIMALAND_VALIDATION_CASA_C_REFERENCE"
 const DEFAULT_REFERENCE = joinpath(
@@ -32,6 +46,7 @@ const DEFAULT_SCOPE_MANIFEST_DIRECTORY =
     joinpath(@__DIR__, "validation", "scopes")
 const DEFAULT_COMPARISON_POLICY =
     joinpath(@__DIR__, "validation", "comparison_policy.toml")
+const VALIDATION_ARTIFACTS = joinpath(@__DIR__, "validation", "Artifacts.toml")
 
 struct RunnerError <: Exception
     message::String
@@ -171,12 +186,14 @@ function validate_scope_manifest(manifest, path, expected_name)
             "$(titlecase(expected_name)) Scope must contain $(metadata.cell_count) cells, found $(length(cell_ids))",
         ),
     )
-    selected_cells = TOML.parsefile(SELECTED_CELL_MANIFEST)["selection"]
-    cell_ids == Int.(selected_cells[metadata.selection_key]) || throw(
-        RunnerError(
-            "$(titlecase(expected_name)) Scope does not preserve the selected-cell collection",
-        ),
-    )
+    if !isnothing(metadata.selection_key)
+        selected_cells = TOML.parsefile(SELECTED_CELL_MANIFEST)["selection"]
+        cell_ids == Int.(selected_cells[metadata.selection_key]) || throw(
+            RunnerError(
+                "$(titlecase(expected_name)) Scope does not preserve the selected-cell collection",
+            ),
+        )
+    end
     partitions = get(manifest, "partition", Any[])
     length(partitions) == 1 ||
         throw(RunnerError("Scope Manifest at $path must declare one partition"))
@@ -190,7 +207,11 @@ function validate_scope_manifest(manifest, path, expected_name)
         "source_manifest_sha256",
         nothing,
     )
-    source_sha == sha256sum(SELECTED_CELL_MANIFEST) || throw(
+    expected_source =
+        expected_name == "representative" ?
+        joinpath(DEFAULT_SCOPE_MANIFEST_DIRECTORY, "smoke.toml") :
+        SELECTED_CELL_MANIFEST
+    source_sha == sha256sum(expected_source) || throw(
         RunnerError(
             "Scope Manifest at $path does not match the selected-cell provenance",
         ),
@@ -235,7 +256,7 @@ function load_scope_manifests(scope)
             ),
             joinpath(directory, "$name.toml"),
             name,
-        ) for name in ("core", "smoke")
+        ) for name in ("core", "smoke", "representative")
     )
     core_ids = manifests["core"].cell_ids
     smoke_ids = manifests["smoke"].cell_ids
@@ -244,13 +265,20 @@ function load_scope_manifests(scope)
             "Nested Validation Scopes require Core to be a strict subset of Smoke",
         ),
     )
+    representative_ids = manifests["representative"].cell_ids
+    all(id -> id in representative_ids, smoke_ids) &&
+        smoke_ids != representative_ids || throw(
+        RunnerError(
+            "Nested Validation Scopes require Smoke to be a strict subset of Representative",
+        ),
+    )
     return manifests[scope]
 end
 
 function comparison_policy()
     path = DEFAULT_COMPARISON_POLICY
     policy = parse_toml(path, "Comparison Policy")
-    get(policy, "schema_version", nothing) == 1 || throw(
+    get(policy, "schema_version", nothing) == 2 || throw(
         RunnerError("Comparison Policy at $path has an incompatible schema"),
     )
     acceptance = get(policy, "acceptance", Dict{String, Any}())
@@ -285,42 +313,63 @@ function comparison_policy()
         ) for rule in required_rules[1:3]
     )
     fresh = model["fresh_fortran_boundary"]
-    fresh_rtol = get(fresh, "rtol", nothing)
-    fresh_rtol isa Real && isfinite(fresh_rtol) && fresh_rtol >= 0 || throw(
+    calibration_name = get(fresh, "calibration_manifest", nothing)
+    calibration_name isa String &&
+        basename(calibration_name) == calibration_name || throw(
         RunnerError(
-            "Comparison Policy at $path has invalid fresh-Fortran rtol",
+            "Comparison Policy at $path has an invalid calibration manifest",
         ),
     )
+    calibration_path = joinpath(dirname(path), calibration_name)
+    calibration = parse_toml(calibration_path, "CASA-C Calibration")
+    get(calibration, "schema_version", nothing) == 1 &&
+        get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
+        get(calibration, "cell_count", nothing) == 4263 || throw(
+        RunnerError("CASA-C Calibration at $calibration_path is incompatible"),
+    )
+    calibrated_variables = get(calibration, "variable", Dict{String, Any}())
     stages = ("prespin", "accelerated_spin", "normal_spin", "historical")
-    stage_variables = nothing
     tolerance["fresh_fortran_boundary"] = Dict(
         stage => begin
-            values = get(fresh, stage, nothing)
+            values = get(calibrated_variables, stage, nothing)
             values isa AbstractDict && !isempty(values) || throw(
                 RunnerError(
-                    "Comparison Policy at $path is missing fresh-Fortran $stage rules",
+                    "CASA-C Calibration at $calibration_path is missing $stage rules",
                 ),
             )
             names = Set(String.(keys(values)))
-            isnothing(stage_variables) ? (stage_variables = names) :
-            names == stage_variables || throw(
+            names == CASA_C_BOUNDARY_VARIABLES || throw(
                 RunnerError(
-                    "Comparison Policy at $path has inconsistent fresh-Fortran variables",
+                    "CASA-C Calibration at $calibration_path has incompatible boundary variables",
                 ),
             )
             Dict(
                 String(name) => begin
-                    atol = values[name]
-                    atol isa Real && isfinite(atol) && atol >= 0 ||
-                        throw(
-                            RunnerError(
-                                "Comparison Policy at $path has an invalid tolerance",
-                            ),
-                        )
-                    Dict(
-                        "atol" => Float64(atol),
-                        "rtol" => Float64(fresh_rtol),
+                    get(values[name], "finite_pair_count", nothing) == 4263 || throw(
+                        RunnerError(
+                            "CASA-C Calibration at $calibration_path is not full-grid",
+                        ),
                     )
+                    derived = get(values[name], "derived_policy", nothing)
+                    derived isa AbstractDict || throw(
+                        RunnerError(
+                            "CASA-C Calibration at $calibration_path has no derived policy",
+                        ),
+                    )
+                    atol = get(derived, "atol", nothing)
+                    rtol = get(derived, "rtol", nothing)
+                    atol isa Real &&
+                        isfinite(atol) &&
+                        atol >= 0 &&
+                        rtol isa Real &&
+                        isfinite(rtol) &&
+                        rtol >= 0 &&
+                        get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                        RunnerError(
+                            "CASA-C Calibration at $calibration_path has an invalid tolerance",
+                        ),
+                    )
+                    Dict("atol" => Float64(atol), "rtol" => Float64(rtol))
                 end for name in keys(values)
             )
         end for stage in stages
@@ -340,6 +389,8 @@ function comparison_policy()
         tolerance,
         budget_rtol = Float64(budget_rtol),
         path = abspath(path),
+        calibration,
+        calibration_path = abspath(calibration_path),
     )
 end
 
@@ -373,6 +424,17 @@ function initial_report(configuration, output_root, scope, policy)
             "acceptance" => policy.document["acceptance"],
             "budget_rtol" => policy.budget_rtol,
             "applied_rules" => sort!(collect(String.(keys(policy.model)))),
+            "fresh_fortran_boundary" =>
+                policy.tolerance["fresh_fortran_boundary"],
+            "calibration" => Dict(
+                "id" => String(policy.calibration["calibration_id"]),
+                "source" => String(policy.calibration["source"]),
+                "cell_count" => Int(policy.calibration["cell_count"]),
+                "units" => String(policy.calibration["units"]),
+                "method" => policy.calibration["method"],
+                "path" => policy.calibration_path,
+                "sha256" => sha256sum(policy.calibration_path),
+            ),
         ),
         "reference_mode" => configuration.reference_mode,
         "workers" => configuration.workers,
@@ -425,10 +487,8 @@ end
 # ============================================================================
 
 function validate_available(configuration)
-    configuration.scope in ("core", "smoke") || throw(
+    configuration.scope in ("core", "smoke", "representative") || throw(
         RunnerError(
-            configuration.scope == "representative" ?
-            "Representative Scope is not available yet; use --scope core" :
             "$(titlecase(configuration.scope)) Scope is not available yet; use --scope core",
         ),
     )
@@ -445,8 +505,41 @@ function validate_available(configuration)
     return nothing
 end
 
-function reference_path()
-    return get(ENV, REFERENCE_OVERRIDE, DEFAULT_REFERENCE)
+function artifact_directory(name, description)
+    hash = try
+        Pkg.Artifacts.artifact_hash(name, VALIDATION_ARTIFACTS)
+    catch error
+        throw(
+            RunnerError(
+                "$description artifact binding is unreadable: $(sprint(showerror, error))",
+            ),
+        )
+    end
+    isnothing(hash) &&
+        throw(RunnerError("$description artifact binding is missing"))
+    Pkg.Artifacts.artifact_exists(hash) || throw(
+        RunnerError(
+            "$description artifact $hash is unavailable locally. Install the pinned artifact; pinned mode never computes it.",
+        ),
+    )
+    return Pkg.Artifacts.artifact_path(hash), string(hash)
+end
+
+function reference_path(scope)
+    haskey(ENV, REFERENCE_OVERRIDE) && return ENV[REFERENCE_OVERRIDE], nothing
+    scope != "representative" && return DEFAULT_REFERENCE, nothing
+    directory, hash = artifact_directory(
+        "representative_casa_c_reference",
+        "Representative CASA-C reference",
+    )
+    return joinpath(directory, "complete_casa_workflow.toml"), hash
+end
+
+function fixture_manifest_path(scope)
+    scope != "representative" && return SELECTED_CELL_MANIFEST, nothing
+    directory, hash =
+        artifact_directory("representative_forcing", "Representative forcing")
+    return joinpath(directory, "fixture.toml"), hash
 end
 
 function validate_reference_file(path)
@@ -577,10 +670,11 @@ function scientific_outcome(report, result)
     return (; passed = all(values(checks)), checks)
 end
 
-function stage_casa(scope, pinned_reference, policy)
+function stage_casa(scope, pinned_reference, policy, fixture_manifest)
     collection = TestbedReferenceCellComparisons.selected_cell_collection(
         scope.name,
-        eligible_cell_ids(scope, "CASA-C"),
+        eligible_cell_ids(scope, "CASA-C");
+        manifest_path = fixture_manifest,
     )
     TestbedSelectedCASAWorkflow.workflow_reference(
         :carbon_only,
@@ -667,13 +761,16 @@ function main(args = ARGS)
         return 2
     end
     report = initial_report(configuration, output_root, scope, policy)
-    pinned_reference = reference_path()
     started = time_ns()
     try
+        pinned_reference, reference_artifact =
+            reference_path(configuration.scope)
         reference = validate_reference_file(pinned_reference)
         validate_eligible_reference_values(reference, scope)
+        fixture_manifest, forcing_artifact =
+            fixture_manifest_path(configuration.scope)
         collection = try
-            stage_casa(scope, pinned_reference, policy)
+            stage_casa(scope, pinned_reference, policy, fixture_manifest)
         catch error
             throw(
                 RunnerError(
@@ -689,6 +786,15 @@ function main(args = ARGS)
             collection,
             policy,
         )
+        model_report = only(report["model"])
+        model_report["forcing"] = Dict(
+            "manifest" => abspath(fixture_manifest),
+            "manifest_sha256" => sha256sum(fixture_manifest),
+        )
+        isnothing(forcing_artifact) ||
+            (model_report["forcing"]["artifact"] = forcing_artifact)
+        isnothing(reference_artifact) ||
+            (model_report["reference"]["artifact"] = reference_artifact)
         report_path = write_report(output_root, report)
         print_summary(stdout, report, report_path)
         return passed ? 0 : 1
