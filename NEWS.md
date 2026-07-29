@@ -2,6 +2,10 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add the Validation Runner's first complete tracer:
+  a pinned 11-cell Core CASA-C comparison with fail-closed input verification,
+  compact reports, and trustworthy command exit status. Issue
+  [#46](https://github.com/yinonbaron/ClimaLand.jl/issues/46).
 - ![][badge-✨feature] Add the native four-stage, 4,263-cell MIMICS-CN
   reconstruction using issue 43's hash-pinned KO4/FI30 parameters, with native
   C/N checkpoints, working-DIN and process diagnostics, stage budgets, and

@@ -5,6 +5,10 @@ import TOML
 
 include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
 
+# ============================================================================
+# Command-line interface
+# ============================================================================
+
 const SCOPES = ("core", "smoke", "representative", "broad", "global")
 const MODELS = ("CORPSE", "MIMICS-C", "MIMICS-CN", "CASA-C", "CASA-CN")
 const REFERENCE_MODES = ("pinned", "fresh")
@@ -118,6 +122,10 @@ function parse_args(args)
     )
 end
 
+# ============================================================================
+# Validation Report
+# ============================================================================
+
 sha256sum(path) = open(path) do io
     bytes2hex(SHA.sha256(io))
 end
@@ -170,6 +178,23 @@ function write_report(output_root, report)
     mv(temporary, path; force = true)
     return path
 end
+
+function print_summary(io, report, report_path)
+    model = only(report["model"])
+    coverage = model["coverage"]
+    println(
+        io,
+        "Validation: $(report["outcome"]) | scope=$(report["scope"]["name"]) " *
+        "| model=$(model["name"]) | coverage=$(coverage["compared_cells"])/$(coverage["scope_cells"]) " *
+        "| reference=$(model["reference_mode"]) | seconds=$(round(report["seconds"]; digits = 3))",
+    )
+    println(io, "Validation Report: $report_path")
+    return nothing
+end
+
+# ============================================================================
+# Pinned Core CASA-C comparison
+# ============================================================================
 
 function validate_available(configuration)
     configuration.scope == "core" || throw(
@@ -225,6 +250,7 @@ function scientific_outcome(report, result)
     boundaries = get(report, "boundary_comparison", Dict{String, Any}())
     carbon_budget = get(report, "carbon_budget", Dict{String, Any}())
     passive = get(report, "passive_restoration", Dict{String, Any}())
+    passive_carbon = get(passive, "carbon", Dict{String, Any}())
     checks = Dict(
         "initialization" => get(initialization, "all_match", false),
         "fresh_fortran_boundaries" => all(
@@ -240,7 +266,11 @@ function scientific_outcome(report, result)
         ),
         "carbon_budget" => get(carbon_budget, "all_close", false),
         "passive_restoration" =>
-            get(passive, "verified", false) &&
+            get(
+                passive,
+                "verified",
+                get(passive_carbon, "verified", false),
+            ) &&
             get(passive, "unaffected_verified", false) &&
             get(passive, "checkpoint_roundtrip_verified", false),
         "checkpoint_roundtrip" =>
@@ -299,9 +329,15 @@ function run_core_casa!(
     return outcome.passed
 end
 
+# ============================================================================
+# Entry point
+# ============================================================================
+
 function main(args = ARGS)
     configuration = try
-        parse_args(args)
+        parsed = parse_args(args)
+        parsed.help || validate_available(parsed)
+        parsed
     catch error
         error isa RunnerError || rethrow()
         println(stderr, "Validation Runner: ", error.message)
@@ -310,13 +346,6 @@ function main(args = ARGS)
     if configuration.help
         usage()
         return 0
-    end
-    try
-        validate_available(configuration)
-    catch error
-        error isa RunnerError || rethrow()
-        println(stderr, "Validation Runner: ", error.message)
-        return 2
     end
 
     output_root =
@@ -344,7 +373,7 @@ function main(args = ARGS)
             collection,
         )
         report_path = write_report(output_root, report)
-        println("Validation Report: $report_path")
+        print_summary(stdout, report, report_path)
         return passed ? 0 : 1
     catch error
         seconds = (time_ns() - started) / 1e9
@@ -353,7 +382,7 @@ function main(args = ARGS)
         report["error"] = sprint(showerror, error)
         report_path = write_report(output_root, report)
         println(stderr, "Validation Runner: ", report["error"])
-        println(stderr, "Validation Report: $report_path")
+        print_summary(stderr, report, report_path)
         return error isa RunnerError ? 2 : 1
     end
 end

@@ -81,3 +81,39 @@ end
         @test !isdir(joinpath(output, "CASA-C", "stages"))
     end
 end
+
+@testset "Validation Runner completes the pinned Core CASA-C comparison" begin
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "core",
+            "--models",
+            "CASA-C",
+            "--reference",
+            "pinned",
+            "--workers",
+            "1",
+            "--output",
+            output,
+        )
+
+        @test result.exitcode == 0
+        @test occursin("Validation: passed", result.stdout)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test report["scope"]["name"] == "core"
+        @test report["scope"]["cell_count"] == 11
+        @test report["model"][1]["name"] == "CASA-C"
+        @test report["model"][1]["coverage"]["compared_cells"] == 11
+        @test report["model"][1]["outcome"] == "passed"
+        @test report["model"][1]["seconds"] > 0
+        @test Set(keys(report["model"][1]["comparison"])) == Set([
+            "initialization",
+            "fresh_fortran_boundaries",
+            "carbon_budget",
+            "passive_restoration",
+            "checkpoint_roundtrip",
+        ])
+        @test all(values(report["model"][1]["comparison"]))
+        @test report["outcome"] == "passed"
+    end
+end
