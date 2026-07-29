@@ -538,10 +538,14 @@ function compare_snapshot(
     )
 end
 
-function workflow_reference(configuration, collection)
-    isfile(REFERENCE_PATH) ||
-        error("Pinned selected-cell CASA reference is missing: $REFERENCE_PATH")
-    reference = TOML.parsefile(REFERENCE_PATH)
+function workflow_reference(
+    configuration,
+    collection;
+    path = REFERENCE_PATH,
+)
+    isfile(path) ||
+        error("Pinned selected-cell CASA reference is missing: $path")
+    reference = TOML.parsefile(path)
     reference["schema_version"] == 1 ||
         error("Unsupported selected-cell CASA reference schema")
     configuration_reference = reference["configuration"][String(configuration)]
@@ -563,7 +567,7 @@ function workflow_reference(configuration, collection)
         reference,
         configuration = configuration_reference,
         indices = (; by_id),
-        path = REFERENCE_PATH,
+        path,
         provenance,
     )
 end
@@ -1044,6 +1048,7 @@ function run_selected_case(
     stages = COMPLETE_STAGES,
     budget_rtol = 5e-12,
     compare_references = true,
+    reference_path = REFERENCE_PATH,
     diagnostics = nothing,
 )
     setup = load_setup(configuration; collection)
@@ -1056,7 +1061,8 @@ function run_selected_case(
     end
     reference =
         canonical_schedule(stages) && compare_references ?
-        workflow_reference(configuration, collection) : nothing
+        workflow_reference(configuration, collection; path = reference_path) :
+        nothing
     initialization_comparison =
         isnothing(reference) ?
         Dict("skipped" => "reference comparison disabled") :
