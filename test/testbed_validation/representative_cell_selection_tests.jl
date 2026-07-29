@@ -74,3 +74,16 @@ end
         selection.matches,
     )
 end
+
+@testset "Representative fixture provenance is complete" begin
+    provenance = REPRESENTATIVE_SELECTION.fixture_provenance()
+    @test provenance.selection["code"] == "representative_cell_selection.jl"
+    @test provenance.selection["code_sha256"] ==
+          REPRESENTATIVE_SELECTION.sha256sum(
+        joinpath(@__DIR__, "representative_cell_selection.jl"),
+    )
+    @test provenance.time["calendar"] == "noleap"
+    @test provenance.time["start_year"] == 1901
+    @test provenance.time["end_year"] == 2014
+    @test provenance.time["days"] == 41610
+end

@@ -272,6 +272,45 @@ end
     end
 end
 
+@testset "Validation Runner binds Representative forcing to its Scope Manifest" begin
+    mktempdir() do directory
+        scope_path = joinpath(directory, "representative.toml")
+        fixture_path = joinpath(directory, "fixture.toml")
+        write(scope_path, "name = \"representative\"\n")
+        scope = (; name = "representative", path = scope_path)
+        open(fixture_path, "w") do io
+            TOML.print(
+                io,
+                Dict("selection" => Dict("scope_manifest_sha256" => "stale")),
+            )
+        end
+
+        failure = try
+            VALIDATION_RUNNER_MODULE.validate_fixture_scope_provenance(
+                fixture_path,
+                scope,
+            )
+        catch error
+            error
+        end
+        @test failure isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("frozen Scope Manifest", sprint(showerror, failure))
+
+        fixture = TOML.parsefile(fixture_path)
+        fixture["selection"]["scope_manifest_sha256"] =
+            bytes2hex(SHA.sha256(read(scope_path)))
+        open(fixture_path, "w") do io
+            TOML.print(io, fixture; sorted = true)
+        end
+        @test isnothing(
+            VALIDATION_RUNNER_MODULE.validate_fixture_scope_provenance(
+                fixture_path,
+                scope,
+            ),
+        )
+    end
+end
+
 @testset "Validation Runner warns for temporary scope aliases" begin
     for (alias, canonical) in (("ordinary", "core"), ("extended", "smoke"))
         mktempdir() do output
@@ -311,6 +350,30 @@ end
     invalid = run_validation("--scope", "core", "--workers", "0")
     @test invalid.exitcode == 2
     @test occursin("workers must be positive", invalid.stderr)
+end
+
+@testset "Validation Runner enforces its hard process deadline" begin
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "core",
+            "--models",
+            "CASA-C",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_TIMEOUT_SECONDS" => "0.05",
+            ),
+        )
+
+        @test result.exitcode == 124
+        @test occursin("hard timeout", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test report["outcome"] == "timed_out"
+        @test report["model"][1]["outcome"] == "timed_out"
+        @test report["timeout"]["expired"]
+        @test report["timeout"]["limit_seconds"] == 0.05
+    end
 end
 
 @testset "Validation Runner fails closed before CASA-C simulation" begin

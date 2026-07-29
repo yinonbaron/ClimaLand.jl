@@ -87,6 +87,9 @@ function build(args)
         manifest = TOML.parsefile(fixture_manifest)
         Int.(manifest["selection"]["representative_cell_ids"]) ==
         selection.cell_ids || error("Existing Representative forcing differs")
+        get(manifest["selection"], "scope_manifest_sha256", nothing) ==
+        Selection.sha256sum(scope_manifest) ||
+            error("Existing Representative forcing has stale scope provenance")
         TestbedSelectedCellFixtures.verified_fixture_paths(
             fixture_manifest,
             manifest,

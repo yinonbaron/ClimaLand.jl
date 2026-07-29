@@ -34,6 +34,9 @@ const CASA_C_BOUNDARY_VARIABLES = Set((
 ),)
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = "CLIMALAND_VALIDATION_CASA_C_REFERENCE"
+const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
+const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
+const DEFAULT_TIMEOUT_SECONDS = 7200.0
 const DEFAULT_REFERENCE = joinpath(
     @__DIR__,
     "fixtures",
@@ -144,10 +147,9 @@ end
 # Validation Report
 # ============================================================================
 
-sha256sum(path) =
-    open(path) do io
-        bytes2hex(SHA.sha256(io))
-    end
+sha256sum(path) = open(path) do io
+    bytes2hex(SHA.sha256(io))
+end
 
 function parse_toml(path, description)
     isfile(path) || throw(RunnerError("$description is missing at $path"))
@@ -267,7 +269,7 @@ function load_scope_manifests(scope)
     )
     representative_ids = manifests["representative"].cell_ids
     all(id -> id in representative_ids, smoke_ids) &&
-        smoke_ids != representative_ids || throw(
+    smoke_ids != representative_ids || throw(
         RunnerError(
             "Nested Validation Scopes require Smoke to be a strict subset of Representative",
         ),
@@ -283,8 +285,8 @@ function comparison_policy()
     )
     acceptance = get(policy, "acceptance", Dict{String, Any}())
     get(acceptance, "eligible_nonfinite", nothing) == "fail" &&
-        get(acceptance, "eligibility_gaps", nothing) ==
-        "reviewed_scope_manifest_only" || throw(
+    get(acceptance, "eligibility_gaps", nothing) ==
+    "reviewed_scope_manifest_only" || throw(
         RunnerError(
             "Comparison Policy at $path has incompatible acceptance rules",
         ),
@@ -315,7 +317,7 @@ function comparison_policy()
     fresh = model["fresh_fortran_boundary"]
     calibration_name = get(fresh, "calibration_manifest", nothing)
     calibration_name isa String &&
-        basename(calibration_name) == calibration_name || throw(
+    basename(calibration_name) == calibration_name || throw(
         RunnerError(
             "Comparison Policy at $path has an invalid calibration manifest",
         ),
@@ -323,8 +325,8 @@ function comparison_policy()
     calibration_path = joinpath(dirname(path), calibration_name)
     calibration = parse_toml(calibration_path, "CASA-C Calibration")
     get(calibration, "schema_version", nothing) == 1 &&
-        get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
-        get(calibration, "cell_count", nothing) == 4263 || throw(
+    get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
+    get(calibration, "cell_count", nothing) == 4263 || throw(
         RunnerError("CASA-C Calibration at $calibration_path is incompatible"),
     )
     calibrated_variables = get(calibration, "variable", Dict{String, Any}())
@@ -359,12 +361,12 @@ function comparison_policy()
                     atol = get(derived, "atol", nothing)
                     rtol = get(derived, "rtol", nothing)
                     atol isa Real &&
-                        isfinite(atol) &&
-                        atol >= 0 &&
-                        rtol isa Real &&
-                        isfinite(rtol) &&
-                        rtol >= 0 &&
-                        get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                    isfinite(atol) &&
+                    atol >= 0 &&
+                    rtol isa Real &&
+                    isfinite(rtol) &&
+                    rtol >= 0 &&
+                    get(derived, "validation_failed_pairs", nothing) == 0 || throw(
                         RunnerError(
                             "CASA-C Calibration at $calibration_path has an invalid tolerance",
                         ),
@@ -542,6 +544,19 @@ function fixture_manifest_path(scope)
     return joinpath(directory, "fixture.toml"), hash
 end
 
+function validate_fixture_scope_provenance(path, scope)
+    scope.name == "representative" || return nothing
+    fixture = parse_toml(path, "Representative forcing manifest")
+    selection = get(fixture, "selection", Dict{String, Any}())
+    get(selection, "scope_manifest_sha256", nothing) == sha256sum(scope.path) ||
+        throw(
+            RunnerError(
+                "Representative forcing manifest does not match the frozen Scope Manifest",
+            ),
+        )
+    return nothing
+end
+
 function validate_reference_file(path)
     isfile(path) || throw(
         RunnerError(
@@ -606,7 +621,7 @@ function validate_eligible_reference_values(reference, scope)
         throw(RunnerError("Pinned CASA-C reference has invalid cell IDs"))
     end
     !isempty(reference_cell_ids) &&
-        length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
+    length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
         throw(RunnerError("Pinned CASA-C reference has invalid cell IDs"))
     eligible_ids = eligible_cell_ids(scope, "CASA-C")
     positions = Int[]
@@ -769,6 +784,7 @@ function main(args = ARGS)
         validate_eligible_reference_values(reference, scope)
         fixture_manifest, forcing_artifact =
             fixture_manifest_path(configuration.scope)
+        validate_fixture_scope_provenance(fixture_manifest, scope)
         collection = try
             stage_casa(scope, pinned_reference, policy, fixture_manifest)
         catch error
@@ -810,8 +826,106 @@ function main(args = ARGS)
     end
 end
 
+function timeout_seconds()
+    value = get(ENV, TIMEOUT_OVERRIDE, string(DEFAULT_TIMEOUT_SECONDS))
+    seconds = try
+        parse(Float64, value)
+    catch
+        throw(
+            RunnerError(
+                "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(DEFAULT_TIMEOUT_SECONDS))",
+            ),
+        )
+    end
+    0 < seconds <= DEFAULT_TIMEOUT_SECONDS || throw(
+        RunnerError(
+            "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(DEFAULT_TIMEOUT_SECONDS))",
+        ),
+    )
+    return seconds
+end
+
+function child_arguments(args)
+    configuration = parse_args(args)
+    configuration.help && return collect(args), nothing
+    if isnothing(configuration.output)
+        output_root = mktempdir(; cleanup = false)
+        return [collect(args); "--output"; output_root], output_root
+    end
+    return collect(args), abspath(configuration.output)
+end
+
+function write_timeout_report(args, output_root, limit_seconds)
+    configuration = parse_args(args)
+    scope = load_scope_manifests(configuration.scope)
+    policy = comparison_policy()
+    report = initial_report(configuration, output_root, scope, policy)
+    message = "hard timeout after $(round(limit_seconds; digits = 3)) seconds"
+    report["outcome"] = "timed_out"
+    report["seconds"] = limit_seconds
+    report["error"] = message
+    report["timeout"] =
+        Dict("expired" => true, "limit_seconds" => limit_seconds)
+    model_report = only(report["model"])
+    model_report["outcome"] = "timed_out"
+    model_report["seconds"] = limit_seconds
+    path = write_report(output_root, report)
+    println(stderr, "Validation Runner: ", message)
+    print_summary(stderr, report, path)
+    return nothing
+end
+
+function run_with_deadline(args = ARGS)
+    child_args, output_root = try
+        child_arguments(args)
+    catch error
+        error isa RunnerError || rethrow()
+        println(stderr, "Validation Runner: ", error.message)
+        return 2
+    end
+    isnothing(output_root) && return main(child_args)
+    limit_seconds = try
+        timeout_seconds()
+    catch error
+        error isa RunnerError || rethrow()
+        println(stderr, "Validation Runner: ", error.message)
+        return 2
+    end
+    project = dirname(Base.active_project())
+    command = addenv(
+        `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) $child_args`,
+        CHILD_PROCESS => "1",
+    )
+    process = run(pipeline(ignorestatus(command); stdout, stderr); wait = false)
+    status = timedwait(
+        () -> process_exited(process),
+        limit_seconds;
+        pollint = min(0.1, limit_seconds / 10),
+    )
+    if status == :timed_out
+        kill(process)
+        wait(process)
+        try
+            write_timeout_report(child_args, output_root, limit_seconds)
+        catch error
+            println(
+                stderr,
+                "Validation Runner: timed out and could not write its report: ",
+                sprint(showerror, error),
+            )
+        end
+        return 124
+    end
+    wait(process)
+    return process.exitcode
+end
+
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(TestbedValidationRunner.main())
+    child = get(ENV, TestbedValidationRunner.CHILD_PROCESS, "0") == "1"
+    exit(
+        child ? TestbedValidationRunner.main() :
+        TestbedValidationRunner.run_with_deadline(),
+    )
 end

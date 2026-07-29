@@ -59,10 +59,20 @@ selected_fixtures() =
 const SMOKE_FIXTURE_MANIFEST =
     joinpath(@__DIR__, "fixtures", "selected_cells", "fixture.toml")
 
-sha256sum(path) =
-    open(path) do io
-        bytes2hex(SHA.sha256(io))
-    end
+sha256sum(path) = open(path) do io
+    bytes2hex(SHA.sha256(io))
+end
+
+function fixture_provenance()
+    source_fixture = TOML.parsefile(SMOKE_FIXTURE_MANIFEST)
+    return (
+        selection = Dict(
+            "code" => basename(@__FILE__),
+            "code_sha256" => sha256sum(@__FILE__),
+        ),
+        time = source_fixture["time"],
+    )
+end
 
 function largest_remainder_allocation(population, total)
     pfts = sort!(collect(keys(population)))
@@ -143,8 +153,8 @@ function select_representative_cells(
     active = filter(
         candidate ->
             candidate.active &&
-                candidate.pft ∉ (13, 15, 17) &&
-                candidate.cell_id ∉ fixed,
+            candidate.pft ∉ (13, 15, 17) &&
+            candidate.cell_id ∉ fixed,
         ordered,
     )
     population = Dict{Int, Int}()
@@ -324,9 +334,9 @@ function representative_candidates(source_paths, grid_path, soil_path)
             cell_id,
             pft = grid[cell_id].pft,
             active = !location.missing &&
-                         grid[cell_id].pft ∉ (13, 15, 17) &&
-                         finite &&
-                         forcing_features.gpp_median > 0,
+                     grid[cell_id].pft ∉ (13, 15, 17) &&
+                     finite &&
+                     forcing_features.gpp_median > 0,
             features,
         )
     end
@@ -479,9 +489,8 @@ function build_representative_fixture(
             selected_fixtures().copy_fixture_file(source, destination_path)
     end
     by_id = Dict(candidate.cell_id => candidate for candidate in candidates)
-    smoke = Set(
-        Int.(TOML.parsefile(scope_manifest)["selection"]["smoke_cell_ids"],),
-    )
+    smoke =
+        Set(Int.(TOML.parsefile(scope_manifest)["selection"]["smoke_cell_ids"]))
     cells = [
         Dict(
             "id" => id,
@@ -491,10 +500,12 @@ function build_representative_fixture(
                 ["augmented Latin-hypercube PFT $(by_id[id].pft)"],
         ) for id in selection.cell_ids
     ]
+    provenance = fixture_provenance()
     manifest = Dict(
         "schema_version" => 1,
         "title" => "Representative CLM5/GSWP3 validation forcing",
         "selection" => Dict(
+            provenance.selection...,
             "representative_cell_ids" => selection.cell_ids,
             "scope_manifest_sha256" => sha256sum(scope_manifest),
         ),
@@ -523,6 +534,7 @@ function build_representative_fixture(
             first(source_paths),
             forcing_path,
         ),
+        "time" => provenance.time,
         "cell" => cells,
     )
     manifest_path = joinpath(destination, "fixture.toml")

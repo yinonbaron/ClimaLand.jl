@@ -55,4 +55,6 @@ julia --project=test test/testbed_validation/validation_runner.jl \
 Initialization, all four fresh-Fortran boundaries, the carbon budget, passive
 pool restoration, and every checkpoint round trip passed. The underlying
 current-Julia 4,263-cell calibration run completed in approximately 1 hour
-53 minutes under the two-hour hard timeout.
+53 minutes under the same bound. The public runner enforces a 7,200-second
+process deadline; a timeout exits with status 124 and records
+`outcome = "timed_out"` in the standard report.
