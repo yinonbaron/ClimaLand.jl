@@ -394,6 +394,12 @@ julia --startup-file=no \
   test/testbed_validation/reference_harness.jl corpse-one-day \
   <biogeochem-testbed-source-root> <run-parent>
 
+# Run the source-pinned, resumable 4,263-cell Fortran CORPSE-C workflow.
+# See CORPSE_C_RECONSTRUCTION.md for controls, retention, and diagnostics.
+julia --startup-file=no --project=.buildkite \
+  test/testbed_validation/corpse_c_reconstruction.jl run \
+  <biogeochem-testbed-source-root> <data-root> <run-root>
+
 # Native scientific comparison. Exact comparison is the default; ignored
 # variables must be scientifically justified in the experiment manifest.
 julia --startup-file=no --project=.buildkite \

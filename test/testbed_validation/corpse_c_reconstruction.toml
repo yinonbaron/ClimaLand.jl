@@ -1,0 +1,79 @@
+schema_version = 1
+issue = 44
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+prespin_loops = 100
+spin_loops = 499
+spin_years = [1901, 1920]
+history_years = [1901, 2014]
+spin_checkpoint_interval = 9960
+conservation_atol = 0.0001
+comparison_atol = 1.0e-12
+comparison_rtol = 1.0e-12
+
+[comparison_evidence]
+basis = "A fresh rerun of the pinned 37-cell workflow reproduced the complete NetCDF oracle byte-for-byte."
+observed_maximum_absolute_error = 0.0
+observed_maximum_relative_error = 0.0
+artifact_match = "sha256 exact"
+
+[inputs]
+driver_directory = "INPUT_GSWP3_CLM5dev110_hist"
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+grid_sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+soil_sha256 = "0aa206e5ce635472b4aa3e9d268cb89e2a898f8c8c7567e8f451521bcc395123"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+phenology_sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+perturbation = "GRID_CN/co2delta_control.txt"
+perturbation_sha256 = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+casa_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+casa_parameters_sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+corpse_parameters = "EXAMPLE_GRID/corpse_params_12.18d.2017.nml"
+corpse_parameters_sha256 = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+
+[stages.prespin]
+control = "EXAMPLE_GRID/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+loops = 100
+years = [1901, 1901]
+initialization = 0
+netcdf_interval = 100
+
+[stages.spin]
+control = "EXAMPLE_GRID/fcasacnp_clm_corpse_spin_1901_1920_x499_STEP_2aof4.lst"
+loops = 499
+years = [1901, 1920]
+initialization = 3
+netcdf_interval = 9960
+
+[stages.spin_continuation]
+control = "EXAMPLE_GRID/fcasacnp_clm_corpse_spin_1901_1920_x499_STEP_2bof4.lst"
+loops = 499
+years = [1901, 1920]
+initialization = 3
+netcdf_interval = 9960
+
+[stages.historical]
+control = "EXAMPLE_GRID/fcasacnp_clm_corpse_HIST_1901_2010_STEP_3of4.lst"
+loops = 1
+years = [1901, 2014]
+initialization = 2
+netcdf_interval = 1
+
+[retention]
+daily_windows = [[1901, 1905], [2010, 2014]]
+spin_outputs = "hash every annual CORPSE output; retain years 1, 9960, and 9980"
+annual_outputs = "one annual-mean NetCDF per model and year"
+daily_outputs = "all variables for the 37 pinned representative cells"
+unretained_daily_outputs = "deleted after the annual mean is written"
+
+[selected_oracle]
+artifact = "fixtures/selected_corpse/complete_workflow.nc"
+artifact_sha256 = "5f1cb5c95649698693f256f05bdb4e44e9af688645fd5435076f771c8e4051db"
+manifest = "fixtures/selected_corpse/complete_workflow.toml"
+manifest_sha256 = "800e831101d5f6aa596fd97a94542d4c82542b2357b882d0e1c5dd84c61a286f"
+historical_years = [1901, 1957, 2014]
+
+[legacy_mean]
+status = "informational_only"
+reason = "The 4,299-cell CLM4.5/CRU-NCEP forcing and exact CASA restart are unavailable and cannot be replaced by the 4,263-cell CLM5/GSWP3 inputs."
