@@ -20,10 +20,10 @@ The production changes are committed in:
 
 The fresh Fortran prespin boundary matches on every compared value. Small
 differences accumulate during the two 499-cycle spins. Most remain below the
-comparison criterion, but a few cells cross CASA's discontinuous minimum-LAI
-gate on different days. This shifts a leaf-turnover pulse by one or two days
-and can create a daily leaf-C difference near 1 g C m⁻² even when the smooth
-fluxes are nearly identical.
+comparison criterion, but the largest finite boundary differences occur in
+leaf C near CASA's discontinuous minimum-LAI gate. Separate high-precision
+traces show how a tiny state difference can shift a leaf-turnover pulse by one
+or two days.
 
 This remaining behavior is accepted for the current work. Exact long-spin
 parity would require a discrete legacy state-transition path that keeps the

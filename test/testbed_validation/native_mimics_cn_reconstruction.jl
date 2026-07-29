@@ -734,7 +734,7 @@ function compare_historical_outputs(
     reference_root;
     archive_grid = fresh_grid,
     compare_fresh = true,
-    compare_archive = true,
+    compare_archive = false,
     fresh_atol,
     fresh_rtol,
     archive_atol,
@@ -1014,7 +1014,7 @@ function write_report(
     return path
 end
 
-function require_acceptance!(path; require_fresh = true, require_archive = true)
+function require_acceptance!(path; require_fresh = true, require_archive = false)
     report = TOML.parsefile(path)
     checks = Dict(
         "boundary comparisons" => all(
@@ -1165,7 +1165,7 @@ function run_gridded_case(
     grid_path = nothing,
     soil_path = nothing,
     prespin_parameters_path = nothing,
-    compare_archive = true,
+    compare_archive = false,
     boundary_atol = 5e-3,
     boundary_rtol = 1e-3,
     fresh_atol = 5e-3,

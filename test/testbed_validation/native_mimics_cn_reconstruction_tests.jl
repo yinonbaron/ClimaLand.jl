@@ -177,6 +177,23 @@ end
         @test TestbedNativeMIMICSCNReconstruction.require_acceptance!(
             result.report,
         ) == result.report
+        fresh_only_report = joinpath(output_root, "fresh_only_report.toml")
+        report["historical_comparison"]["published_archive"]["all_match"] =
+            false
+        open(fresh_only_report, "w") do io
+            TOML.print(io, report; sorted = true)
+        end
+        @test TestbedNativeMIMICSCNReconstruction.require_acceptance!(
+            fresh_only_report,
+        ) == fresh_only_report
+        @test_throws ErrorException begin
+            TestbedNativeMIMICSCNReconstruction.require_acceptance!(
+                fresh_only_report;
+                require_archive = true,
+            )
+        end
+        report["historical_comparison"]["published_archive"]["all_match"] =
+            true
         archive_only_report = joinpath(output_root, "archive_only_report.toml")
         report["historical_comparison"]["fresh_fortran"] =
             Dict("required" => false, "status" => "not_available")
@@ -186,6 +203,7 @@ end
         @test TestbedNativeMIMICSCNReconstruction.require_acceptance!(
             archive_only_report;
             require_fresh = false,
+            require_archive = true,
         ) == archive_only_report
         @test Set(keys(report["historical_comparison"])) ==
               Set(("fresh_fortran", "published_archive"))

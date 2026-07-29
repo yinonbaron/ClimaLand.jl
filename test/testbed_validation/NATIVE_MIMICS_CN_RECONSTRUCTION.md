@@ -66,10 +66,9 @@ orders can place a state on opposite sides of either comparison.
 `LegacyDaily` therefore evaluates the complete CASA carbon and nitrogen map in
 the legacy gram/day order, including LAI, before converting the result to SI
 tendencies. `ContinuousRate` retains the native SI calculation. The traced
-cell-1715 separation near `417.827` g leaf C is the maximum-LAI allocation
-gate, not the minimum-LAI turnover gate. A tested `1e-5` g guard band merely
-moved the first flip and introduced incorrect decisions in other cells, so no
-LAI deadband is used.
+cell-1715 separation near `417.827` g leaf C is the minimum-LAI turnover gate.
+A tested `1e-5` g guard band merely moved the first flip and introduced
+incorrect decisions in other cells, so no LAI deadband is used.
 
 The remaining smooth drift originated earlier in CASA respiration.
 At the end of every C or C-N timestep, Fortran `casa_pdummy` reconstructs leaf
@@ -79,7 +78,7 @@ translation used the exact reciprocal table ratio and omitted both the
 denominator offset and the ordered reconstruction division. The first visible
 effect in a high-precision cell-1715 trace was an approximately `3e-14` g/day
 NPP difference on day 49. Although locally negligible, repeated forcing
-eventually put the two states on opposite sides of the maximum-LAI gate.
+eventually put the two states on opposite sides of the minimum-LAI gate.
 
 The legacy kernel now evaluates exactly
 `(N / (N:P)) / (N + 1e-10 g)`. The operation order is intentional: replacing
