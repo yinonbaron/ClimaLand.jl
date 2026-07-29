@@ -542,6 +542,7 @@ function workflow_reference(
     configuration,
     collection;
     path = REFERENCE_PATH,
+    comparison_policy = nothing,
 )
     isfile(path) ||
         error("Pinned selected-cell CASA reference is missing: $path")
@@ -549,6 +550,10 @@ function workflow_reference(
     reference["schema_version"] == 1 ||
         error("Unsupported selected-cell CASA reference schema")
     configuration_reference = reference["configuration"][String(configuration)]
+    if !isnothing(comparison_policy)
+        configuration_reference = copy(configuration_reference)
+        configuration_reference["tolerance"] = comparison_policy
+    end
     reference_ids = Int.(reference["cell_ids"])
     by_id = Dict(id => index for (index, id) in enumerate(reference_ids))
     for cell in collection.cells
@@ -1049,6 +1054,7 @@ function run_selected_case(
     budget_rtol = 5e-12,
     compare_references = true,
     reference_path = REFERENCE_PATH,
+    comparison_policy = nothing,
     diagnostics = nothing,
 )
     setup = load_setup(configuration; collection)
@@ -1061,8 +1067,12 @@ function run_selected_case(
     end
     reference =
         canonical_schedule(stages) && compare_references ?
-        workflow_reference(configuration, collection; path = reference_path) :
-        nothing
+        workflow_reference(
+            configuration,
+            collection;
+            path = reference_path,
+            comparison_policy,
+        ) : nothing
     initialization_comparison =
         isnothing(reference) ?
         Dict("skipped" => "reference comparison disabled") :

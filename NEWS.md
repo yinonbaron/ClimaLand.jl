@@ -2,6 +2,11 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add immutable Core and Smoke Scope Manifests and a
+  Git-versioned CASA-C Comparison Policy to the Validation Runner, with strict
+  nesting, reviewed Eligibility Gaps, fail-closed nonfinite handling, and
+  temporary warnings for the `ordinary` and `extended` aliases. Issue
+  [#47](https://github.com/yinonbaron/ClimaLand.jl/issues/47).
 - ![][badge-✨feature] Add the Validation Runner's first complete tracer:
   a pinned 11-cell Core CASA-C comparison with fail-closed input verification,
   compact reports, and trustworthy command exit status. Issue
