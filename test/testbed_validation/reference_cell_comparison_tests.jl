@@ -3,8 +3,12 @@ using Test
 const REFERENCE_CELLS = TestbedReferenceCellComparisons
 
 @testset "reference-cell comparison contract" begin
-    ordinary = REFERENCE_CELLS.ordinary_cell_collection()
-    extended = REFERENCE_CELLS.extended_cell_collection()
+    ordinary =
+        @test_logs (:warn, r"ordinary_cell_collection\(\) is deprecated") REFERENCE_CELLS.ordinary_cell_collection()
+    extended =
+        @test_logs (:warn, r"extended_cell_collection\(\) is deprecated") REFERENCE_CELLS.extended_cell_collection()
+    @test ordinary.name == "core"
+    @test extended.name == "smoke"
     subset =
         REFERENCE_CELLS.subset(extended, getproperty.(ordinary.cells[1:2], :id))
 
@@ -38,7 +42,7 @@ end
 
 @testset "reference-cell deterministic bounded scheduling" begin
     collection = REFERENCE_CELLS.subset(
-        REFERENCE_CELLS.extended_cell_collection(),
+        REFERENCE_CELLS.smoke_cell_collection(),
         [532, 618, 626, 1285],
     )
     active = Threads.Atomic{Int}(0)
@@ -86,7 +90,7 @@ end
 
 @testset "reference-cell failure aggregation" begin
     collection = REFERENCE_CELLS.subset(
-        REFERENCE_CELLS.extended_cell_collection(),
+        REFERENCE_CELLS.smoke_cell_collection(),
         [532, 618, 626],
     )
     comparison = REFERENCE_CELLS.ReferenceComparison(
@@ -118,7 +122,7 @@ end
 
 @testset "reference-cell eligibility failure context" begin
     collection = REFERENCE_CELLS.subset(
-        REFERENCE_CELLS.extended_cell_collection(),
+        REFERENCE_CELLS.smoke_cell_collection(),
         [532, 618],
     )
     comparison = REFERENCE_CELLS.ReferenceComparison(

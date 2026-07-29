@@ -40,22 +40,34 @@ function selected_cell_collection(name, ids)
     return ReferenceCellCollection(String(name), cells, manifest, files)
 end
 
-"Return the issue-33 core cells used by ordinary package tests."
-function ordinary_cell_collection()
+"Return the 11-cell Core Scope."
+function core_cell_collection()
     manifest = TOML.parsefile(SELECTED_CELL_MANIFEST)
     return selected_cell_collection(
-        "ordinary",
+        "core",
         manifest["selection"]["core_cell_ids"],
     )
 end
 
-"Return the complete issue-33 selected-cell collection."
-function extended_cell_collection()
+"Return the 37-cell Smoke Scope."
+function smoke_cell_collection()
     manifest = TOML.parsefile(SELECTED_CELL_MANIFEST)
     return selected_cell_collection(
-        "extended",
+        "smoke",
         manifest["selection"]["extended_cell_ids"],
     )
+end
+
+"Deprecated alias for `core_cell_collection()`."
+function ordinary_cell_collection()
+    @warn "ordinary_cell_collection() is deprecated; use core_cell_collection()"
+    return core_cell_collection()
+end
+
+"Deprecated alias for `smoke_cell_collection()`."
+function extended_cell_collection()
+    @warn "extended_cell_collection() is deprecated; use smoke_cell_collection()"
+    return smoke_cell_collection()
 end
 
 "Return a deterministically ordered subset of `collection`."
@@ -241,7 +253,7 @@ function run_comparison(
     end
     results = filter(result -> result isa CellResult, slots)
     failures = [
-        eligibility_failures;
+        eligibility_failures
         filter(result -> result isa CellFailure, slots)
     ]
     cell_order =

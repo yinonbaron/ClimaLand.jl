@@ -12,12 +12,14 @@ include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
 const SCOPES = ("core", "smoke", "representative", "broad", "global")
 const DEPRECATED_SCOPE_ALIASES =
     Dict("ordinary" => "core", "extended" => "smoke")
+const AVAILABLE_SCOPE_METADATA = Dict(
+    "core" => (; cell_count = 11, selection_key = "core_cell_ids"),
+    "smoke" => (; cell_count = 37, selection_key = "extended_cell_ids"),
+)
 const MODELS = ("CORPSE", "MIMICS-C", "MIMICS-CN", "CASA-C", "CASA-CN")
 const REFERENCE_MODES = ("pinned", "fresh")
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = "CLIMALAND_VALIDATION_CASA_C_REFERENCE"
-const SCOPE_MANIFEST_DIRECTORY_OVERRIDE = "CLIMALAND_VALIDATION_SCOPE_MANIFEST_DIRECTORY"
-const COMPARISON_POLICY_OVERRIDE = "CLIMALAND_VALIDATION_COMPARISON_POLICY"
 const DEFAULT_REFERENCE = joinpath(
     @__DIR__,
     "fixtures",
@@ -145,14 +147,6 @@ function parse_toml(path, description)
     end
 end
 
-function scope_manifest_directory()
-    return get(
-        ENV,
-        SCOPE_MANIFEST_DIRECTORY_OVERRIDE,
-        DEFAULT_SCOPE_MANIFEST_DIRECTORY,
-    )
-end
-
 function validate_scope_manifest(manifest, path, expected_name)
     get(manifest, "schema_version", nothing) == 1 ||
         throw(RunnerError("Scope Manifest at $path has an incompatible schema"))
@@ -171,16 +165,14 @@ function validate_scope_manifest(manifest, path, expected_name)
             "Scope Manifest at $path must declare unique cell IDs in deterministic order",
         ),
     )
-    expected_count = expected_name == "core" ? 11 : 37
-    length(cell_ids) == expected_count || throw(
+    metadata = AVAILABLE_SCOPE_METADATA[expected_name]
+    length(cell_ids) == metadata.cell_count || throw(
         RunnerError(
-            "$(titlecase(expected_name)) Scope must contain $expected_count cells, found $(length(cell_ids))",
+            "$(titlecase(expected_name)) Scope must contain $(metadata.cell_count) cells, found $(length(cell_ids))",
         ),
     )
     selected_cells = TOML.parsefile(SELECTED_CELL_MANIFEST)["selection"]
-    selected_key =
-        expected_name == "core" ? "core_cell_ids" : "extended_cell_ids"
-    cell_ids == Int.(selected_cells[selected_key]) || throw(
+    cell_ids == Int.(selected_cells[metadata.selection_key]) || throw(
         RunnerError(
             "$(titlecase(expected_name)) Scope does not preserve the selected-cell collection",
         ),
@@ -203,7 +195,7 @@ function validate_scope_manifest(manifest, path, expected_name)
             "Scope Manifest at $path does not match the selected-cell provenance",
         ),
     )
-    gaps = get(manifest, "eligibility_gaps", Any[])
+    gaps = collect(get(manifest, "eligibility_gaps", Any[]))
     seen_gaps = Set{Tuple{String, Int}}()
     for gap in gaps
         model = String(get(gap, "model", ""))
@@ -234,7 +226,7 @@ function validate_scope_manifest(manifest, path, expected_name)
 end
 
 function load_scope_manifests(scope)
-    directory = scope_manifest_directory()
+    directory = DEFAULT_SCOPE_MANIFEST_DIRECTORY
     manifests = Dict(
         name => validate_scope_manifest(
             parse_toml(
@@ -256,7 +248,7 @@ function load_scope_manifests(scope)
 end
 
 function comparison_policy()
-    path = get(ENV, COMPARISON_POLICY_OVERRIDE, DEFAULT_COMPARISON_POLICY)
+    path = DEFAULT_COMPARISON_POLICY
     policy = parse_toml(path, "Comparison Policy")
     get(policy, "schema_version", nothing) == 1 || throw(
         RunnerError("Comparison Policy at $path has an incompatible schema"),
@@ -343,7 +335,7 @@ function comparison_policy()
             )
     end
     return (;
-        policy,
+        document = policy,
         model,
         tolerance,
         budget_rtol = Float64(budget_rtol),
@@ -374,11 +366,11 @@ function initial_report(configuration, output_root, scope, policy)
             "manifest_sha256" => sha256sum(scope.path),
         ),
         "comparison_policy" => Dict(
-            "id" => String(policy.policy["policy_id"]),
+            "id" => String(policy.document["policy_id"]),
             "model" => "CASA-C",
             "path" => policy.path,
             "sha256" => sha256sum(policy.path),
-            "acceptance" => policy.policy["acceptance"],
+            "acceptance" => policy.document["acceptance"],
             "budget_rtol" => policy.budget_rtol,
             "applied_rules" => sort!(collect(String.(keys(policy.model)))),
         ),
@@ -429,7 +421,7 @@ function print_summary(io, report, report_path)
 end
 
 # ============================================================================
-# Pinned Core CASA-C comparison
+# Pinned CASA-C comparison
 # ============================================================================
 
 function validate_available(configuration)
@@ -480,7 +472,7 @@ function validate_reference_file(path)
     return reference
 end
 
-function validate_finite_reference_values!(
+function validate_finite_reference_values(
     value,
     location,
     reference_cell_ids,
@@ -489,7 +481,7 @@ function validate_finite_reference_values!(
     if value isa AbstractDict
         for name in sort!(collect(String.(keys(value))))
             name == "sample_days" && continue
-            validate_finite_reference_values!(
+            validate_finite_reference_values(
                 value[name],
                 "$location.$name",
                 reference_cell_ids,
@@ -538,13 +530,13 @@ function validate_eligible_reference_values(reference, scope)
     )
     native = get(configuration, "native_julia", Dict{String, Any}())
     fresh = get(configuration, "fresh_fortran", Dict{String, Any}())
-    validate_finite_reference_values!(
+    validate_finite_reference_values(
         native,
         "carbon_only.native_julia",
         reference_cell_ids,
         positions,
     )
-    validate_finite_reference_values!(
+    validate_finite_reference_values(
         fresh,
         "carbon_only.fresh_fortran",
         reference_cell_ids,

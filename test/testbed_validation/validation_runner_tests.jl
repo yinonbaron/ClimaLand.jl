@@ -4,6 +4,10 @@ import TOML
 
 const VALIDATION_RUNNER = joinpath(@__DIR__, "validation_runner.jl")
 const VALIDATION_SCOPE_MANIFESTS = joinpath(@__DIR__, "validation", "scopes")
+const VALIDATION_COMPARISON_POLICY =
+    joinpath(@__DIR__, "validation", "comparison_policy.toml")
+include(VALIDATION_RUNNER)
+const VALIDATION_RUNNER_MODULE = TestbedValidationRunner
 
 function run_validation(args...; environment = Dict{String, String}())
     project = dirname(Base.active_project())
@@ -22,17 +26,24 @@ function run_validation(args...; environment = Dict{String, String}())
     )
 end
 
+function write_smoke_scope_manifests(directory, eligibility_gaps)
+    manifests = joinpath(directory, "scopes")
+    mkpath(manifests)
+    cp(
+        joinpath(VALIDATION_SCOPE_MANIFESTS, "core.toml"),
+        joinpath(manifests, "core.toml"),
+    )
+    smoke = TOML.parsefile(joinpath(VALIDATION_SCOPE_MANIFESTS, "smoke.toml"))
+    smoke["eligibility_gaps"] = eligibility_gaps
+    open(joinpath(manifests, "smoke.toml"), "w") do io
+        TOML.print(io, smoke; sorted = true)
+    end
+    return manifests
+end
+
 @testset "Validation Runner reports reviewed Eligibility Gaps" begin
     mktempdir() do directory
-        manifests = joinpath(directory, "scopes")
-        mkpath(manifests)
-        cp(
-            joinpath(VALIDATION_SCOPE_MANIFESTS, "core.toml"),
-            joinpath(manifests, "core.toml"),
-        )
-        smoke =
-            TOML.parsefile(joinpath(VALIDATION_SCOPE_MANIFESTS, "smoke.toml"))
-        smoke["eligibility_gaps"] = [
+        eligibility_gaps = [
             Dict(
                 "model" => "CASA-C",
                 "cell_id" => 51,
@@ -40,78 +51,57 @@ end
                 "reviewed" => true,
             ),
         ]
-        open(joinpath(manifests, "smoke.toml"), "w") do io
-            TOML.print(io, smoke; sorted = true)
-        end
+        manifests = write_smoke_scope_manifests(directory, eligibility_gaps)
 
-        output = joinpath(directory, "output")
-        result = run_validation(
-            "--scope",
+        path = joinpath(manifests, "smoke.toml")
+        scope = VALIDATION_RUNNER_MODULE.validate_scope_manifest(
+            TOML.parsefile(path),
+            path,
             "smoke",
-            "--models",
-            "CASA-C",
-            "--output",
-            output;
-            environment = Dict(
-                "CLIMALAND_VALIDATION_SCOPE_MANIFEST_DIRECTORY" =>
-                    manifests,
-                "CLIMALAND_VALIDATION_CASA_C_REFERENCE" =>
-                    joinpath(directory, "missing-reference.toml"),
-            ),
         )
-
-        @test result.exitcode == 2
-        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        configuration =
+            (; scope = "smoke", reference_mode = "pinned", workers = 1)
+        report = VALIDATION_RUNNER_MODULE.initial_report(
+            configuration,
+            directory,
+            scope,
+            VALIDATION_RUNNER_MODULE.comparison_policy(),
+        )
         coverage = report["model"][1]["coverage"]
         @test coverage["scope_cells"] == 37
         @test coverage["eligible_cells"] == 36
         @test coverage["compared_cells"] == 0
-        @test coverage["eligibility_gaps"] == [
-            Dict(
-                "model" => "CASA-C",
-                "cell_id" => 51,
-                "reason" => "reviewed nonfinite Fortran trajectory",
-                "reviewed" => true,
-            ),
-        ]
+        @test coverage["eligibility_gaps"] == eligibility_gaps
     end
 end
 
 @testset "Validation Runner rejects unreviewed Eligibility Gaps" begin
     mktempdir() do directory
-        manifests = joinpath(directory, "scopes")
-        mkpath(manifests)
-        cp(
-            joinpath(VALIDATION_SCOPE_MANIFESTS, "core.toml"),
-            joinpath(manifests, "core.toml"),
+        manifests = write_smoke_scope_manifests(
+            directory,
+            [
+                Dict(
+                    "model" => "CASA-C",
+                    "cell_id" => 51,
+                    "reason" => "not reviewed",
+                    "reviewed" => false,
+                ),
+            ],
         )
-        smoke =
-            TOML.parsefile(joinpath(VALIDATION_SCOPE_MANIFESTS, "smoke.toml"))
-        smoke["eligibility_gaps"] = [
-            Dict(
-                "model" => "CASA-C",
-                "cell_id" => 51,
-                "reason" => "not reviewed",
-                "reviewed" => false,
-            ),
-        ]
-        open(joinpath(manifests, "smoke.toml"), "w") do io
-            TOML.print(io, smoke; sorted = true)
+
+        path = joinpath(manifests, "smoke.toml")
+        failure = try
+            VALIDATION_RUNNER_MODULE.validate_scope_manifest(
+                TOML.parsefile(path),
+                path,
+                "smoke",
+            )
+        catch error
+            error
         end
 
-        result = run_validation(
-            "--scope",
-            "smoke",
-            "--models",
-            "CASA-C";
-            environment = Dict(
-                "CLIMALAND_VALIDATION_SCOPE_MANIFEST_DIRECTORY" =>
-                    manifests,
-            ),
-        )
-
-        @test result.exitcode == 2
-        @test occursin("unreviewed Eligibility Gap", result.stderr)
+        @test failure isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("unreviewed Eligibility Gap", sprint(showerror, failure))
     end
 end
 
@@ -197,9 +187,13 @@ end
             @test report["scope"]["cell_count"] == cell_count
             @test report["scope"]["cell_ids"] ==
                   sort(report["scope"]["cell_ids"])
+            @test report["scope"]["manifest"] ==
+                  abspath(joinpath(VALIDATION_SCOPE_MANIFESTS, "$scope.toml"))
             @test report["scope"]["manifest_sha256"] ==
                   bytes2hex(SHA.sha256(read(report["scope"]["manifest"])))
             @test report["comparison_policy"]["model"] == "CASA-C"
+            @test report["comparison_policy"]["path"] ==
+                  abspath(VALIDATION_COMPARISON_POLICY)
             @test report["comparison_policy"]["sha256"] == bytes2hex(
                 SHA.sha256(read(report["comparison_policy"]["path"])),
             )
@@ -306,38 +300,40 @@ end
     end
 end
 
-@testset "Validation Runner completes the pinned Core CASA-C comparison" begin
-    mktempdir() do output
-        result = run_validation(
-            "--scope",
-            "core",
-            "--models",
-            "CASA-C",
-            "--reference",
-            "pinned",
-            "--workers",
-            "1",
-            "--output",
-            output,
-        )
+@testset "Validation Runner completes pinned Core and Smoke comparisons" begin
+    for (scope, cell_count) in (("core", 11), ("smoke", 37))
+        mktempdir() do output
+            result = run_validation(
+                "--scope",
+                scope,
+                "--models",
+                "CASA-C",
+                "--reference",
+                "pinned",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            )
 
-        @test result.exitcode == 0
-        @test occursin("Validation: passed", result.stdout)
-        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
-        @test report["scope"]["name"] == "core"
-        @test report["scope"]["cell_count"] == 11
-        @test report["model"][1]["name"] == "CASA-C"
-        @test report["model"][1]["coverage"]["compared_cells"] == 11
-        @test report["model"][1]["outcome"] == "passed"
-        @test report["model"][1]["seconds"] > 0
-        @test Set(keys(report["model"][1]["comparison"])) == Set([
-            "initialization",
-            "fresh_fortran_boundaries",
-            "carbon_budget",
-            "passive_restoration",
-            "checkpoint_roundtrip",
-        ])
-        @test all(values(report["model"][1]["comparison"]))
-        @test report["outcome"] == "passed"
+            @test result.exitcode == 0
+            @test occursin("Validation: passed", result.stdout)
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            @test report["scope"]["name"] == scope
+            @test report["scope"]["cell_count"] == cell_count
+            @test report["model"][1]["name"] == "CASA-C"
+            @test report["model"][1]["coverage"]["compared_cells"] == cell_count
+            @test report["model"][1]["outcome"] == "passed"
+            @test report["model"][1]["seconds"] > 0
+            @test Set(keys(report["model"][1]["comparison"])) == Set([
+                "initialization",
+                "fresh_fortran_boundaries",
+                "carbon_budget",
+                "passive_restoration",
+                "checkpoint_roundtrip",
+            ])
+            @test all(values(report["model"][1]["comparison"]))
+            @test report["outcome"] == "passed"
+        end
     end
 end
