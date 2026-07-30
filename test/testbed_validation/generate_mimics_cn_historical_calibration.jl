@@ -34,6 +34,91 @@ function units(reducer, name)
     return "kg $element m^-2"
 end
 
+function comparison_semantics(section, name)
+    section == "budget" &&
+        return ("zero_centered_conservation_residual", false)
+    name in (
+        "diagnostic.mimics_overflow_r",
+        "diagnostic.mimics_overflow_k",
+    ) && return ("nonnegative_guard_residual", false)
+    return ("mixed_absolute_relative", true)
+end
+
+function absolute_policy!(
+    record,
+    actual,
+    expected,
+    observations,
+    semantics,
+)
+    actual_values = Float64.(actual)
+    expected_values = Float64.(expected)
+    errors = abs.(actual_values .- expected_values)
+    raw_atol = maximum(errors)
+    float_padding =
+        64eps(Float64) * max(
+            maximum(abs, actual_values),
+            maximum(abs, expected_values),
+            floatmin(Float64),
+        )
+    atol = Calibration.SAFETY_FACTOR * raw_atol + float_padding
+    active_tolerance =
+        256eps(Float64) * max(abs(raw_atol), floatmin(Float64))
+    active = findall(
+        error -> isapprox(
+            error,
+            raw_atol;
+            atol = active_tolerance,
+            rtol = 0,
+        ),
+        errors,
+    )
+    record["comparison_semantics"] = semantics
+    record["active_constraint"] = Dict(
+        "count" => length(active),
+        "observation" => [
+            Calibration.observation_record(observations, index) for
+            index in active[1:min(6, length(active))]
+        ],
+    )
+    record["derived_policy"] = Dict(
+        "atol" => atol,
+        "rtol" => 0.0,
+        "raw_atol" => raw_atol,
+        "raw_rtol" => 0.0,
+        "float_padding" => float_padding,
+        "raw_objective" => raw_atol,
+        "validation_failed_pairs" => count(errors .> atol),
+    )
+    return record
+end
+
+function calibration_record(
+    actual,
+    expected,
+    section,
+    name;
+    units,
+    observations,
+)
+    semantics, relative = comparison_semantics(section, name)
+    record = Calibration.calibration_record(
+        actual,
+        expected;
+        units,
+        observations,
+    )
+    relative &&
+        return merge!(record, Dict("comparison_semantics" => semantics))
+    return absolute_policy!(
+        record,
+        actual,
+        expected,
+        observations,
+        semantics,
+    )
+end
+
 function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
     annual_observations = [
         merge((; cell_id, year), get(coordinates, cell_id, (;))) for
@@ -47,9 +132,11 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
     end
     annual = Dict(
         reducer => Dict(
-            name => Calibration.calibration_record(
+            name => calibration_record(
                 annual_actual[reducer][name],
-                expected;
+                expected,
+                reducer,
+                name;
                 units = units(reducer, name),
                 observations = annual_observations,
             ) for (name, expected) in variables
@@ -80,9 +167,11 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
         )
     end
     daily = Dict(
-        name => Calibration.calibration_record(
+        name => calibration_record(
             daily_actual[name],
-            expected;
+            expected,
+            "daily",
+            name;
             units = units("daily", name),
             observations = daily_observations,
         ) for (name, expected) in oracle["daily"]["variable"]
@@ -109,9 +198,11 @@ function write_calibration(output_path, report_path, oracle_path, path)
         historical_values(output_path, oracle, cell_ids; coordinates)
     report = TOML.parsefile(report_path)
     budget = Dict(
-        name => Calibration.calibration_record(
+        name => calibration_record(
             report["historical_comparison"]["budget"][name],
-            oracle["budget"][name];
+            oracle["budget"][name],
+            "budget",
+            name;
             units = endswith(name, "_kg_n") ? "kg N" : "kg C",
             observations = [
                 merge((; cell_id), get(coordinates, cell_id, (;))) for
@@ -144,7 +235,7 @@ function write_calibration(output_path, report_path, oracle_path, path)
             "reference_magnitude" => "x_i = abs(Fortran_i)",
             "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
             "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
+                "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for zero-centered conservation residuals and nonnegative overflow guard residuals whose near-zero reference does not define a multiplicative scale",
             "safety_margin" =>
                 "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
             "nonfinite" =>

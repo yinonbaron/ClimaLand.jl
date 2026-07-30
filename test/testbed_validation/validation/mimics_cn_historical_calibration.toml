@@ -6,6 +6,7 @@ schema_version = 1
 scope = "representative"
 
 [annual.annual_mean."casa_plant.c_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -130,6 +131,7 @@ units = "kg C m^-2"
     year = 1935
 
 [annual.annual_mean."casa_plant.c_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -284,6 +286,7 @@ units = "kg C m^-2"
     year = 1953
 
 [annual.annual_mean."casa_plant.c_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -438,6 +441,7 @@ units = "kg C m^-2"
     year = 1956
 
 [annual.annual_mean."casa_plant.n_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -562,6 +566,7 @@ units = "kg N m^-2"
     year = 1942
 
 [annual.annual_mean."casa_plant.n_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -716,6 +721,7 @@ units = "kg N m^-2"
     year = 1960
 
 [annual.annual_mean."casa_plant.n_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -840,6 +846,7 @@ units = "kg N m^-2"
     year = 1956
 
 [annual.annual_mean."diagnostic.mimics_working_din"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -964,6 +971,7 @@ units = "kg N m^-2"
     year = 1906
 
 [annual.annual_mean."mimics_soil.c_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1088,6 +1096,7 @@ units = "kg C m^-2"
     year = 1948
 
 [annual.annual_mean."mimics_soil.c_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1212,6 +1221,7 @@ units = "kg C m^-2"
     year = 1953
 
 [annual.annual_mean."mimics_soil.c_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1336,6 +1346,7 @@ units = "kg C m^-2"
     year = 1942
 
 [annual.annual_mean."mimics_soil.c_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1460,6 +1471,7 @@ units = "kg C m^-2"
     year = 1986
 
 [annual.annual_mean."mimics_soil.c_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1584,6 +1596,7 @@ units = "kg C m^-2"
     year = 1922
 
 [annual.annual_mean."mimics_soil.c_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1708,6 +1721,7 @@ units = "kg C m^-2"
     year = 1975
 
 [annual.annual_mean."mimics_soil.c_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1862,6 +1876,7 @@ units = "kg C m^-2"
     year = 1942
 
 [annual.annual_mean."mimics_soil.c_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -1986,6 +2001,7 @@ units = "kg C m^-2"
     year = 1998
 
 [annual.annual_mean."mimics_soil.n_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2110,6 +2126,7 @@ units = "kg N m^-2"
     year = 1948
 
 [annual.annual_mean."mimics_soil.n_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2234,6 +2251,7 @@ units = "kg N m^-2"
     year = 1924
 
 [annual.annual_mean."mimics_soil.n_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2358,6 +2376,7 @@ units = "kg N m^-2"
     year = 1942
 
 [annual.annual_mean."mimics_soil.n_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2482,6 +2501,7 @@ units = "kg N m^-2"
     year = 1986
 
 [annual.annual_mean."mimics_soil.n_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2606,6 +2626,7 @@ units = "kg N m^-2"
     year = 1941
 
 [annual.annual_mean."mimics_soil.n_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2730,6 +2751,7 @@ units = "kg N m^-2"
     year = 1975
 
 [annual.annual_mean."mimics_soil.n_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2854,6 +2876,7 @@ units = "kg N m^-2"
     year = 1938
 
 [annual.annual_mean."mimics_soil.n_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -2978,6 +3001,7 @@ units = "kg N m^-2"
     year = 2000
 
 [annual.annual_total."diagnostic.cgpp"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -3108,6 +3132,7 @@ units = "kg C m^-2 year^-1"
     year = 2008
 
 [annual.annual_total."diagnostic.cnpp"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -3232,6 +3257,7 @@ units = "kg C m^-2 year^-1"
     year = 1922
 
 [annual.annual_total."diagnostic.mimics_immobilization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -3356,6 +3382,7 @@ units = "kg N m^-2 year^-1"
     year = 1980
 
 [annual.annual_total."diagnostic.mimics_litter_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -3480,6 +3507,7 @@ units = "kg N m^-2 year^-1"
     year = 1988
 
 [annual.annual_total."diagnostic.mimics_metabolic_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -3604,6 +3632,7 @@ units = "kg C m^-2 year^-1"
     year = 1988
 
 [annual.annual_total."diagnostic.mimics_n_metabolic_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -3728,6 +3757,7 @@ units = "kg N m^-2 year^-1"
     year = 2000
 
 [annual.annual_total."diagnostic.mimics_n_structural_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -3852,6 +3882,7 @@ units = "kg N m^-2 year^-1"
     year = 1988
 
 [annual.annual_total."diagnostic.mimics_net_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -3976,6 +4007,7 @@ units = "kg N m^-2 year^-1"
     year = 1990
 
 [annual.annual_total."diagnostic.mimics_overflow_k"]
+comparison_semantics = "nonnegative_guard_residual"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -4000,52 +4032,22 @@ units = "kg C m^-2 year^-1"
     p999 = 1.031924245675963e-6
 
     [annual.annual_total."diagnostic.mimics_overflow_k".active_constraint]
-    count = 343
+    count = 1
 
         [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 51
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        year = 1901
-        [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 923
-        latitude = 19.89
-        longitude = 22.5
-        pft = 16
-        year = 1901
-        [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        year = 1901
-        [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 51
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        year = 1902
-        [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 923
-        latitude = 19.89
-        longitude = 22.5
-        pft = 16
-        year = 1902
-        [[annual.annual_total."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        year = 1902
+        cell_id = 9764
+        latitude = 36.95
+        longitude = 252.5
+        pft = 1
+        year = 1924
 
     [annual.annual_total."diagnostic.mimics_overflow_k".derived_policy]
-    atol = 8.033576600812954e-20
+    atol = 3.1836529379541207e-6
     float_padding = 8.033576600812954e-20
-    raw_atol = 0.0
-    raw_objective = 2.3531134184131397e-7
-    raw_rtol = 2.7320939130342534
-    rtol = 2.8686986086859663
+    raw_atol = 3.0320504170990857e-6
+    raw_objective = 3.0320504170990857e-6
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [annual.annual_total."diagnostic.mimics_overflow_k".relative_error]
@@ -4130,6 +4132,7 @@ units = "kg C m^-2 year^-1"
     year = 1914
 
 [annual.annual_total."diagnostic.mimics_overflow_r"]
+comparison_semantics = "nonnegative_guard_residual"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -4154,52 +4157,22 @@ units = "kg C m^-2 year^-1"
     p999 = 2.9093091093357225e-6
 
     [annual.annual_total."diagnostic.mimics_overflow_r".active_constraint]
-    count = 229
+    count = 1
 
         [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        year = 1901
-        [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        year = 1901
-        [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        year = 1902
-        [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        year = 1902
-        [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        year = 1903
-        [[annual.annual_total."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        year = 1903
+        cell_id = 9764
+        latitude = 36.95
+        longitude = 252.5
+        pft = 1
+        year = 1984
 
     [annual.annual_total."diagnostic.mimics_overflow_r".derived_policy]
-    atol = 2.4222294814100794e-19
+    atol = 1.0333309680041734e-5
     float_padding = 2.4222294814100794e-19
-    raw_atol = 0.0
-    raw_objective = 6.82361905790969e-7
-    raw_rtol = 4.205212526112266
-    rtol = 4.41547315241788
+    raw_atol = 9.84124731432523e-6
+    raw_objective = 9.84124731432523e-6
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [annual.annual_total."diagnostic.mimics_overflow_r".relative_error]
@@ -4284,6 +4257,7 @@ units = "kg C m^-2 year^-1"
     year = 1969
 
 [annual.annual_total."diagnostic.mimics_physical_protection"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -4408,6 +4382,7 @@ units = "kg C m^-2 year^-1"
     year = 1938
 
 [annual.annual_total."diagnostic.mimics_respiration"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -4532,6 +4507,7 @@ units = "kg C m^-2 year^-1"
     year = 1922
 
 [annual.annual_total."diagnostic.mimics_soil_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -4656,6 +4632,7 @@ units = "kg N m^-2 year^-1"
     year = 1922
 
 [annual.annual_total."diagnostic.mimics_structural_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2 year^-1"
 
@@ -4780,6 +4757,7 @@ units = "kg C m^-2 year^-1"
     year = 1988
 
 [annual.annual_total."diagnostic.n_deposition"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -4934,6 +4912,7 @@ units = "kg N m^-2 year^-1"
     year = 1990
 
 [annual.annual_total."diagnostic.n_fixation"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -5088,6 +5067,7 @@ units = "kg N m^-2 year^-1"
     year = 1901
 
 [annual.annual_total."diagnostic.n_gaseous_loss"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -5212,6 +5192,7 @@ units = "kg N m^-2 year^-1"
     year = 1968
 
 [annual.annual_total."diagnostic.n_leaching"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -5336,6 +5317,7 @@ units = "kg N m^-2 year^-1"
     year = 1906
 
 [annual.annual_total."diagnostic.n_plant_uptake"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2 year^-1"
 
@@ -5460,6 +5442,7 @@ units = "kg N m^-2 year^-1"
     year = 1902
 
 [annual.end_of_year."casa_plant.c_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -5584,6 +5567,7 @@ units = "kg C m^-2"
     year = 1944
 
 [annual.end_of_year."casa_plant.c_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -5738,6 +5722,7 @@ units = "kg C m^-2"
     year = 2014
 
 [annual.end_of_year."casa_plant.c_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -5892,6 +5877,7 @@ units = "kg C m^-2"
     year = 1944
 
 [annual.end_of_year."casa_plant.n_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -6016,6 +6002,7 @@ units = "kg N m^-2"
     year = 1938
 
 [annual.end_of_year."casa_plant.n_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -6170,6 +6157,7 @@ units = "kg N m^-2"
     year = 1940
 
 [annual.end_of_year."casa_plant.n_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -6294,6 +6282,7 @@ units = "kg N m^-2"
     year = 1955
 
 [annual.end_of_year."diagnostic.mimics_working_din"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -6418,6 +6407,7 @@ units = "kg N m^-2"
     year = 1968
 
 [annual.end_of_year."mimics_soil.c_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -6542,6 +6532,7 @@ units = "kg C m^-2"
     year = 1947
 
 [annual.end_of_year."mimics_soil.c_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -6666,6 +6657,7 @@ units = "kg C m^-2"
     year = 1940
 
 [annual.end_of_year."mimics_soil.c_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -6790,6 +6782,7 @@ units = "kg C m^-2"
     year = 1903
 
 [annual.end_of_year."mimics_soil.c_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -6914,6 +6907,7 @@ units = "kg C m^-2"
     year = 1950
 
 [annual.end_of_year."mimics_soil.c_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -7038,6 +7032,7 @@ units = "kg C m^-2"
     year = 1921
 
 [annual.end_of_year."mimics_soil.c_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -7162,6 +7157,7 @@ units = "kg C m^-2"
     year = 1922
 
 [annual.end_of_year."mimics_soil.c_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -7316,6 +7312,7 @@ units = "kg C m^-2"
     year = 1942
 
 [annual.end_of_year."mimics_soil.c_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg C m^-2"
 
@@ -7440,6 +7437,7 @@ units = "kg C m^-2"
     year = 2000
 
 [annual.end_of_year."mimics_soil.n_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -7564,6 +7562,7 @@ units = "kg N m^-2"
     year = 1949
 
 [annual.end_of_year."mimics_soil.n_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -7688,6 +7687,7 @@ units = "kg N m^-2"
     year = 1934
 
 [annual.end_of_year."mimics_soil.n_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -7812,6 +7812,7 @@ units = "kg N m^-2"
     year = 1903
 
 [annual.end_of_year."mimics_soil.n_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -7936,6 +7937,7 @@ units = "kg N m^-2"
     year = 1950
 
 [annual.end_of_year."mimics_soil.n_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -8060,6 +8062,7 @@ units = "kg N m^-2"
     year = 1902
 
 [annual.end_of_year."mimics_soil.n_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -8184,6 +8187,7 @@ units = "kg N m^-2"
     year = 1938
 
 [annual.end_of_year."mimics_soil.n_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -8308,6 +8312,7 @@ units = "kg N m^-2"
     year = 1946
 
 [annual.end_of_year."mimics_soil.n_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 9120
 units = "kg N m^-2"
 
@@ -8432,6 +8437,7 @@ units = "kg N m^-2"
     year = 2000
 
 [budget.historical_residual_kg_c]
+comparison_semantics = "zero_centered_conservation_residual"
 finite_pair_count = 80
 units = "kg C"
 
@@ -8549,86 +8555,62 @@ units = "kg C"
     relative_error = 222141.06029938906
 
 [budget.historical_residual_kg_n]
+comparison_semantics = "zero_centered_conservation_residual"
 finite_pair_count = 80
 units = "kg N"
 
     [budget.historical_residual_kg_n.absolute_error]
-    maximum = 4.211237609793171e8
-    mean = 8.694763508895276e6
-    median = 338788.32616110495
-    minimum = 8735.891450057297
-    p90 = 2.9150910310225706e6
-    p95 = 5.600752712353286e6
-    p99 = 2.4925709363825968e8
-    p999 = 4.039370942452126e8
+    maximum = 6.791109803262313e6
+    mean = 886078.7777835351
+    median = 311927.74713763525
+    minimum = 0.0
+    p90 = 2.1964132532733013e6
+    p95 = 3.465334456811198e6
+    p99 = 5.965865752611022e6
+    p999 = 6.70858539819719e6
 
     [budget.historical_residual_kg_n.absolute_reference]
-    maximum = 4.211237609793171e8
-    mean = 7.808932275992167e6
-    median = 202.20026267126036
-    minimum = 35.015430164862
-    p90 = 607.4656008246557
-    p95 = 690.9934117862585
-    p99 = 2.4925709363825968e8
-    p999 = 4.039370942452126e8
+    maximum = 838.2859175301874
+    mean = 247.5448804272174
+    median = 196.48364224181142
+    minimum = 0.0
+    p90 = 566.0291813946365
+    p95 = 664.8455519652322
+    p99 = 798.5231729319727
+    p999 = 834.3096430703662
 
     [budget.historical_residual_kg_n.active_constraint]
-    count = 2
+    count = 1
 
         [[budget.historical_residual_kg_n.active_constraint.observation]]
         cell_id = 618
         latitude = -12.32
         longitude = 15.0
         pft = 9
-        [[budget.historical_residual_kg_n.active_constraint.observation]]
-        cell_id = 3442
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
 
     [budget.historical_residual_kg_n.derived_policy]
-    atol = 7.130464455900629e6
-    float_padding = 5.98452858439653e-6
-    raw_atol = 6.790918529423471e6
-    raw_objective = 1.4473926248784762e7
-    raw_rtol = 0.9838742926458691
-    rtol = 1.0330680072781626
+    atol = 7.130665293425526e6
+    float_padding = 9.651023748462067e-8
+    raw_atol = 6.791109803262313e6
+    raw_objective = 6.791109803262313e6
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [budget.historical_residual_kg_n.relative_error]
-    nonzero_reference_count = 80
-    zero_reference_count = 0
+    nonzero_reference_count = 78
+    zero_reference_count = 2
 
         [budget.historical_residual_kg_n.relative_error.distribution]
         maximum = 52014.15513391501
-        mean = 4799.059764455569
-        median = 1885.4878042143891
-        minimum = 1.0
-        p90 = 12881.738141602342
-        p95 = 22456.074434523234
-        p99 = 38519.337724432175
-        p999 = 50664.673392966826
+        mean = 4922.086937903148
+        median = 1923.4408700203253
+        minimum = 56.36643259396786
+        p90 = 12993.023151203548
+        p95 = 23057.37592571327
+        p99 = 38860.97867150762
+        p999 = 50698.8374876743
 
-    [[budget.historical_residual_kg_n.top_outlier]]
-    absolute_error = 4.211237609793171e8
-    cell_id = 3442
-    fortran = -4.211237609793171e8
-    julia = 0.0
-    latitude = 63.47
-    longitude = 87.5
-    pft = 11
-    rank = 1
-    relative_error = 1.0
-    [[budget.historical_residual_kg_n.top_outlier]]
-    absolute_error = 2.0357101750962198e8
-    cell_id = 51
-    fortran = -2.0357101750962198e8
-    julia = 0.0
-    latitude = 4.74
-    longitude = 0.0
-    pft = 17
-    rank = 2
-    relative_error = 1.0
     [[budget.historical_residual_kg_n.top_outlier]]
     absolute_error = 6.791109803262313e6
     cell_id = 618
@@ -8637,7 +8619,7 @@ units = "kg N"
     latitude = -12.32
     longitude = 15.0
     pft = 9
-    rank = 3
+    rank = 1
     relative_error = 34932.10778013909
     [[budget.historical_residual_kg_n.top_outlier]]
     absolute_error = 5.746497080918897e6
@@ -8647,7 +8629,7 @@ units = "kg N"
     latitude = 6.63
     longitude = 12.5
     pft = 8
-    rank = 4
+    rank = 2
     relative_error = 52014.15513391501
     [[budget.historical_residual_kg_n.top_outlier]]
     absolute_error = 5.593081956112991e6
@@ -8657,7 +8639,7 @@ units = "kg N"
     latitude = -2.84
     longitude = 102.5
     pft = 9
-    rank = 5
+    rank = 3
     relative_error = 28168.438600828948
     [[budget.historical_residual_kg_n.top_outlier]]
     absolute_error = 5.239116492564561e6
@@ -8667,10 +8649,31 @@ units = "kg N"
     latitude = -31.26
     longitude = 150.0
     pft = 8
-    rank = 6
+    rank = 4
     relative_error = 32277.06989091877
+    [[budget.historical_residual_kg_n.top_outlier]]
+    absolute_error = 3.3719775075610266e6
+    cell_id = 1700
+    fortran = -685.8902582259998
+    julia = 3.3712916173028005e6
+    latitude = 36.95
+    longitude = 42.5
+    pft = 14
+    rank = 5
+    relative_error = 4916.205569506667
+    [[budget.historical_residual_kg_n.top_outlier]]
+    absolute_error = 3.12609526863659e6
+    cell_id = 10997
+    fortran = -787.9533294311809
+    julia = -3.126883221966021e6
+    latitude = 8.53
+    longitude = 285.0
+    pft = 14
+    rank = 6
+    relative_error = 3967.3609487674867
 
 [daily."casa_plant.c_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -8809,6 +8812,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."casa_plant.c_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -8987,6 +8991,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."casa_plant.c_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -9165,6 +9170,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."casa_plant.n_fine_root"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -9303,6 +9309,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."casa_plant.n_leaf"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -9481,6 +9488,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."casa_plant.n_wood"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -9619,6 +9627,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."diagnostic.cgpp"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -9797,6 +9806,7 @@ units = "kg C m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.cnpp"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -9935,6 +9945,7 @@ units = "kg C m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_immobilization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -10081,6 +10092,7 @@ units = "kg N m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.mimics_litter_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -10219,6 +10231,7 @@ units = "kg N m^-2 s^-1"
     year = 1957
 
 [daily."diagnostic.mimics_metabolic_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -10357,6 +10370,7 @@ units = "kg C m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_n_metabolic_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -10495,6 +10509,7 @@ units = "kg N m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_n_structural_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -10633,6 +10648,7 @@ units = "kg N m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_net_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -10771,6 +10787,7 @@ units = "kg N m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.mimics_overflow_k"]
+comparison_semantics = "nonnegative_guard_residual"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -10795,64 +10812,24 @@ units = "kg C m^-2 s^-1"
     p999 = 6.698414238228523e-14
 
     [daily."diagnostic.mimics_overflow_k".active_constraint]
-    count = 253
+    count = 1
 
         [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 51
-        day_of_year = 1
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        sample_day = 1
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 923
-        day_of_year = 1
-        latitude = 19.89
-        longitude = 22.5
-        pft = 16
-        sample_day = 1
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 3442
-        day_of_year = 1
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        sample_day = 1
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 51
-        day_of_year = 2
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        sample_day = 2
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 923
-        day_of_year = 2
-        latitude = 19.89
-        longitude = 22.5
-        pft = 16
-        sample_day = 2
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_k".active_constraint.observation]]
-        cell_id = 3442
-        day_of_year = 2
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        sample_day = 2
+        cell_id = 9764
+        day_of_year = 91
+        latitude = 36.95
+        longitude = 252.5
+        pft = 1
+        sample_day = 91
         year = 1901
 
     [daily."diagnostic.mimics_overflow_k".derived_policy]
-    atol = 1.4014341780907047e-27
+    atol = 5.681346854640325e-14
     float_padding = 1.4014341780907047e-27
-    raw_atol = 0.0
-    raw_objective = 1.6195114574676191e-15
-    raw_rtol = 0.6538254897130297
-    rtol = 0.6865167641986812
+    raw_atol = 5.410806528228747e-14
+    raw_objective = 5.410806528228747e-14
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [daily."diagnostic.mimics_overflow_k".relative_error]
@@ -10949,6 +10926,7 @@ units = "kg C m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_overflow_r"]
+comparison_semantics = "nonnegative_guard_residual"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -10973,64 +10951,24 @@ units = "kg C m^-2 s^-1"
     p999 = 1.0059006188856544e-13
 
     [daily."diagnostic.mimics_overflow_r".active_constraint]
-    count = 169
+    count = 1
 
         [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        day_of_year = 1
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        sample_day = 1
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        day_of_year = 1
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        sample_day = 1
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        day_of_year = 2
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        sample_day = 2
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        day_of_year = 2
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        sample_day = 2
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 51
-        day_of_year = 3
-        latitude = 4.74
-        longitude = 0.0
-        pft = 17
-        sample_day = 3
-        year = 1901
-        [[daily."diagnostic.mimics_overflow_r".active_constraint.observation]]
-        cell_id = 3442
-        day_of_year = 3
-        latitude = 63.47
-        longitude = 87.5
-        pft = 11
-        sample_day = 3
+        cell_id = 9764
+        day_of_year = 91
+        latitude = 36.95
+        longitude = 252.5
+        pft = 1
+        sample_day = 91
         year = 1901
 
     [daily."diagnostic.mimics_overflow_r".derived_policy]
-    atol = 1.828901779481751e-27
+    atol = 5.477671284740428e-14
     float_padding = 1.828901779481751e-27
-    raw_atol = 0.0
-    raw_objective = 1.9982068622895895e-15
-    raw_rtol = 0.4324696678228779
-    rtol = 0.4540931512140218
+    raw_atol = 5.216829794990709e-14
+    raw_objective = 5.216829794990709e-14
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [daily."diagnostic.mimics_overflow_r".relative_error]
@@ -11127,6 +11065,7 @@ units = "kg C m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_physical_protection"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -11265,6 +11204,7 @@ units = "kg C m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.mimics_respiration"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -11403,6 +11343,7 @@ units = "kg C m^-2 s^-1"
     year = 1957
 
 [daily."diagnostic.mimics_soil_mineralization"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -11541,6 +11482,7 @@ units = "kg N m^-2 s^-1"
     year = 1957
 
 [daily."diagnostic.mimics_structural_input"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2 s^-1"
 
@@ -11679,6 +11621,7 @@ units = "kg C m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.mimics_working_din"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -11817,6 +11760,7 @@ units = "kg N m^-2"
     year = 2014
 
 [daily."diagnostic.n_deposition"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -11995,6 +11939,7 @@ units = "kg N m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.n_fixation"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -12173,6 +12118,7 @@ units = "kg N m^-2 s^-1"
     year = 1901
 
 [daily."diagnostic.n_gaseous_loss"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -12311,6 +12257,7 @@ units = "kg N m^-2 s^-1"
     year = 2014
 
 [daily."diagnostic.n_leaching"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -12449,6 +12396,7 @@ units = "kg N m^-2 s^-1"
     year = 1957
 
 [daily."diagnostic.n_plant_uptake"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2 s^-1"
 
@@ -12587,6 +12535,7 @@ units = "kg N m^-2 s^-1"
     year = 2014
 
 [daily."mimics_soil.c_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -12725,6 +12674,7 @@ units = "kg C m^-2"
     year = 1901
 
 [daily."mimics_soil.c_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -12863,6 +12813,7 @@ units = "kg C m^-2"
     year = 1901
 
 [daily."mimics_soil.c_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13001,6 +12952,7 @@ units = "kg C m^-2"
     year = 1901
 
 [daily."mimics_soil.c_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13139,6 +13091,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."mimics_soil.c_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13277,6 +13230,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."mimics_soil.c_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13415,6 +13369,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."mimics_soil.c_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13593,6 +13548,7 @@ units = "kg C m^-2"
     year = 1901
 
 [daily."mimics_soil.c_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg C m^-2"
 
@@ -13731,6 +13687,7 @@ units = "kg C m^-2"
     year = 1957
 
 [daily."mimics_soil.n_litter_cwd"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -13869,6 +13826,7 @@ units = "kg N m^-2"
     year = 1901
 
 [daily."mimics_soil.n_litter_metabolic"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14007,6 +13965,7 @@ units = "kg N m^-2"
     year = 1901
 
 [daily."mimics_soil.n_litter_structural"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14145,6 +14104,7 @@ units = "kg N m^-2"
     year = 1901
 
 [daily."mimics_soil.n_microbe_k"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14283,6 +14243,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."mimics_soil.n_microbe_r"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14421,6 +14382,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."mimics_soil.n_soil_available"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14559,6 +14521,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."mimics_soil.n_soil_chemical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14705,6 +14668,7 @@ units = "kg N m^-2"
     year = 1957
 
 [daily."mimics_soil.n_soil_physical"]
+comparison_semantics = "mixed_absolute_relative"
 finite_pair_count = 6720
 units = "kg N m^-2"
 
@@ -14848,10 +14812,10 @@ nonfinite = "fail calibration; exclusions require a reviewed Scope Manifest Elig
 raw_absolute = "a(r) = max(0, max_i(e_i - r*x_i))"
 reference_magnitude = "x_i = abs(Fortran_i)"
 safety_margin = "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol"
-selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x)"
+selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for zero-centered conservation residuals and nonnegative overflow guard residuals whose near-zero reference does not define a multiplicative scale"
 
 [source_provenance]
-git_revision_basis = "ddf5d5010a799ed5c0517df24145725cd649f6d9"
+git_revision_basis = "c06fe5a60ba7d63a9bcdfc0500fa538dbd787453"
 julia_version = "1.12.6"
 
     [source_provenance.calibration]
@@ -14870,7 +14834,7 @@ julia_version = "1.12.6"
     fortran_source_revision = "82c57f8aa1179865d9752b617493ef06f45c3266"
     id = "pinned_mimics_cn_representative_oracle"
     scope_manifest_sha256 = "293190db2dda44f1babd13715a7e33027349df9e959a40dd60cc9d329671e9f4"
-    sha256 = "0c61b67d1c6c6669fa7cf1a5317081683901ef927c825c4de1a83ea2657e6125"
+    sha256 = "398fac802102158d9f38b39baf7deb5ef9a14b2ad4ba3a657788ec9a1aa1d8a4"
 
         [source_provenance.fresh_fortran_oracle.fresh_historical_source_sha256]
         "casaclm_pool_flux_1901_daily.nc" = "24da88c9a67abc91ff6a812965dbd7c464d82948f8e5751747c08ea5038e92fe"
@@ -15104,4 +15068,4 @@ julia_version = "1.12.6"
 
     [source_provenance.generator]
     id = "test/testbed_validation/generate_mimics_cn_historical_calibration.jl"
-    sha256 = "d36a03dcd5cdac0b613969dd27d871d6f533a36311fc81534a502aafed5f0262"
+    sha256 = "30cb0cd8a3bbfcbeda7d16895a2e938cc6cb7f86a44e54f9374721861f689cfd"

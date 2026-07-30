@@ -143,6 +143,41 @@ end
     )
 end
 
+@testset "MIMICS-CN guard residuals use absolute comparison semantics" begin
+    for section in ("daily", "annual_total")
+        for name in (
+            "diagnostic.mimics_overflow_r",
+            "diagnostic.mimics_overflow_k",
+        )
+            @test HistoricalCalibration.comparison_semantics(
+                section,
+                name,
+            ) == ("nonnegative_guard_residual", false)
+        end
+    end
+    @test HistoricalCalibration.comparison_semantics(
+        "budget",
+        "historical_residual_kg_n",
+    ) == ("zero_centered_conservation_residual", false)
+    @test HistoricalCalibration.comparison_semantics(
+        "daily",
+        "diagnostic.cnpp",
+    ) == ("mixed_absolute_relative", true)
+    absolute = HistoricalCalibration.calibration_record(
+        [2.0, 20.0],
+        [1.0, 10.0],
+        "budget",
+        "historical_residual_kg_n";
+        units = "kg N",
+        observations = [(; cell_id = 1), (; cell_id = 2)],
+    )
+    @test absolute["derived_policy"]["raw_atol"] == 10.0
+    @test absolute["derived_policy"]["raw_rtol"] == 0.0
+    @test absolute["derived_policy"]["validation_failed_pairs"] == 0
+    @test absolute["active_constraint"]["observation"] ==
+          [Dict("cell_id" => 2)]
+end
+
 @testset "MIMICS-CN consumes only fitted calibration policies" begin
     record = MIMICSCNCalibration.calibration_record(
         [1.0, 2.001],
