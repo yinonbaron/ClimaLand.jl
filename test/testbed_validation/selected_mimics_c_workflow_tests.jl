@@ -239,7 +239,7 @@ end
         "safety_margin" => "5% plus scale-aware Float64 padding",
         "nonfinite" => "fail",
     )
-    boundary_provenance = Dict(
+    boundary_provenance = Dict{String, Any}(
         name => digest() for name in (
             "population_manifest",
             "grid",
@@ -249,12 +249,16 @@ end
             "fresh_fortran_workflow",
         )
     )
+    boundary_provenance["git_revision_basis"] = repeat("b", 40)
+    boundary_provenance["julia_version"] = string(VERSION)
     boundary_provenance["generator"] = Dict(
+        "id" => "generate_mimics_c_boundary_calibration.jl",
         "sha256" => BoundaryCalibration.sha256sum(
             joinpath(@__DIR__, "generate_mimics_c_boundary_calibration.jl"),
         ),
     )
     boundary_provenance["calibration"] = Dict(
+        "id" => "mimics_c_calibration.jl",
         "sha256" => BoundaryCalibration.sha256sum(
             joinpath(@__DIR__, "mimics_c_calibration.jl"),
         ),
@@ -271,7 +275,7 @@ end
             stage in SelectedMIMICSC.STAGE_NAMES
         ),
     )
-    historical_provenance = Dict(
+    historical_provenance = Dict{String, Any}(
         name => digest() for name in (
             "scope_manifest",
             "current_julia_output",
@@ -279,12 +283,16 @@ end
             "fresh_fortran_oracle",
         )
     )
+    historical_provenance["git_revision_basis"] = repeat("b", 40)
+    historical_provenance["julia_version"] = string(VERSION)
     historical_provenance["generator"] = Dict(
+        "id" => "generate_mimics_c_historical_calibration.jl",
         "sha256" => HistoricalCalibration.sha256sum(
             joinpath(@__DIR__, "generate_mimics_c_historical_calibration.jl"),
         ),
     )
     historical_provenance["calibration"] = Dict(
+        "id" => "mimics_c_calibration.jl",
         "sha256" => HistoricalCalibration.sha256sum(
             joinpath(@__DIR__, "mimics_c_calibration.jl"),
         ),

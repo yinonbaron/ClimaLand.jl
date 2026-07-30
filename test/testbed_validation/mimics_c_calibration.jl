@@ -205,7 +205,10 @@ const DISTRIBUTION_KEYS =
 function validate_distribution(values, location; allow_empty = false)
     allow_empty && isempty(values) && return nothing
     Set(String.(keys(values))) == DISTRIBUTION_KEYS &&
-        all(value -> value isa Real && isfinite(value), Base.values(values)) ||
+        all(
+            value -> value isa Real && isfinite(value) && value >= 0,
+            Base.values(values),
+        ) ||
         error("$location has an invalid distribution")
     return nothing
 end
@@ -230,7 +233,7 @@ function validate_record(record, location, pair_count, observation_fields)
         allow_empty = get(relative, "nonzero_reference_count", 0) == 0,
     )
     active = record["active_constraint"]
-    get(active, "count", 0) > 0 ||
+    0 < get(active, "count", 0) <= pair_count ||
         error("$location has no active constraint")
     observations = get(active, "observation", Dict{String, Any}[])
     length(observations) == min(6, active["count"]) ||
@@ -252,6 +255,29 @@ function validate_record(record, location, pair_count, observation_fields)
             (outlier["julia"], outlier["fortran"], outlier["absolute_error"]),
         ) || error("$location has a nonfinite outlier")
     end
+    getindex.(top, "rank") == collect(1:length(top)) ||
+        error("$location has invalid outlier ranks")
+    policy = get(record, "derived_policy", Dict{String, Any}())
+    Set(String.(keys(policy))) == Set((
+        "atol",
+        "rtol",
+        "raw_atol",
+        "raw_rtol",
+        "float_padding",
+        "raw_objective",
+        "validation_failed_pairs",
+    )) || error("$location has incomplete fitted-policy diagnostics")
+    all(
+        value -> value isa Real && isfinite(value) && value >= 0,
+        (
+            policy["atol"],
+            policy["rtol"],
+            policy["raw_atol"],
+            policy["raw_rtol"],
+            policy["float_padding"],
+            policy["raw_objective"],
+        ),
+    ) || error("$location has invalid fitted-policy diagnostics")
     policy_record(record, location)
     return nothing
 end
@@ -265,6 +291,11 @@ end
 
 function validate_provenance(document, required, generator)
     provenance = get(document, "source_provenance", Dict{String, Any}())
+    revision = get(provenance, "git_revision_basis", "")
+    length(revision) == 40 && all(isxdigit, revision) ||
+        error("MIMICS-C calibration has an invalid Git revision")
+    !isempty(String(get(provenance, "julia_version", ""))) ||
+        error("MIMICS-C calibration has no Julia version")
     for name in required
         validate_digest(
             get(provenance, name, Dict{String, Any}()),
@@ -276,6 +307,10 @@ function validate_provenance(document, required, generator)
         provenance["calibration"],
         "source_provenance.calibration",
     )
+    for name in ("generator", "calibration")
+        !isempty(String(get(provenance[name], "id", ""))) ||
+            error("source_provenance.$name has no logical ID")
+    end
     provenance["generator"]["sha256"] ==
         open(
             joinpath(@__DIR__, generator),
