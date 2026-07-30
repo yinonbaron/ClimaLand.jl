@@ -102,6 +102,7 @@ function write_calibration(output_path, report_path, oracle_path, path)
         Int(cell["cell_id"]) => (;
             latitude = cell["latitude"],
             longitude = cell["longitude"],
+            pft = cell["pft"],
         ) for cell in get(reference, "cell", Dict{String, Any}[])
     )
     annual, daily =

@@ -885,7 +885,7 @@ julia_version = "1.12.6"
 
     [source_provenance.calibration]
     id = "test/testbed_validation/mimics_cn_calibration.jl"
-    sha256 = "3fdd347412a0c0f2b71d0d6664f309f7bd6c78c91139baa1bcf37dfc3c5e5f7f"
+    sha256 = "74c12aa83db20a826ecdb478c5b1cedb6ffe937247126bd7c27a52eebf75df60"
 
     [source_provenance.generator]
     id = "test/testbed_validation/generate_mimics_cn_boundary_calibration.jl"

@@ -2,8 +2,240 @@ module TestbedMIMICSCNCalibration
 
 import Statistics
 import TOML
+import SHA
 
 const SAFETY_FACTOR = 1.05
+const BOUNDARY_CALIBRATION_ID =
+    "mimics-cn-current-julia-fresh-fortran-800-representative-union-boundary-v1"
+const HISTORICAL_CALIBRATION_ID =
+    "mimics-cn-current-julia-fresh-fortran-representative-history-v1"
+const METHOD_FIELDS = Set((
+    "error",
+    "nonfinite",
+    "raw_absolute",
+    "reference_magnitude",
+    "safety_margin",
+    "selection",
+))
+const POPULATION_SIZES = Dict(
+    "random_pft_800" => (800, 790),
+    "representative" => (80, 80),
+)
+const STAGES = Set(("prespin", "spin", "spin_continuation", "historical"))
+
+sha256sum(path) = bytes2hex(SHA.sha256(read(path)))
+is_sha256(value) =
+    value isa AbstractString && occursin(r"^[0-9a-f]{64}$", value)
+is_git_revision(value) =
+    value isa AbstractString && occursin(r"^[0-9a-f]{40}$", value)
+
+function validate_method(document, location)
+    method = get(document, "method", nothing)
+    method isa AbstractDict ||
+        error("$location calibration method is missing")
+    Set(keys(method)) == METHOD_FIELDS ||
+        error("$location calibration method fields are invalid")
+    all(value -> value isa AbstractString && !isempty(value), values(method)) ||
+        error("$location calibration method is incomplete")
+    occursin("max(0", method["raw_absolute"]) ||
+        error("$location raw absolute method is invalid")
+    !occursin("absolute_floor", method["raw_absolute"]) ||
+        error("$location raw absolute method contains a scientific floor")
+end
+
+function validate_local_source(record, location, id, path)
+    record isa AbstractDict || error("$location provenance is missing")
+    get(record, "id", nothing) == id ||
+        error("$location provenance id is invalid")
+    get(record, "sha256", nothing) == sha256sum(path) ||
+        error("$location provenance hash is stale")
+end
+
+function validate_digest(value, location)
+    is_sha256(value) || error("$location is not a SHA-256 digest")
+end
+
+function validate_common(document, location, calibration_id, generator)
+    get(document, "model", nothing) == "MIMICS-CN" ||
+        error("$location calibration is not for MIMICS-CN")
+    get(document, "schema_version", nothing) == 1 ||
+        error("$location calibration schema is invalid")
+    get(document, "calibration_id", nothing) == calibration_id ||
+        error("$location calibration id is invalid")
+    validate_method(document, location)
+
+    provenance = get(document, "source_provenance", nothing)
+    provenance isa AbstractDict ||
+        error("$location source provenance is missing")
+    get(provenance, "julia_version", "") isa AbstractString &&
+        !isempty(provenance["julia_version"]) ||
+        error("$location Julia version provenance is missing")
+    is_git_revision(get(provenance, "git_revision_basis", nothing)) ||
+        error("$location git revision provenance is invalid")
+    validate_local_source(
+        get(provenance, "generator", nothing),
+        "$location generator",
+        "test/testbed_validation/$generator",
+        joinpath(@__DIR__, generator),
+    )
+    validate_local_source(
+        get(provenance, "calibration", nothing),
+        "$location calibration helper",
+        "test/testbed_validation/mimics_cn_calibration.jl",
+        @__FILE__,
+    )
+    return provenance
+end
+
+function validate_boundary(document)
+    provenance = validate_common(
+        document,
+        "boundary",
+        BOUNDARY_CALIBRATION_ID,
+        "generate_mimics_cn_boundary_calibration.jl",
+    )
+    get(document, "union_cell_count", nothing) == 852 ||
+        error("boundary union population is invalid")
+
+    populations = get(provenance, "population", nothing)
+    populations isa AbstractDict &&
+        Set(keys(populations)) == Set(keys(POPULATION_SIZES)) ||
+        error("boundary population provenance is invalid")
+    validation = get(document, "population_validation", nothing)
+    validation isa AbstractDict &&
+        Set(keys(validation)) == Set(keys(POPULATION_SIZES)) ||
+        error("boundary population validation is invalid")
+    for (name, (cell_count, eligible_count)) in POPULATION_SIZES
+        population = populations[name]
+        get(population, "cell_count", nothing) == cell_count &&
+            get(population, "eligible_cell_count", nothing) == eligible_count ||
+            error("boundary $name population count is invalid")
+        is_git_revision(
+            get(population, "fortran_source_revision", nothing),
+        ) || error("boundary $name Fortran revision is invalid")
+        for key in ("cell_ids_sha256",)
+            validate_digest(
+                get(population, key, nothing),
+                "boundary $name $key",
+            )
+        end
+        for key in ("fortran_build", "fortran_workflow")
+            record = get(population, key, nothing)
+            record isa AbstractDict ||
+                error("boundary $name $key provenance is missing")
+            validate_digest(
+                get(record, "sha256", nothing),
+                "boundary $name $key",
+            )
+        end
+        sources = get(population, "sources", nothing)
+        sources isa AbstractDict && Set(keys(sources)) == STAGES ||
+            error("boundary $name source stages are invalid")
+        for (stage, records) in sources
+            records isa AbstractDict ||
+                error("boundary $name $stage source provenance is invalid")
+            for (source, record) in records
+                record isa AbstractDict ||
+                    error("boundary $name $stage $source provenance is invalid")
+                validate_digest(
+                    get(record, "sha256", nothing),
+                    "boundary $name $stage $source",
+                )
+            end
+        end
+
+        stages = validation[name]
+        stages isa AbstractDict && Set(keys(stages)) == STAGES ||
+            error("boundary $name validation stages are invalid")
+        for (stage, records) in stages
+            records isa AbstractDict && !isempty(records) ||
+                error("boundary $name $stage validation is empty")
+            all(
+                record ->
+                    get(record, "finite_pair_count", nothing) ==
+                    eligible_count &&
+                        get(record, "failed_pairs", nothing) == 0,
+                values(records),
+            ) || error("boundary $name $stage validation is invalid")
+        end
+    end
+
+    population_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_cn_boundary_populations.toml",
+    )
+    scope_path =
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml")
+    validate_local_source(
+        get(provenance, "population_manifest", nothing),
+        "boundary population manifest",
+        "test/testbed_validation/validation/mimics_cn_boundary_populations.toml",
+        population_path,
+    )
+    validate_local_source(
+        get(provenance, "scope_manifest", nothing),
+        "boundary scope manifest",
+        "test/testbed_validation/validation/scopes/representative.toml",
+        scope_path,
+    )
+    for key in ("normal_casa_parameters", "mimics_parameters")
+        record = get(provenance, key, nothing)
+        record isa AbstractDict ||
+            error("boundary $key provenance is missing")
+        validate_digest(
+            get(record, "sha256", nothing),
+            "boundary $key provenance",
+        )
+    end
+end
+
+function validate_historical(document)
+    provenance = validate_common(
+        document,
+        "historical",
+        HISTORICAL_CALIBRATION_ID,
+        "generate_mimics_cn_historical_calibration.jl",
+    )
+    get(document, "scope", nothing) == "representative" ||
+        error("historical scope is invalid")
+    get(document, "cell_count", nothing) == 80 ||
+        error("historical population count is invalid")
+    scope_path =
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml")
+    scope = TOML.parsefile(scope_path)
+    get(document, "cell_ids", nothing) == scope["cell_ids"] ||
+        error("historical population ids do not match the scope manifest")
+
+    oracle = get(provenance, "fresh_fortran_oracle", nothing)
+    oracle isa AbstractDict ||
+        error("historical Fortran oracle provenance is missing")
+    get(oracle, "id", nothing) == "pinned_mimics_cn_representative_oracle" ||
+        error("historical Fortran oracle id is invalid")
+    validate_digest(
+        get(oracle, "sha256", nothing),
+        "historical Fortran oracle",
+    )
+    get(oracle, "scope_manifest_sha256", nothing) == sha256sum(scope_path) ||
+        error("historical Fortran oracle scope hash is stale")
+    is_git_revision(get(oracle, "fortran_source_revision", nothing)) ||
+        error("historical Fortran source revision is invalid")
+    source_hashes = get(oracle, "fresh_historical_source_sha256", nothing)
+    source_hashes isa AbstractDict && !isempty(source_hashes) ||
+        error("historical Fortran source hashes are missing")
+    for (name, digest) in source_hashes
+        validate_digest(digest, "historical Fortran source $name")
+    end
+    for key in ("current_julia_output", "current_julia_report")
+        record = get(provenance, key, nothing)
+        record isa AbstractDict ||
+            error("historical $key provenance is missing")
+        validate_digest(
+            get(record, "sha256", nothing),
+            "historical $key provenance",
+        )
+    end
+end
 
 function right_derivative(relative, errors, references, absolute_floor)
     maximum_residual =
@@ -207,10 +439,8 @@ used by the selected-cell workflow.
 function comparison_policy(boundary_path, historical_path)
     boundary = TOML.parsefile(boundary_path)
     historical = TOML.parsefile(historical_path)
-    get(boundary, "model", "MIMICS-CN") == "MIMICS-CN" ||
-        error("boundary calibration is not for MIMICS-CN")
-    get(historical, "model", nothing) == "MIMICS-CN" ||
-        error("historical calibration is not for MIMICS-CN")
+    validate_boundary(boundary)
+    validate_historical(historical)
     boundary_values = get(boundary, "variable", Dict{String, Any}())
     annual_values = get(historical, "annual", Dict{String, Any}())
     daily_values = get(historical, "daily", Dict{String, Any}())

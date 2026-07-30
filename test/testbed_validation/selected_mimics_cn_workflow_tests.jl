@@ -149,63 +149,16 @@ end
         [1.0, 2.0];
         units = "kg C m^-2",
     )
-    boundary = Dict(
-        "model" => "MIMICS-CN",
-        "variable" => Dict(
-            stage => Dict(name => deepcopy(record) for name in
-                SelectedMIMICSCN.BOUNDARY_NAMES) for
-            stage in SelectedMIMICSCN.STAGE_NAMES
-        ),
+    @test MIMICSCNCalibration.policy_record(record, "test") == Dict(
+        "atol" => record["derived_policy"]["atol"],
+        "rtol" => record["derived_policy"]["rtol"],
     )
-    historical = Dict(
-        "model" => "MIMICS-CN",
-        "annual" => Dict(
-            "annual_mean" => Dict(
-                name => deepcopy(record) for
-                name in SelectedMIMICSCN.ANNUAL_STATE_NAMES
-            ),
-            "end_of_year" => Dict(
-                name => deepcopy(record) for
-                name in SelectedMIMICSCN.ANNUAL_STATE_NAMES
-            ),
-            "annual_total" => Dict(
-                name => deepcopy(record) for
-                name in SelectedMIMICSCN.ANNUAL_FLUX_NAMES
-            ),
-        ),
-        "daily" => Dict(
-            name => deepcopy(record) for name in SelectedMIMICSCN.DAILY_NAMES
-        ),
-        "budget" => Dict(
-            "historical_residual_kg_c" => deepcopy(record),
-            "historical_residual_kg_n" => deepcopy(record),
-        ),
+    invalid = deepcopy(record)
+    invalid["derived_policy"]["validation_failed_pairs"] = 1
+    @test_throws ErrorException MIMICSCNCalibration.policy_record(
+        invalid,
+        "test",
     )
-    mktempdir() do directory
-        boundary_path = joinpath(directory, "boundary.toml")
-        historical_path = joinpath(directory, "historical.toml")
-        open(boundary_path, "w") do io
-            TOML.print(io, boundary)
-        end
-        open(historical_path, "w") do io
-            TOML.print(io, historical)
-        end
-        policy = MIMICSCNCalibration.comparison_policy(
-            boundary_path,
-            historical_path,
-        )
-        SelectedMIMICSCN.validate_policy(policy)
-        @test Set(keys(policy["fresh_fortran_budget"])) == Set((
-            "historical_residual_kg_c",
-            "historical_residual_kg_n",
-        ))
-        @test policy["fresh_fortran_daily"][first(
-            SelectedMIMICSCN.DAILY_NAMES,
-        )] == Dict(
-            "atol" => record["derived_policy"]["atol"],
-            "rtol" => record["derived_policy"]["rtol"],
-        )
-    end
 end
 
 @testset "MIMICS-CN calibration records elemental units" begin
@@ -354,6 +307,15 @@ end
         record["derived_policy"]["validation_failed_pairs"] == 0 for
         record in vcat(annual, daily, budget)
     )
+    @test all(
+        all(
+            observation -> haskey(observation, "pft"),
+            vcat(
+                record["top_outlier"],
+                record["active_constraint"]["observation"],
+            ),
+        ) for record in vcat(annual, daily, budget)
+    )
     @test Set(getindex.(budget, "units")) == Set(("kg C", "kg N"))
 
     for (document, generator, calibration) in (
@@ -375,6 +337,79 @@ end
     end
     @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(boundary_path, String))
     @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(historical_path, String))
+
+    policy = MIMICSCNCalibration.comparison_policy(
+        boundary_path,
+        historical_path,
+    )
+    @test isnothing(SelectedMIMICSCN.validate_policy(policy))
+
+    mktempdir() do directory
+        invalid_boundary_path = joinpath(directory, "boundary.toml")
+        invalid_historical_path = joinpath(directory, "historical.toml")
+        function rejects(boundary_document, historical_document)
+            open(invalid_boundary_path, "w") do io
+                TOML.print(io, boundary_document; sorted = true)
+            end
+            open(invalid_historical_path, "w") do io
+                TOML.print(io, historical_document; sorted = true)
+            end
+            return try
+                MIMICSCNCalibration.comparison_policy(
+                    invalid_boundary_path,
+                    invalid_historical_path,
+                )
+                false
+            catch error
+                error isa ErrorException
+            end
+        end
+
+        invalid_boundary = deepcopy(boundary)
+        delete!(invalid_boundary, "model")
+        @test rejects(invalid_boundary, historical)
+
+        invalid_boundary = deepcopy(boundary)
+        invalid_boundary["model"] = "MIMICS-C"
+        @test rejects(invalid_boundary, historical)
+
+        invalid_historical = deepcopy(historical)
+        delete!(invalid_historical, "model")
+        @test rejects(boundary, invalid_historical)
+
+        invalid_historical = deepcopy(historical)
+        invalid_historical["model"] = "MIMICS-C"
+        @test rejects(boundary, invalid_historical)
+
+        invalid_boundary = deepcopy(boundary)
+        invalid_boundary["calibration_id"] = "wrong"
+        @test rejects(invalid_boundary, historical)
+
+        invalid_historical = deepcopy(historical)
+        invalid_historical["calibration_id"] = "wrong"
+        @test rejects(boundary, invalid_historical)
+
+        invalid_boundary = deepcopy(boundary)
+        delete!(invalid_boundary["method"], "selection")
+        @test rejects(invalid_boundary, historical)
+
+        invalid_boundary = deepcopy(boundary)
+        invalid_boundary["source_provenance"]["population"]["representative"][
+            "eligible_cell_count"
+        ] = 79
+        @test rejects(invalid_boundary, historical)
+
+        invalid_boundary = deepcopy(boundary)
+        invalid_boundary["source_provenance"]["calibration"]["sha256"] =
+            repeat("0", 64)
+        @test rejects(invalid_boundary, historical)
+
+        invalid_historical = deepcopy(historical)
+        invalid_historical["source_provenance"]["fresh_fortran_oracle"][
+            "scope_manifest_sha256"
+        ] = repeat("0", 64)
+        @test rejects(boundary, invalid_historical)
+    end
 end
 
 @testset "MIMICS-CN generator reads only supplied NetCDF locations" begin
