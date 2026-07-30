@@ -515,175 +515,199 @@ end
     end
 end
 
-@testset "Validation Runner completes pinned Representative CASA-CN" begin
-    mktempdir() do output
-        result = run_validation(
-            "--scope",
-            "representative",
-            "--models",
-            "CASA-CN",
-            "--reference",
-            "pinned",
-            "--workers",
-            "1",
-            "--output",
-            output,
-        )
+if get(ENV, "CLIMALAND_RUN_REPRESENTATIVE_VALIDATION", "false") == "true"
+    @testset "Validation Runner completes pinned Representative CASA-CN" begin
+        mktempdir() do output
+            result = run_validation(
+                "--scope",
+                "representative",
+                "--models",
+                "CASA-CN",
+                "--reference",
+                "pinned",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            )
 
-        @test result.exitcode == 0
-        @test occursin("Validation: passed", result.stdout)
-        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
-        model = only(report["model"])
-        @test model["name"] == "CASA-CN"
-        @test report["comparison_policy"]["id"] ==
-              "casa-representative-validation-v3"
-        @test report["comparison_policy"]["budget_rtol"] == 1.2e-11
+            @test result.exitcode == 0
+            @test occursin("Validation: passed", result.stdout)
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            model = only(report["model"])
+            @test model["name"] == "CASA-CN"
+            @test report["comparison_policy"]["id"] ==
+                  "casa-representative-validation-v3"
+            @test report["comparison_policy"]["budget_rtol"] == 1.2e-11
+            @test occursin(
+                "1.05 safety margin",
+                report["comparison_policy"]["budget_rtol_method"],
+            )
+            @test model["coverage"]["scope_cells"] == 80
+            @test model["coverage"]["compared_cells"] == 80
+            @test model["outcome"] == "passed"
+            @test all(values(model["comparison"]))
+            @test haskey(model["budget"], "carbon")
+            @test haskey(model["budget"], "nitrogen")
+            @test model["budget"]["carbon"]["reducer"] ==
+                  "maximum_absolute_residual"
+            @test model["budget"]["nitrogen"]["reducer"] ==
+                  "maximum_absolute_residual"
+            @test model["historical"]["annual"]["all_match"]
+            @test model["historical"]["fixed_daily_samples"]["all_match"]
+            @test model["historical"]["fresh_fortran_daily"]["all_match"]
+            @test length(
+                model["historical"]["fresh_fortran_daily"]["sample_days"],
+            ) == 56
+            @test report["comparison_policy"]["fixed_daily_samples"]["sample_count_per_variable_cell"] ==
+                  84
+            @test report["comparison_policy"]["annual_reducers"]["state_pool"]["reducers"] ==
+                  ["annual_mean", "end_of_year"]
+            @test report["comparison_policy"]["invalid_oracle_variables"]["nLitInptStruc"]["kind"] ==
+                  "variable_level"
+            daily_gap =
+                report["comparison_policy"]["invalid_oracle_windows"]["fresh_fortran_fixed_daily"]
+            @test daily_gap["kind"] == "time_window"
+            @test daily_gap["missing_years"] == [1957]
+            @test daily_gap["comparison"] == "missing_window_native_julia_only"
+            policy_document = TOML.parsefile(VALIDATION_COMPARISON_POLICY)
+            for rule in (
+                "fresh_fortran_boundary",
+                "fresh_fortran_annual",
+                "fresh_fortran_daily",
+            )
+                @test !haskey(policy_document["model"]["CASA-CN"][rule], "atol")
+                @test !haskey(policy_document["model"]["CASA-CN"][rule], "rtol")
+            end
+            scientific = TOML.parsefile(model["comparison_report"])
+            applied =
+                scientific["historical_comparison"]["annual"]["source"]["fresh_fortran"]["reducers"]["annual_mean"]["variable"]["casa_plant.c_leaf"]
+            policy =
+                report["comparison_policy"]["fresh_fortran_annual"]["annual_mean"]["casa_plant.c_leaf"]
+            @test applied["atol"] == policy["atol"]
+            @test applied["rtol"] == policy["rtol"]
+            daily_applied =
+                model["historical"]["fresh_fortran_daily"]["variable"]["casa_plant.c_leaf"]
+            daily_policy =
+                report["comparison_policy"]["fresh_fortran_historical"]["casa_plant.c_leaf"]
+            @test daily_applied["atol"] == daily_policy["atol"]
+            @test daily_applied["rtol"] == daily_policy["rtol"]
+        end
+    end
+
+    @testset "Validation Runner aggregates a CASA-CN scientific failure" begin
+        pinned, _ =
+            VALIDATION_RUNNER_MODULE.reference_path("representative", "CASA-CN")
+        reference = TOML.parsefile(pinned)
+        incomplete = deepcopy(reference)
+        delete!(
+            incomplete["configuration"]["carbon_nitrogen"]["native_julia"]["historical"],
+            "diagnostic.n_litter_structural_input",
+        )
+        scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+        @test_throws VALIDATION_RUNNER_MODULE.RunnerError VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+            incomplete,
+            scope,
+            "CASA-CN",
+        )
+        nonfinite = deepcopy(reference)
+        nonfinite["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"][1] =
+            Inf
+        nonfinite_error = try
+            VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+                nonfinite,
+                scope,
+                "CASA-CN",
+            )
+            nothing
+        catch error
+            error
+        end
+        @test nonfinite_error isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("carbon_nitrogen.fresh_fortran", nonfinite_error.message)
+        invalid_provenance = deepcopy(reference)
+        invalid_provenance["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_daily_sha256"]["2014"] = "not-a-sha256"
+        provenance_error = try
+            VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+                invalid_provenance,
+                scope,
+                "CASA-CN",
+            )
+            nothing
+        catch error
+            error
+        end
+        @test provenance_error isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("daily provenance", provenance_error.message)
+        invalid_forcing = deepcopy(reference)
+        invalid_forcing["configuration"]["carbon_nitrogen"]["provenance"]["forcing_artifact_git_tree_sha1"] = "0000000000000000000000000000000000000000"
+        forcing_error = try
+            VALIDATION_RUNNER_MODULE.validate_reference_forcing_artifact(
+                invalid_forcing,
+                "836b4cda5912f1bea5f27abd326789285b02ed46",
+                "CASA-CN",
+                scope,
+            )
+            nothing
+        catch error
+            error
+        end
+        @test forcing_error isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("Representative forcing artifact", forcing_error.message)
+        stale_calibration = deepcopy(reference)
+        stale_calibration["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_calibration_sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
+        calibration_error = try
+            VALIDATION_RUNNER_MODULE.validate_reference_calibration(
+                stale_calibration,
+                joinpath(
+                    @__DIR__,
+                    "validation",
+                    "casa_cn_full_grid_calibration.toml",
+                ),
+                "CASA-CN",
+                scope,
+            )
+            nothing
+        catch error
+            error
+        end
+        @test calibration_error isa VALIDATION_RUNNER_MODULE.RunnerError
         @test occursin(
-            "1.05 safety margin",
-            report["comparison_policy"]["budget_rtol_method"],
+            "current full-grid calibration",
+            calibration_error.message,
         )
-        @test model["coverage"]["scope_cells"] == 80
-        @test model["coverage"]["compared_cells"] == 80
-        @test model["outcome"] == "passed"
-        @test all(values(model["comparison"]))
-        @test haskey(model["budget"], "carbon")
-        @test haskey(model["budget"], "nitrogen")
-        @test model["budget"]["carbon"]["reducer"] ==
-              "maximum_absolute_residual"
-        @test model["budget"]["nitrogen"]["reducer"] ==
-              "maximum_absolute_residual"
-        @test model["historical"]["annual"]["all_match"]
-        @test model["historical"]["fixed_daily_samples"]["all_match"]
-        @test model["historical"]["fresh_fortran_daily"]["all_match"]
-        @test length(
-            model["historical"]["fresh_fortran_daily"]["sample_days"],
-        ) == 56
-        @test report["comparison_policy"]["fixed_daily_samples"]["sample_count_per_variable_cell"] ==
-              84
-        @test report["comparison_policy"]["annual_reducers"]["state_pool"]["reducers"] ==
-              ["annual_mean", "end_of_year"]
-        @test report["comparison_policy"]["invalid_oracle_variables"]["nLitInptStruc"]["kind"] ==
-              "variable_level"
-        daily_gap =
-            report["comparison_policy"]["invalid_oracle_windows"]["fresh_fortran_fixed_daily"]
-        @test daily_gap["kind"] == "time_window"
-        @test daily_gap["missing_years"] == [1957]
-        @test daily_gap["comparison"] == "missing_window_native_julia_only"
-        policy_document = TOML.parsefile(VALIDATION_COMPARISON_POLICY)
-        for rule in (
-            "fresh_fortran_boundary",
-            "fresh_fortran_annual",
-            "fresh_fortran_daily",
-        )
-            @test !haskey(policy_document["model"]["CASA-CN"][rule], "atol")
-            @test !haskey(policy_document["model"]["CASA-CN"][rule], "rtol")
-        end
-        scientific = TOML.parsefile(model["comparison_report"])
-        applied =
-            scientific["historical_comparison"]["annual"]["source"]["fresh_fortran"]["reducers"]["annual_mean"]["variable"]["casa_plant.c_leaf"]
-        policy =
-            report["comparison_policy"]["fresh_fortran_annual"]["annual_mean"]["casa_plant.c_leaf"]
-        @test applied["atol"] == policy["atol"]
-        @test applied["rtol"] == policy["rtol"]
-        daily_applied =
-            model["historical"]["fresh_fortran_daily"]["variable"]["casa_plant.c_leaf"]
-        daily_policy =
-            report["comparison_policy"]["fresh_fortran_historical"]["casa_plant.c_leaf"]
-        @test daily_applied["atol"] == daily_policy["atol"]
-        @test daily_applied["rtol"] == daily_policy["rtol"]
-    end
-end
+        leaf =
+            reference["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"]
+        leaf[1] += 1.0e6
+        mktempdir() do directory
+            altered = joinpath(directory, "altered-reference.toml")
+            open(altered, "w") do io
+                TOML.print(io, reference; sorted = true)
+            end
+            output = joinpath(directory, "output")
+            result = run_validation(
+                "--scope",
+                "core",
+                "--models",
+                "CASA-CN",
+                "--reference",
+                "pinned",
+                "--workers",
+                "1",
+                "--output",
+                output;
+                environment = Dict(
+                    "CLIMALAND_VALIDATION_CASA_CN_REFERENCE" => altered,
+                ),
+            )
 
-@testset "Validation Runner aggregates a CASA-CN scientific failure" begin
-    pinned, _ =
-        VALIDATION_RUNNER_MODULE.reference_path("representative", "CASA-CN")
-    reference = TOML.parsefile(pinned)
-    incomplete = deepcopy(reference)
-    delete!(
-        incomplete["configuration"]["carbon_nitrogen"]["native_julia"]["historical"],
-        "diagnostic.n_litter_structural_input",
-    )
-    scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
-    @test_throws VALIDATION_RUNNER_MODULE.RunnerError VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
-        incomplete,
-        scope,
-        "CASA-CN",
-    )
-    nonfinite = deepcopy(reference)
-    nonfinite["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"][1] =
-        Inf
-    nonfinite_error = try
-        VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
-            nonfinite,
-            scope,
-            "CASA-CN",
-        )
-        nothing
-    catch error
-        error
-    end
-    @test nonfinite_error isa VALIDATION_RUNNER_MODULE.RunnerError
-    @test occursin("carbon_nitrogen.fresh_fortran", nonfinite_error.message)
-    invalid_provenance = deepcopy(reference)
-    invalid_provenance["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_daily_sha256"]["2014"] = "not-a-sha256"
-    provenance_error = try
-        VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
-            invalid_provenance,
-            scope,
-            "CASA-CN",
-        )
-        nothing
-    catch error
-        error
-    end
-    @test provenance_error isa VALIDATION_RUNNER_MODULE.RunnerError
-    @test occursin("daily provenance", provenance_error.message)
-    invalid_forcing = deepcopy(reference)
-    invalid_forcing["configuration"]["carbon_nitrogen"]["provenance"]["forcing_artifact_git_tree_sha1"] = "0000000000000000000000000000000000000000"
-    forcing_error = try
-        VALIDATION_RUNNER_MODULE.validate_reference_forcing_artifact(
-            invalid_forcing,
-            "836b4cda5912f1bea5f27abd326789285b02ed46",
-            "CASA-CN",
-            scope,
-        )
-        nothing
-    catch error
-        error
-    end
-    @test forcing_error isa VALIDATION_RUNNER_MODULE.RunnerError
-    @test occursin("Representative forcing artifact", forcing_error.message)
-    leaf =
-        reference["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"]
-    leaf[1] += 1.0e6
-    mktempdir() do directory
-        altered = joinpath(directory, "altered-reference.toml")
-        open(altered, "w") do io
-            TOML.print(io, reference; sorted = true)
+            @test result.exitcode == 1
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            model = only(report["model"])
+            @test model["coverage"]["compared_cells"] == 11
+            @test model["outcome"] == "failed"
+            @test !model["comparison"]["fresh_fortran_boundaries"]
+            @test report["outcome"] == "failed"
         end
-        output = joinpath(directory, "output")
-        result = run_validation(
-            "--scope",
-            "core",
-            "--models",
-            "CASA-CN",
-            "--reference",
-            "pinned",
-            "--workers",
-            "1",
-            "--output",
-            output;
-            environment = Dict(
-                "CLIMALAND_VALIDATION_CASA_CN_REFERENCE" => altered,
-            ),
-        )
-
-        @test result.exitcode == 1
-        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
-        model = only(report["model"])
-        @test model["coverage"]["compared_cells"] == 11
-        @test model["outcome"] == "failed"
-        @test !model["comparison"]["fresh_fortran_boundaries"]
-        @test report["outcome"] == "failed"
     end
 end

@@ -689,7 +689,8 @@ Run the pinned CASA-CN prespin, accelerated spin, normal spin, and historical
 workflow on all 4,263 cells. `reference_root` is the completed issue-24 case
 root. In addition to its `stages`, `candidates`, and `reference` directories,
 it must contain `fresh_reference` with separately reduced annual and retained
-daily fresh-Fortran products.
+daily fresh-Fortran products. `resume_historical_checkpoint` is restricted to
+boundary-only calibration recovery and reruns only the historical stage.
 """
 function run_gridded_case(
     source_root,

@@ -43,6 +43,22 @@ include("generate_casa_c_full_grid_calibration.jl")
     @test record["units"] == "kg N m^-2"
     @test !haskey(record["derived_policy"], "absolute_floor")
     @test record["derived_policy"]["numerical_padding"] > 0
+    @test record["active_constraint_count"] == 6
+    @test length(record["active_constraint_sample"]) == 6
+    @test !haskey(record, "active_constraint_cell_ids")
+    @test !haskey(record, "active_constraint_objective_slopes")
+    @test all(
+        all(
+            haskey(observation, key) for key in (
+                "cell_id",
+                "pft",
+                "latitude",
+                "longitude",
+                "year",
+                "objective_slope",
+            )
+        ) for observation in record["active_constraint_sample"]
+    )
     @test all(
         all(
             haskey(outlier, key) for

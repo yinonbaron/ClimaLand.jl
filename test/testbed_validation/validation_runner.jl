@@ -876,6 +876,32 @@ function validate_reference_forcing_artifact(
     return nothing
 end
 
+function validate_reference_calibration(
+    reference,
+    calibration_path,
+    model,
+    scope,
+)
+    scope.name == "representative" || return nothing
+    configuration_key = model == "CASA-C" ? "carbon_only" : "carbon_nitrogen"
+    provenance = get(
+        get(
+            get(reference, "configuration", Dict{String, Any}()),
+            configuration_key,
+            Dict{String, Any}(),
+        ),
+        "provenance",
+        Dict{String, Any}(),
+    )
+    get(provenance, "fresh_fortran_calibration_sha256", nothing) ==
+    sha256sum(calibration_path) || throw(
+        RunnerError(
+            "Pinned $model reference was not generated with the current full-grid calibration",
+        ),
+    )
+    return nothing
+end
+
 function validate_reference_file(path, model = "CASA-C")
     isfile(path) || throw(
         RunnerError(
@@ -1242,6 +1268,12 @@ function main(args = ARGS)
             reference_path(configuration.scope, model)
         reference = validate_reference_file(pinned_reference, model)
         validate_eligible_reference_values(reference, scope, model)
+        validate_reference_calibration(
+            reference,
+            policy.calibration_path,
+            model,
+            scope,
+        )
         fixture_manifest, forcing_artifact =
             fixture_manifest_path(configuration.scope, model)
         validate_fixture_scope_provenance(fixture_manifest, scope)

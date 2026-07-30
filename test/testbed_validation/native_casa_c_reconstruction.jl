@@ -1682,6 +1682,8 @@ end
 Run the four-stage native CASA-C reconstruction contract. Models may differ by
 stage (the accelerated-spin parameter table does), but every stage advances
 through the native workflow and round-trips through a native checkpoint.
+For calibration recovery after a completed spin, the same seam also accepts a
+single historical stage initialized from an explicit checkpoint.
 
 Boundary and historical comparisons are deliberately supplied by the case:
 the tiny acceptance case compares in-memory synthetic references, while the

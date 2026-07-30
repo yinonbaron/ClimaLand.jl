@@ -172,6 +172,21 @@ function calibration_record(actual, expected, contexts; units)
             ),
             residuals,
         ) : Int[]
+    active_sample = [
+        Dict(
+            "cell_id" => contexts[index].cell_id,
+            "pft" => contexts[index].pft,
+            "latitude" => contexts[index].latitude,
+            "longitude" => contexts[index].longitude,
+            (
+                string(name) => value for
+                (name, value) in pairs(contexts[index]) if
+                name ∉ (:cell_id, :pft, :latitude, :longitude)
+            )...,
+            "objective_slope" =>
+                Statistics.mean(references) - references[index],
+        ) for index in Iterators.take(active, 6)
+    ]
     order = sortperm(errors; rev = true)
     outliers = [
         Dict(
@@ -199,11 +214,8 @@ function calibration_record(actual, expected, contexts; units)
         "absolute_error" => distribution(errors),
         "relative_error" => relative_distribution,
         "absolute_reference" => distribution(references),
-        "active_constraint_cell_ids" =>
-            [contexts[index].cell_id for index in active],
-        "active_constraint_objective_slopes" => [
-            Statistics.mean(references) - references[index] for index in active
-        ],
+        "active_constraint_count" => length(active),
+        "active_constraint_sample" => active_sample,
         "nonnegative_absolute_constraint_active" => isapprox(
             0.0,
             max(0.0, maximum_residual);

@@ -34,7 +34,8 @@ rules cover every valid state and flux over 114 years; daily rules cover
 238,728 day-cell pairs per valid variable. The calibration
 manifest records the exact Julia and Fortran inputs, execution source hashes,
 single-thread execution contract, distributions, leading outliers, active
-constraints, and the derived policy.
+constraint counts with up to six coordinate-rich examples, and the derived
+policy.
 
 `nLitInptStruc` is the sole variable-level invalid-oracle gap. The audited
 Fortran implementation adds an uninitialized `nwd2str` work array to that
@@ -63,6 +64,11 @@ in a supervised process with a hard 7,200-second deadline and records scope
 coverage, Eligibility Gaps, policy and artifact provenance, annual reducers,
 fixed daily samples, carbon and nitrogen budgets, scientific checks, and
 timing in `validation_report.toml`.
+
+The ordinary package-test matrix excludes this expensive scientific run. The
+dedicated validation job enables its focused success and scientific-failure
+tests with `CLIMALAND_RUN_REPRESENTATIVE_VALIDATION=true`, so the 80-cell
+comparison runs once rather than once per package-test job.
 
 ## Verified run
 
