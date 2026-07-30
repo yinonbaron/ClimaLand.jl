@@ -299,8 +299,8 @@ function reduced_calibration(julia_path, fortran_path, scope, grid)
                                 ),
                                 reducer,
                             ),
-                            coordinate_schema,
-                            coordinates,
+                            coordinate_schema = coordinate_schema,
+                            coordinates = coordinates,
                         )
                     end for name in getproperty.(variables, :name)
                 ) for (reducer, variables) in reducer_variables

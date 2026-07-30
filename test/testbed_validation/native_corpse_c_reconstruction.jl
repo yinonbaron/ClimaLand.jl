@@ -421,10 +421,11 @@ function reduced_flux_variables()
         ),
         (
             name = "LitterLayer_CO2",
-            source = :corpse_flux,
+            source = :corpse_litter_flux,
             variables = (
-                corpse_flux_index(:litter_rhiz_cumulative_co2),
-                corpse_flux_index(:litter_bulk_cumulative_co2),
+                length(selected_corpse().CORPSE.PROGNOSTIC_VARIABLES) + 1,
+                corpse_flux_index(:soil_rhiz_cumulative_co2),
+                corpse_flux_index(:soil_bulk_cumulative_co2),
             ),
             scale = 1000.0 * DAY_SECONDS,
             daily_units = "g C m-2 day-1",
@@ -441,7 +442,8 @@ const REDUCED_VARIABLES =
 function reduced_units(description, reducer)
     reducer == "annual_total" && return description.annual_units
     reducer == "fixed_daily_sample" &&
-        description.source in (:plant_flux, :corpse_flux) &&
+        description.source in
+        (:plant_flux, :corpse_flux, :corpse_litter_flux) &&
         return description.daily_units
     return description.units
 end
@@ -481,6 +483,12 @@ function reduced_field(description, state, parameters)
         description.source == :plant_flux ?
         parameters.casa_plant.carbon_fluxes :
         parameters.corpse_soil.carbon_fluxes
+    if description.source == :corpse_litter_flux
+        total, soil_rhiz, soil_bulk = map(description.variables) do index
+            vec(parent(getindex.(fluxes, index)))
+        end
+        return [total .- soil_rhiz .- soil_bulk]
+    end
     return map(description.variables) do index
         vec(parent(getindex.(fluxes, index)))
     end

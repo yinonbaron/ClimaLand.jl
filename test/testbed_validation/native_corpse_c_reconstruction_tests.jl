@@ -10,9 +10,9 @@ const NativeCORPSE = TestbedNativeCORPSECReconstruction
 const CORPSECalibration = TestbedCORPSERepresentativeCalibration
 const CORPSEReference = GenerateRepresentativeCORPSEReference
 
-struct ConstantCORPSEFields
+struct ConstantCORPSEFields{F}
     values::Vector{Float64}
-    fluxes::Vector{NTuple{37, Float64}}
+    fluxes::F
 end
 
 function Base.getproperty(fields::ConstantCORPSEFields, name::Symbol)
@@ -79,7 +79,7 @@ end
     state = ConstantCORPSEState(
         ConstantCORPSEFields(
             [1.0, 2.0],
-            [ntuple(_ -> value, 37) for value in (1.0, 2.0)],
+            [ntuple(_ -> value, 39) for value in (1.0, 2.0)],
         ),
     )
     historical = (name = :historical,)
@@ -93,6 +93,28 @@ end
     first_flux = first(NativeCORPSE.REDUCED_FLUX_VARIABLES).name
     @test tracker.annual_total[first_flux][:, 1] ==
           365 * NativeCORPSE.DAY_SECONDS * [1000.0, 2000.0]
+    litter_respiration = only(
+        filter(
+            variable -> variable.name == "LitterLayer_CO2",
+            NativeCORPSE.REDUCED_FLUX_VARIABLES,
+        ),
+    )
+    respiration_fluxes = [
+        ntuple(
+            index -> index == 38 ? 10.0 : index in (9, 18) ? 2.0 : 0.0,
+            39,
+        ),
+    ]
+    respiration_state = ConstantCORPSEState(
+        ConstantCORPSEFields([0.0], respiration_fluxes),
+    )
+    @test only(
+        NativeCORPSE.reduced_field(
+            litter_respiration,
+            respiration_state,
+            respiration_state,
+        ),
+    ) == [6.0]
     mktempdir() do directory
         path = joinpath(directory, "reduced.nc")
         NativeCORPSE.write_reduced_historical(
