@@ -91,6 +91,35 @@ end
             outlier in litter["top_outlier"]
         ) > 0
     end
+    mktempdir() do directory
+        function write_policy(name, policy)
+            path = joinpath(directory, "$name.toml")
+            open(path, "w") do io
+                TOML.print(io, policy; sorted = true)
+            end
+            return path
+        end
+        for source in
+            ("runner_source", "calibration_source", "scope_manifest")
+            stale = deepcopy(calibration)
+            stale["provenance"][source]["sha256"] = repeat("0", 64)
+            @test_throws ErrorException NativeCORPSE.calibration_policy(
+                write_policy("stale_$source", stale),
+            )
+        end
+        wrong_method = deepcopy(calibration)
+        wrong_method["method"]["safety_margin"] = "none"
+        @test_throws ErrorException NativeCORPSE.calibration_policy(
+            write_policy("wrong_method", wrong_method),
+        )
+        floored = deepcopy(calibration)
+        floored["reducer"]["annual_total"]["LitterLayer_CO2"][
+            "derived_policy"
+        ]["absolute_floor"] = 1e-6
+        @test_throws ErrorException NativeCORPSE.calibration_policy(
+            write_policy("scientific_floor", floored),
+        )
+    end
 end
 
 @testset "CORPSE Representative population and reducers" begin

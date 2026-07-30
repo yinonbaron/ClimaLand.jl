@@ -812,6 +812,14 @@ function boundary_summary(pairs)
     )
 end
 
+has_scientific_floor(::Any) = false
+has_scientific_floor(values::AbstractVector) =
+    any(has_scientific_floor, values)
+has_scientific_floor(values::AbstractDict) = any(
+    occursin("floor", lowercase(string(key))) || has_scientific_floor(value)
+    for (key, value) in values
+)
+
 function calibration_policy(path)
     policy = TOML.parsefile(path)
     get(policy, "schema_version", nothing) == 1 &&
@@ -823,6 +831,8 @@ function calibration_policy(path)
         get(policy, "scope_cell_count", nothing) == 80 &&
         get(policy, "eligible_cell_count", nothing) == 78 ||
         error("incompatible CORPSE Representative calibration")
+    has_scientific_floor(policy) &&
+        error("CORPSE calibration must not contain a scientific floor")
     gaps = Dict(
         Int(gap["cell_id"]) => Int(gap["pft"]) for
         gap in get(policy, "eligibility_gaps", Any[]) if
@@ -830,6 +840,69 @@ function calibration_policy(path)
         get(gap, "reviewed", false) === true
     )
     gaps == REPRESENTATIVE_GAPS || error("calibration eligibility gaps differ")
+    method = get(policy, "method", Dict{String, Any}())
+    Set(keys(method)) == Set((
+        "acceptance",
+        "annual_flux_total_population_per_variable",
+        "annual_population_per_variable",
+        "boundary_population_per_variable",
+        "coefficient_constraints",
+        "error",
+        "fixed_daily_population_per_variable",
+        "flux_annual_total",
+        "globally_inapplicable_pfts",
+        "nonfinite",
+        "numerical_padding",
+        "outliers_per_variable",
+        "population",
+        "reference_magnitude",
+        "representative_gaps",
+        "safety_margin",
+        "selection",
+    )) || error("calibration method schema differs")
+    method["acceptance"] ==
+        "e_i <= atol + rtol*x_i for every eligible pair" &&
+        method["coefficient_constraints"] ==
+        "fit atol >= 0 and rtol >= 0 solely from observed errors and absolute Fortran reference magnitudes" &&
+        method["error"] == "e_i = abs(Julia_i - Fortran_i)" &&
+        method["nonfinite"] ==
+        "hard failure in any eligible Julia or Fortran pair" &&
+        method["numerical_padding"] ==
+        "after the 5% fit, add 64*eps(Float64)*max(maximum(abs, Julia), maximum(abs, Fortran), floatmin(Float64)) to atol; add no rtol padding" &&
+        method["reference_magnitude"] == "x_i = abs(Fortran_i)" &&
+        method["safety_margin"] ==
+        "multiply both fitted coefficients by 1.05 before adding numerical padding" &&
+        method["selection"] ==
+        "choose the smallest r >= 0 minimizing a(r) + r*mean(x)" ||
+        error("calibration method differs")
+    provenance = get(policy, "provenance", Dict{String, Any}())
+    sources = (
+        (
+            "runner_source",
+            "test/testbed_validation/native_corpse_c_reconstruction.jl",
+            joinpath(@__DIR__, "native_corpse_c_reconstruction.jl"),
+        ),
+        (
+            "calibration_source",
+            "test/testbed_validation/generate_corpse_c_representative_calibration.jl",
+            joinpath(
+                @__DIR__,
+                "generate_corpse_c_representative_calibration.jl",
+            ),
+        ),
+        (
+            "scope_manifest",
+            "validation/scopes/representative.toml",
+            joinpath(@__DIR__, "validation", "scopes", "representative.toml"),
+        ),
+    )
+    for (name, id, source_path) in sources
+        source = get(provenance, name, Dict{String, Any}())
+        get(source, "id", nothing) == id &&
+            get(source, "sha256", nothing) ==
+            native_workflow().sha256sum(source_path) ||
+            error("calibration $name provenance differs")
+    end
     return policy
 end
 
