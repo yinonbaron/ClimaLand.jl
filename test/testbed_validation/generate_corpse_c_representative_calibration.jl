@@ -13,6 +13,11 @@ import NCDatasets
 
 const TIMEOUT_SECONDS = 2 * 60 * 60
 const CALIBRATION_ID = "corpse-c-representative-fresh-fortran-v1"
+const COORDINATE_SCHEMAS = Dict(
+    :boundary => Set{String}(),
+    :annual => Set(("year",)),
+    :fixed_daily => Set(("year", "sample_day", "day_of_year")),
+)
 
 native_corpse() =
     getfield(parentmodule(@__MODULE__), :TestbedNativeCORPSECReconstruction)
@@ -83,10 +88,27 @@ function distribution(values)
     )
 end
 
-function calibration_record(actual, expected, grid; units)
+function calibration_record(
+    actual,
+    expected,
+    grid;
+    units,
+    coordinate_schema = :boundary,
+    coordinates = Dict{String, Any}(),
+)
     length(actual) == length(expected) == length(grid) ||
         error("calibration requires aligned eligible cell pairs")
     isempty(actual) && error("calibration requires at least one eligible pair")
+    all(
+        hasproperty(point, :latitude) && hasproperty(point, :longitude) for
+        point in grid
+    ) || error("calibration observations require latitude and longitude")
+    haskey(COORDINATE_SCHEMAS, coordinate_schema) ||
+        error("calibration contains an unsupported coordinate schema")
+    Set(keys(coordinates)) == COORDINATE_SCHEMAS[coordinate_schema] ||
+        error("calibration temporal coordinates differ from their schema")
+    all(length(values) == length(actual) for values in values(coordinates)) ||
+        error("calibration temporal coordinates are not aligned")
     all(isfinite, actual) || error(
         "eligible Julia Representative boundary contains a nonfinite value",
     )
@@ -125,16 +147,22 @@ function calibration_record(actual, expected, grid; units)
     order = sortperm(errors; rev = true)
     outlier_count = min(6, length(order))
     outliers = [
-        Dict(
-            "rank" => rank,
-            "cell_id" => grid[index].cell_id,
-            "pft" => grid[index].pft,
-            "julia_value" => actual[index],
-            "fortran_value" => expected[index],
-            "absolute_error" => errors[index],
-            "relative_error" =>
-                iszero(references[index]) ? "undefined_zero_reference" :
-                errors[index] / references[index],
+        merge(
+            Dict{String, Any}(
+                "rank" => rank,
+                "cell_id" => grid[index].cell_id,
+                "pft" => grid[index].pft,
+                "latitude" => grid[index].latitude,
+                "longitude" => grid[index].longitude,
+                "julia_value" => actual[index],
+                "fortran_value" => expected[index],
+                "absolute_error" => errors[index],
+                "relative_error" =>
+                    iszero(references[index]) ?
+                    "undefined_zero_reference" :
+                    errors[index] / references[index],
+            ),
+            Dict(name => values[index] for (name, values) in coordinates),
         ) for (rank, index) in enumerate(order[1:outlier_count])
     ]
     return Dict(
@@ -174,6 +202,31 @@ function calibration_record(actual, expected, grid; units)
     )
 end
 
+function calibration_population(grid, reducer, coordinate)
+    schema = if reducer == "fixed_daily_sample"
+        :fixed_daily
+    elseif reducer in ("annual_mean", "end_of_year", "annual_total")
+        :annual
+    else
+        error("unsupported CORPSE historical reducer $reducer")
+    end
+    repeated_grid = repeat(grid, outer = length(coordinate))
+    year_coordinate =
+        schema == :fixed_daily ? 1900 .+ cld.(coordinate, 365) : coordinate
+    coordinates = Dict(
+        "year" => repeat(year_coordinate, inner = length(grid)),
+    )
+    schema == :fixed_daily && merge!(
+        coordinates,
+        Dict(
+            "sample_day" => repeat(coordinate, inner = length(grid)),
+            "day_of_year" =>
+                repeat(mod1.(coordinate, 365), inner = length(grid)),
+        ),
+    )
+    return repeated_grid, coordinates, schema
+end
+
 function checkpoint_path(output_root, stage)
     stage_root = joinpath(output_root, "stages", String(stage.name))
     manifest_path = joinpath(stage_root, "workflow.toml")
@@ -203,6 +256,8 @@ function reduced_calibration(julia_path, fortran_path, scope, grid)
                 error("reduced fixed-daily coordinates differ")
             eligible = findall(native_corpse().eligible_cell, grid)
             eligible_grid = grid[eligible]
+            years = Int.(julia["year"][:])
+            sample_days = Int.(julia["sample_day"][:])
             reducer_variables = (
                 "annual_mean" => native_corpse().REDUCED_STATE_VARIABLES,
                 "end_of_year" => native_corpse().REDUCED_STATE_VARIABLES,
@@ -223,10 +278,14 @@ function reduced_calibration(julia_path, fortran_path, scope, grid)
                         expected = Float64.(fortran[variable][eligible, :])
                         size(actual) == size(expected) ||
                             error("$variable reduced shapes differ")
-                        repeated_grid = repeat(
-                            eligible_grid,
-                            outer = size(actual, 2),
-                        )
+                        coordinate = reducer == "fixed_daily_sample" ?
+                                     sample_days : years
+                        population =
+                            calibration_population(eligible_grid, reducer, coordinate)
+                        repeated_grid, coordinates, coordinate_schema =
+                            population
+                        length(repeated_grid) == length(actual) ||
+                            error("$reducer coordinates are not aligned")
                         calibration_record(
                             vec(actual),
                             vec(expected),
@@ -240,6 +299,8 @@ function reduced_calibration(julia_path, fortran_path, scope, grid)
                                 ),
                                 reducer,
                             ),
+                            coordinate_schema,
+                            coordinates,
                         )
                     end for name in getproperty.(variables, :name)
                 ) for (reducer, variables) in reducer_variables

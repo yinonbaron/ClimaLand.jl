@@ -125,7 +125,14 @@ end
 end
 
 @testset "CORPSE calibration policy derivation" begin
-    grid = [(cell_id = index, pft = 1) for index in 1:8]
+    grid = [
+        (
+            cell_id = index,
+            pft = 1,
+            latitude = 10.0 + index,
+            longitude = -20.0 - index,
+        ) for index in 1:8
+    ]
     expected = [0.0, 1e-6, 1e-3, 0.1, 1.0, 2.0, 3.0, 4.0]
     actual = expected .+ [0.0, 3e-7, 2e-6, 4e-5, 2e-4, 5e-4, 9e-4, 1e-3]
     record = CORPSECalibration.calibration_record(
@@ -141,6 +148,9 @@ end
     @test policy["raw_rtol"] >= 0
     @test policy["validation_failed_pairs"] == 0
     @test length(record["top_outlier"]) == 6
+    @test record["top_outlier"][1]["latitude"] == 18.0
+    @test record["top_outlier"][1]["longitude"] == -28.0
+    @test !haskey(record["top_outlier"][1], "year")
     @test record["finite_pair_count"] == length(grid)
     @test record["units"] == "kg C m-2"
     @test CORPSECalibration.CALIBRATION_ID ==
@@ -179,6 +189,79 @@ end
         [1.0, 2.0],
         grid[1:2],
         units = "kg C m-2",
+    )
+
+    historical = CORPSECalibration.calibration_record(
+        [1.0, 4.0],
+        [1.0, 2.0],
+        grid[1:2];
+        units = "g C m-2",
+        coordinate_schema = :fixed_daily,
+        coordinates = Dict(
+            "year" => [1957, 1957],
+            "sample_day" => [20_441, 20_532],
+            "day_of_year" => [1, 92],
+        ),
+    )
+    @test historical["top_outlier"][1]["cell_id"] == 2
+    @test historical["top_outlier"][1]["latitude"] == 12.0
+    @test historical["top_outlier"][1]["longitude"] == -22.0
+    @test historical["top_outlier"][1]["year"] == 1957
+    @test historical["top_outlier"][1]["sample_day"] == 20_532
+    @test historical["top_outlier"][1]["day_of_year"] == 92
+    mktempdir() do directory
+        path = joinpath(directory, "calibration.toml")
+        open(path, "w") do io
+            TOML.print(io, Dict("record" => historical); sorted = true)
+        end
+        parsed = TOML.parsefile(path)["record"]["top_outlier"][1]
+        @test parsed["latitude"] == 12.0
+        @test parsed["year"] == 1957
+        @test parsed["sample_day"] == 20_532
+        @test parsed["day_of_year"] == 92
+    end
+    @test_throws ErrorException CORPSECalibration.calibration_record(
+        [1.0, 4.0],
+        [1.0, 2.0],
+        grid[1:2];
+        units = "g C m-2",
+        coordinate_schema = :fixed_daily,
+        coordinates = Dict("year" => [1957]),
+    )
+    annual_grid, annual_coordinates, annual_schema =
+        CORPSECalibration.calibration_population(
+            grid[1:2],
+            "annual_mean",
+            [1901, 1902],
+        )
+    @test getproperty.(annual_grid, :cell_id) == [1, 2, 1, 2]
+    @test annual_coordinates == Dict(
+        "year" => [1901, 1901, 1902, 1902],
+    )
+    @test annual_schema == :annual
+    daily_grid, daily_coordinates, daily_schema =
+        CORPSECalibration.calibration_population(
+            grid[1:2],
+            "fixed_daily_sample",
+            [1, 92, 20_441],
+        )
+    @test getproperty.(daily_grid, :cell_id) == [1, 2, 1, 2, 1, 2]
+    @test daily_coordinates == Dict(
+        "year" => [1901, 1901, 1901, 1901, 1957, 1957],
+        "sample_day" => [1, 1, 92, 92, 20_441, 20_441],
+        "day_of_year" => [1, 1, 92, 92, 1, 1],
+    )
+    @test daily_schema == :fixed_daily
+    @test_throws ErrorException CORPSECalibration.calibration_record(
+        [1.0, 4.0],
+        [1.0, 2.0],
+        grid[1:2];
+        units = "g C m-2",
+        coordinate_schema = :annual,
+        coordinates = Dict(
+            "year" => [1957, 1957],
+            "sample_day" => [20_441, 20_532],
+        ),
     )
 
     mktempdir() do directory
