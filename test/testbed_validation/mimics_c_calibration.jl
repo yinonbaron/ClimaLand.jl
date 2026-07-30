@@ -22,13 +22,14 @@ function right_derivative(relative, errors, references, absolute_floor)
 end
 
 """
-    calibrated_envelope(actual, expected)
+    calibrated_envelope(actual, expected; relative = true)
 
 Fit the mixed absolute-relative envelope used by the MIMICS-C policy. The raw
 envelope minimizes `atol + rtol * mean(abs(expected))`; a 5% safety factor is
-then applied without admitting nonfinite pairs.
+then applied without admitting nonfinite pairs. Set `relative = false` for
+zero-centered diagnostics whose reference value is not a meaningful scale.
 """
-function calibrated_envelope(actual, expected)
+function calibrated_envelope(actual, expected; relative = true)
     length(actual) == length(expected) && !isempty(actual) ||
         error("MIMICS-C calibration requires nonempty aligned pairs")
     all(isfinite, actual) ||
@@ -45,8 +46,9 @@ function calibrated_envelope(actual, expected)
             maximum(abs, expected_values),
             floatmin(Float64),
         )
-    relative = 0.0
-    if right_derivative(relative, errors, references, 0.0) < 0
+    relative_value = 0.0
+    if relative &&
+       right_derivative(relative_value, errors, references, 0.0) < 0
         upper = eps(Float64)
         while right_derivative(
             upper,
@@ -72,11 +74,12 @@ function calibrated_envelope(actual, expected)
                 upper = middle
             end
         end
-        relative = upper
+        relative_value = upper
     end
-    absolute = max(0.0, maximum(errors .- relative .* references))
+    absolute =
+        max(0.0, maximum(errors .- relative_value .* references))
     atol = SAFETY_FACTOR * absolute + float_padding
-    rtol = SAFETY_FACTOR * relative
+    rtol = SAFETY_FACTOR * relative_value
     failed = count(errors .> atol .+ rtol .* references)
     iszero(failed) ||
         error("derived MIMICS-C tolerance does not enclose every pair")
@@ -84,7 +87,7 @@ function calibrated_envelope(actual, expected)
         atol,
         rtol,
         raw_atol = absolute,
-        raw_rtol = relative,
+        raw_rtol = relative_value,
         float_padding,
         errors,
         references,
@@ -112,11 +115,17 @@ function observation_record(observations, index)
     return Dict(String(name) => field for (name, field) in pairs(value))
 end
 
-function calibration_record(actual, expected; units, observations = nothing)
+function calibration_record(
+    actual,
+    expected;
+    units,
+    observations = nothing,
+    relative = true,
+)
     isnothing(observations) ||
         length(observations) == length(actual) ||
         error("MIMICS-C calibration observation metadata is not aligned")
-    envelope = calibrated_envelope(actual, expected)
+    envelope = calibrated_envelope(actual, expected; relative)
     nonzero = findall(value -> !iszero(value), envelope.references)
     relative_errors =
         envelope.errors[nonzero] ./ envelope.references[nonzero]

@@ -157,6 +157,14 @@ end
         fitted.errors .<=
         fitted.atol .+ fitted.rtol .* fitted.references,
     )
+    absolute_only = MIMICSCCalibration.calibrated_envelope(
+        [10.0, 20.0],
+        [1.0, 2.0];
+        relative = false,
+    )
+    @test absolute_only.raw_atol == 18.0
+    @test absolute_only.raw_rtol == 0.0
+    @test absolute_only.rtol == 0.0
     @test_throws ErrorException MIMICSCCalibration.calibrated_envelope(
         [1.0, Inf],
         [1.0, 2.0],
@@ -284,6 +292,87 @@ end
     )
     policy_count += 1
     @test policy_count == 46
+end
+
+@testset "MIMICS-C audited full-grid calibration is immutable" begin
+    boundary_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_c_full_grid_calibration.toml",
+    )
+    historical_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_c_historical_calibration.toml",
+    )
+    boundary_text = read(boundary_path, String)
+    boundary = TOML.parse(boundary_text)
+    @test boundary["model"] == "MIMICS-C"
+    @test boundary["source"] == "fresh_fortran_full_grid"
+    @test boundary["cell_count"] == 4263
+    @test boundary["eligible_cell_count"] == 4263
+    @test isempty(boundary["reviewed_exclusion"])
+    @test !occursin("/Users/", boundary_text)
+    @test !occursin("/private/tmp", boundary_text)
+    @test !occursin("absolute_floor", boundary_text)
+
+    provenance = boundary["source_provenance"]
+    @test provenance["population_manifest"]["sha256"] ==
+          BoundaryCalibration.sha256sum(
+        joinpath(
+            @__DIR__,
+            "validation",
+            "mimics_c_boundary_population.toml",
+        ),
+    )
+    @test provenance["population"]["cell_ids_sha256"] ==
+          "568d1274962e901163cc038504fece59a604414b14c7525d5585c19ca0e2748c"
+    MIMICSCCalibration.validate_method(boundary)
+    MIMICSCCalibration.validate_provenance(
+        boundary,
+        (
+            "generator",
+            "calibration",
+            "population_manifest",
+            "grid",
+            "casa_parameters",
+            "mimics_parameters",
+            "fresh_fortran_build",
+            "fresh_fortran_workflow",
+        ),
+        "generate_mimics_c_boundary_calibration.jl",
+    )
+
+    policy_count = 0
+    @test Set(keys(boundary["variable"])) ==
+          Set(SelectedMIMICSC.STAGE_NAMES)
+    for (stage, variables) in boundary["variable"]
+        @test Set(keys(variables)) ==
+              Set(SelectedMIMICSC.BOUNDARY_NAMES)
+        for (name, record) in variables
+            MIMICSCCalibration.validate_record(
+                record,
+                "boundary.$stage.$name",
+                4263,
+                ("cell_id", "pft", "latitude", "longitude"),
+            )
+            policy_count += 1
+        end
+    end
+    @test policy_count == 36
+
+    policy = MIMICSCCalibration.comparison_policy(
+        boundary_path,
+        historical_path,
+    )
+    SelectedMIMICSC.validate_policy(policy)
+    @test sum(
+        length(variables) for
+        variables in values(policy["fresh_fortran_boundary"])
+    ) == 36
+    @test policy["fresh_fortran_budget"][
+        "historical_residual_kg_c"
+    ]["rtol"] == 0.0
 end
 
 @testset "MIMICS-C consumes only fitted calibration policies" begin

@@ -178,6 +178,7 @@ function write_calibration(
             merge((; cell_id), coordinates[cell_id]) for
             cell_id in contract.eligible_ids
         ],
+        relative = false,
     )
     eligible_count = length(contract.eligible_ids)
     all(
@@ -207,7 +208,7 @@ function write_calibration(
             "reference_magnitude" => "x_i = abs(Fortran_i)",
             "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
             "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
+                "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for the zero-centered budget residual",
             "safety_margin" =>
                 "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
             "nonfinite" =>

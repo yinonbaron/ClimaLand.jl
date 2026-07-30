@@ -3379,24 +3379,20 @@ units = "kg C"
     p999 = 2311.023409996057
 
     [budget.active_constraint]
-    count = 2
+    count = 1
 
         [[budget.active_constraint.observation]]
         cell_id = 4079
         latitude = -2.84
         longitude = 105.0
-        [[budget.active_constraint.observation]]
-        cell_id = 6325
-        latitude = 69.16
-        longitude = 162.5
 
     [budget.derived_policy]
-    atol = 2.35681279182525e7
+    atol = 8.335628018513006e7
     float_padding = 1.1281890804190594e-6
-    raw_atol = 2.2445836112620354e7
-    raw_objective = 3.111780880862859e7
-    raw_rtol = 24593.67126879414
-    rtol = 25823.354832233847
+    raw_atol = 7.93869335096466e7
+    raw_objective = 7.93869335096466e7
+    raw_rtol = 0.0
+    rtol = 0.0
     validation_failed_pairs = 0
 
     [budget.relative_error]
@@ -5799,15 +5795,15 @@ nonfinite = "fail calibration; exclusions require a reviewed Scope Manifest Elig
 raw_absolute = "a(r) = max(0, max_i(e_i - r*x_i))"
 reference_magnitude = "x_i = abs(Fortran_i)"
 safety_margin = "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol"
-selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x)"
+selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for the zero-centered budget residual"
 
 [source_provenance]
-git_revision_basis = "ddf5d5010a799ed5c0517df24145725cd649f6d9"
+git_revision_basis = "ed75a82ea8d35558a757edaaae275560c8d300fb"
 julia_version = "1.12.6"
 
     [source_provenance.calibration]
     id = "test/testbed_validation/mimics_c_calibration.jl"
-    sha256 = "1724d871e555066043486ea3825f867da42d39061d36afb0c0beee5b2819ec79"
+    sha256 = "a3eb94940acf7b96973fc2add6b400cbf3b89bed10a201a33a4d13c8b4947bf8"
 
     [source_provenance.current_julia_output]
     id = "current_julia_representative_historical_output"
@@ -6055,7 +6051,7 @@ julia_version = "1.12.6"
 
     [source_provenance.generator]
     id = "test/testbed_validation/generate_mimics_c_historical_calibration.jl"
-    sha256 = "299ed274386c0925aaa1bac7f86297a3039d96386b151b76d16c17a2741f86fa"
+    sha256 = "826aa42f29daa02f6296f9e77b24ce047702af8be5af87d2e2fddc5cbd5d49fe"
 
     [source_provenance.scope_manifest]
     id = "test/testbed_validation/validation/scopes/representative.toml"
