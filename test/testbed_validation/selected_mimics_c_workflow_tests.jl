@@ -161,6 +161,11 @@ end
         [1.0, Inf],
         [1.0, 2.0],
     )
+    @test_throws ErrorException MIMICSCCalibration.calibration_record(
+        [1.0],
+        [nextfloat(0.0)];
+        units = "kg C m^-2",
+    )
 end
 
 @testset "MIMICS-C calibration preserves observation coordinates" begin

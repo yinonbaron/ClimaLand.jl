@@ -120,6 +120,8 @@ function calibration_record(actual, expected; units, observations = nothing)
     nonzero = findall(value -> !iszero(value), envelope.references)
     relative_errors =
         envelope.errors[nonzero] ./ envelope.references[nonzero]
+    all(isfinite, relative_errors) ||
+        error("MIMICS-C calibration relative errors are nonfinite")
     residuals =
         envelope.errors .- envelope.raw_rtol .* envelope.references
     maximum_residual = maximum(residuals)
