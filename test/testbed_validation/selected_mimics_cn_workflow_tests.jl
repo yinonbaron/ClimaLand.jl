@@ -447,6 +447,46 @@ end
     end
 end
 
+@testset "MIMICS-CN reference budget excludes unapplied inactive deposition" begin
+    points = 2
+    years = length(SelectedMIMICSCN.HISTORICAL_YEARS)
+    boundary = Dict(
+        stage => Dict(
+            name => zeros(points) for
+            name in SelectedMIMICSCN.BOUNDARY_NAMES
+        ) for
+        stage in ("spin_continuation", "historical")
+    )
+    nitrogen_name = first(
+        filter(
+            name -> occursin(".n_", name),
+            SelectedMIMICSCN.BOUNDARY_NAMES,
+        ),
+    )
+    boundary["historical"][nitrogen_name][1] = 1.0
+    deposition = zeros(points, years)
+    deposition[1, 1] = 1.0
+    deposition[2, 1] = 2.0
+    annual = Dict(
+        "annual_total" => Dict(
+            "diagnostic.cnpp" => zeros(points * years),
+            "diagnostic.mimics_respiration" => zeros(points * years),
+            "diagnostic.n_deposition" => vec(deposition),
+            "diagnostic.n_fixation" => zeros(points * years),
+            "diagnostic.n_leaching" => zeros(points * years),
+            "diagnostic.n_gaseous_loss" => zeros(points * years),
+        ),
+    )
+    grid = [
+        (; area_m2 = 1.0, active = true),
+        (; area_m2 = 1.0, active = false),
+    ]
+
+    budget = GenerateMIMICSCN.budget_values(boundary, annual, grid)
+
+    @test budget["historical_residual_kg_n"] == [0.0, 0.0]
+end
+
 @testset "MIMICS-CN reduced oracle accepts a replaceable exact collection" begin
     collection = mimics_cn_test_collection()
     reference = mimics_cn_test_reference()

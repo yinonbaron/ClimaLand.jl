@@ -276,6 +276,7 @@ function budget_values(boundary, annual, grid)
         cell_count,
         years,
     )
+    n_input .*= getproperty.(grid, :active)
     n_output = reshape(
         annual_total["diagnostic.n_leaching"] .+
         annual_total["diagnostic.n_gaseous_loss"],
@@ -321,6 +322,13 @@ function write_reference(
         collection.files["grid"],
         cell_ids,
     )
+    parameters = Native.native_casa().read_pft_parameters(
+        collection.files["casa_c_parameters"],
+    )
+    grid = [
+        merge(point, (; active = !parameters[point.pft].inactive)) for
+        point in grid
+    ]
     boundary, boundary_sources = boundary_values(fortran_root, cell_ids)
     annual, daily, historical_sources =
         historical_values(fortran_root, reference_grid(fortran_root, grid))
