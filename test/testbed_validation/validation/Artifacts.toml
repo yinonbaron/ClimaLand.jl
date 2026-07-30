@@ -1,5 +1,8 @@
 [representative_casa_c_reference]
 git-tree-sha1 = "32c190dd1f97d4b71b2b7aa0310ea0a5802dad08"
 
+[representative_casa_cn_reference]
+git-tree-sha1 = "7886a4c28f23ad1eff079beee11aa8632ccd08b5"
+
 [representative_forcing]
 git-tree-sha1 = "836b4cda5912f1bea5f27abd326789285b02ed46"

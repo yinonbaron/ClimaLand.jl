@@ -462,6 +462,22 @@ function generate(
     execution_revision =
         readchomp(`git -C $repo_root rev-parse $execution_revision`)
     manifest_revision = readchomp(`git -C $repo_root rev-parse HEAD`)
+    recovery_path = joinpath(output_root, "historical_recovery.toml")
+    historical_recovery = if isfile(recovery_path)
+        detail = TOML.parsefile(recovery_path)
+        get(detail, "schema_version", nothing) == 1 &&
+            get(detail, "mode", nothing) == "historical_only" ||
+            error("Historical recovery provenance is incompatible")
+        Dict(
+            "record" => source_file_record(
+                recovery_path,
+                "julia/historical_recovery.toml",
+            ),
+            "detail" => detail,
+        )
+    else
+        Dict{String, Any}()
+    end
     document = Dict(
         "schema_version" => 1,
         "calibration_id" => calibration_id,
@@ -496,6 +512,7 @@ function generate(
             "fortran" => fortran_sources,
             "annual" => annual_sources,
             "daily" => daily_sources,
+            "historical_recovery" => historical_recovery,
             "model_source" => model_sources,
         ),
         "variable" => variables,

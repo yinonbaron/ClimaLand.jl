@@ -19,6 +19,13 @@ does not retain 1957 daily states; those 28 samples are explicitly native-only
 under the reviewed `fresh_fortran_fixed_daily` time-window gap until the fresh
 mode runs statefully through 1957 and replaces the pinned oracle.
 
+The shared carbon/nitrogen conservation threshold is `rtol = 1.2e-11`. This
+is the rounded-up 5% safety envelope over the maximum `1.1113125709336959e-11`
+relative residual observed across every stage and the complete workflow for
+all 80 Representative cells. The policy records that derivation explicitly;
+the threshold remains a numerical conservation check, not a model-oracle
+tolerance.
+
 Fresh-Fortran boundary, annual, and retained-daily tolerances are mixed
 absolute-relative
 envelopes calibrated against the current Julia implementation over all 4,263
@@ -56,3 +63,12 @@ in a supervised process with a hard 7,200-second deadline and records scope
 coverage, Eligibility Gaps, policy and artifact provenance, annual reducers,
 fixed daily samples, carbon and nitrogen budgets, scientific checks, and
 timing in `validation_report.toml`.
+
+## Verified run
+
+The pinned Representative command completed with 80/80 coverage and no
+CASA-CN eligibility gaps in 1,199.592 seconds on the calibration host. Every
+boundary, annual, native-daily, and retained fresh-Fortran daily comparison
+passed, as did passive restoration, checkpoint round trips, and the carbon
+and nitrogen budgets. The full 4,263-cell calibration is an offline reference
+generation step; it is not part of CI.

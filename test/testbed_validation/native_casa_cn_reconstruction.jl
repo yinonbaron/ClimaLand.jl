@@ -704,7 +704,14 @@ function run_gridded_case(
     archive_rtol = 1e-3,
     budget_rtol = 5e-12,
     boundary_only = false,
+    resume_historical_checkpoint = nothing,
 )
+    isnothing(resume_historical_checkpoint) ||
+        boundary_only ||
+        error("CASA-CN historical recovery is calibration-only")
+    isnothing(resume_historical_checkpoint) ||
+        isfile(resume_historical_checkpoint) ||
+        error("CASA-CN historical recovery checkpoint is missing")
     if boundary_only
         Threads.nthreads() == 1 ||
             error("CASA-CN calibration requires exactly one Julia thread")
@@ -836,7 +843,7 @@ function run_gridded_case(
         nitrogen_stage_budgets,
         passive_restoration,
     )
-        boundary_only && return Dict("skipped" => "boundary calibration only")
+        boundary_only && return nothing
         return Dict(
             "carbon" => selected_casa().workflow_budget_report(
                 carbon_stage_budgets,
@@ -886,13 +893,25 @@ function run_gridded_case(
             Dict("atol" => archive_atol, "rtol" => archive_rtol),
     )
     try
-        result = native_casa().run_case(
+        active_stages =
+            isnothing(resume_historical_checkpoint) ? COMPLETE_STAGES :
+            (last(COMPLETE_STAGES),)
+        initial_state = if isnothing(resume_historical_checkpoint)
             selected_casa().gridded_cn_initial_state(
                 prespin.model,
                 grid,
                 prespin_path,
-            ),
-            COMPLETE_STAGES,
+            )
+        else
+            checkpoint_state, _ = native_casa().ClimaLand.read_checkpoint(
+                resume_historical_checkpoint;
+                model = normal.model,
+            )
+            native_casa().state_as_initial_state(checkpoint_state, normal.model)
+        end
+        result = native_casa().run_case(
+            initial_state,
+            active_stages,
             output_root;
             model_for_stage,
             update_forcing! = GriddedCNForcingUpdate(forcing),

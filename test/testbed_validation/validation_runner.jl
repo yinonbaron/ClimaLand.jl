@@ -360,6 +360,12 @@ function comparison_policy(
             "Comparison Policy at $path has invalid $model_name budget rtol",
         ),
     )
+    budget_rtol_method = get(model, "budget_rtol_method", nothing)
+    budget_rtol_method isa String && !isempty(budget_rtol_method) || throw(
+        RunnerError(
+            "Comparison Policy at $path has no $model_name budget rtol method",
+        ),
+    )
     tolerance = Dict{String, Any}(
         rule => Dict(
             "atol" => Float64(model[rule]["atol"]),
@@ -638,6 +644,7 @@ function comparison_policy(
         model,
         tolerance,
         budget_rtol = Float64(budget_rtol),
+        budget_rtol_method,
         path = abspath(path),
         calibration,
         calibration_path = abspath(calibration_path),
@@ -676,6 +683,7 @@ function initial_report(configuration, output_root, scope, policy)
             "sha256" => sha256sum(policy.path),
             "acceptance" => policy.document["acceptance"],
             "budget_rtol" => policy.budget_rtol,
+            "budget_rtol_method" => policy.budget_rtol_method,
             "applied_rules" => sort!(collect(String.(keys(policy.model)))),
             "fresh_fortran_boundary" =>
                 policy.tolerance["fresh_fortran_boundary"],

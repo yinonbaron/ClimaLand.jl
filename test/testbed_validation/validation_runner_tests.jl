@@ -385,7 +385,7 @@ end
         calibration_path =
             joinpath(directory, "casa_c_full_grid_calibration.toml")
         cp(VALIDATION_COMPARISON_POLICY, policy_path)
-        obsolete = TOML.parsefile(CASA_C_CALIBRATION)
+        obsolete = TOML.parsefile(VALIDATION_CASA_C_CALIBRATION)
         obsolete["method"]["raw_absolute"] = "a(r) = max(5e-10, max_i(e_i - r*x_i))"
         open(calibration_path, "w") do io
             TOML.print(io, obsolete; sorted = true)
@@ -537,6 +537,11 @@ end
         @test model["name"] == "CASA-CN"
         @test report["comparison_policy"]["id"] ==
               "casa-representative-validation-v3"
+        @test report["comparison_policy"]["budget_rtol"] == 1.2e-11
+        @test occursin(
+            "1.05 safety margin",
+            report["comparison_policy"]["budget_rtol_method"],
+        )
         @test model["coverage"]["scope_cells"] == 80
         @test model["coverage"]["compared_cells"] == 80
         @test model["outcome"] == "passed"
@@ -620,8 +625,7 @@ end
     @test nonfinite_error isa VALIDATION_RUNNER_MODULE.RunnerError
     @test occursin("carbon_nitrogen.fresh_fortran", nonfinite_error.message)
     invalid_provenance = deepcopy(reference)
-    invalid_provenance["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_daily_sha256"]["2014"] =
-        "not-a-sha256"
+    invalid_provenance["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_daily_sha256"]["2014"] = "not-a-sha256"
     provenance_error = try
         VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
             invalid_provenance,

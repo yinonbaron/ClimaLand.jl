@@ -50,6 +50,21 @@ import TOML
         "nLitInptStruc",
     ))
     @test Set(first.(variables)) == required
+    @test_throws ErrorException TestbedNativeCASACNReconstruction.run_gridded_case(
+        "",
+        "",
+        "",
+        "";
+        resume_historical_checkpoint = "missing.hdf5",
+    )
+    @test_throws ErrorException TestbedNativeCASACNReconstruction.run_gridded_case(
+        "",
+        "",
+        "",
+        "";
+        boundary_only = true,
+        resume_historical_checkpoint = "missing.hdf5",
+    )
 end
 
 @testset "native CASA-CN boundary bookkeeping" begin

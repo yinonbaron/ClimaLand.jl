@@ -1709,9 +1709,10 @@ function run_case(
     deflatelevel = 0,
 )
     expected_names = (:prespin, :accelerated_spin, :normal_spin, :historical)
-    getproperty.(stages, :name) == expected_names || throw(
+    stage_names = getproperty.(stages, :name)
+    stage_names in (expected_names, (:historical,)) || throw(
         ArgumentError(
-            "CASA-C stages must be ordered $(join(expected_names, ", "))",
+            "CASA-C stages must be the complete ordered workflow or a historical-only recovery",
         ),
     )
     passive_multiplier > 0 ||

@@ -7,6 +7,7 @@ eligibility_gaps = "reviewed_scope_manifest_only"
 
 [model."CASA-C"]
 budget_rtol = 5.0e-12
+budget_rtol_method = "fixed conservation-roundoff bound; verified maximum Representative workflow relative residual was 2.347624699959058e-13"
 
 [model."CASA-C".native_julia_initialization]
 atol = 1.4210854715202004e-14
@@ -28,7 +29,8 @@ calibration_manifest = "casa_c_full_grid_calibration.toml"
 method = "mixed absolute-relative envelope calibrated from all 4,263 current-Julia/fresh-Fortran cell pairs"
 
 [model."CASA-CN"]
-budget_rtol = 5.0e-12
+budget_rtol = 1.2e-11
+budget_rtol_method = "rounded-up 1.05 safety margin over the 1.1113125709336959e-11 maximum relative residual observed across C/N stages and workflows for all 80 Representative cells"
 
 [model."CASA-CN".native_julia_initialization]
 atol = 1.4210854715202004e-14

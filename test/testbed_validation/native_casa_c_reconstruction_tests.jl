@@ -174,6 +174,35 @@ end
     end
 end
 
+@testset "native CASA historical-only recovery seam" begin
+    reconstruction = TestbedNativeCASACReconstruction
+    model = reconstruction.synthetic_model()
+    stage = TestbedNativeWorkflow.NativeStage(:historical, 2, 1)
+    carbon_budget(_, _, start_carbon, stop_carbon, _, _) = Dict(
+        "start_carbon" => start_carbon,
+        "stop_carbon" => stop_carbon,
+        "close" => true,
+    )
+    mktempdir() do output_root
+        result = reconstruction.run_case(
+            reconstruction.synthetic_initial_state(model),
+            (stage,),
+            output_root;
+            model_for_stage = _ -> model,
+            diagnostics = reconstruction.casa_diagnostics(),
+            provenance = reconstruction.synthetic_provenance,
+            compare_boundary = (_, _, _) -> Dict("all_match" => true),
+            compare_historical = (path, _) ->
+                reconstruction.synthetic_historical_comparison(path),
+            carbon_budget,
+        )
+        report = TOML.parsefile(result.report)
+        @test getproperty.(result.stages, :name) == (:historical,)
+        @test report["historical_output"]["records"] == 2
+        @test report["carbon_budget"]["all_close"]
+    end
+end
+
 @testset "native CASA-C reduced gridded fixture" begin
     mktempdir() do directory
         fixture = write_gridded_fixture(directory)
