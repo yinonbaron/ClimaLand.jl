@@ -361,6 +361,7 @@ function write_scope_manifest(
     soil_path,
     smoke_manifest;
     seed,
+    eligibility_gaps = Any[],
 )
     matches = [
         Dict(
@@ -374,7 +375,7 @@ function write_scope_manifest(
         "schema_version" => 1,
         "name" => "representative",
         "cell_ids" => selection.cell_ids,
-        "eligibility_gaps" => Any[],
+        "eligibility_gaps" => deepcopy(collect(eligibility_gaps)),
         "selection" => Dict(
             "method" => "PFT-stratified augmented Latin hypercube matched to unique real cells in empirical-quantile space",
             "seed" => seed,

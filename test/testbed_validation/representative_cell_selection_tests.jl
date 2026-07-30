@@ -1,4 +1,5 @@
 using Test
+import TOML
 
 const REPRESENTATIVE_SELECTION = TestbedRepresentativeCellSelection
 
@@ -33,6 +34,47 @@ function synthetic_candidate(cell_id, pft, offset; active = true)
             porosity = offset + 0.22,
         ),
     )
+end
+
+@testset "Representative manifest preserves reviewed gaps" begin
+    mktempdir() do directory
+        source = joinpath(directory, "forcing.nc")
+        grid = joinpath(directory, "grid.csv")
+        soil = joinpath(directory, "soil.csv")
+        write(source, "forcing")
+        write(grid, "grid")
+        write(soil, "soil")
+        output = joinpath(directory, "representative.toml")
+        gaps = [
+            Dict(
+                "model" => "CORPSE",
+                "cell_id" => 51,
+                "pft" => 17,
+                "reason" => "reviewed inactive mask evidence",
+                "reviewed" => true,
+            ),
+        ]
+        selection = (;
+            cell_ids = [51, 52],
+            matches = NamedTuple[],
+            allocation = Dict(1 => 1),
+            population = Dict(1 => 2),
+        )
+        smoke_manifest =
+            joinpath(@__DIR__, "validation", "scopes", "smoke.toml")
+        REPRESENTATIVE_SELECTION.write_scope_manifest(
+            output,
+            selection,
+            [51],
+            [source],
+            grid,
+            soil,
+            smoke_manifest;
+            seed = 31432026,
+            eligibility_gaps = gaps,
+        )
+        @test TOML.parsefile(output)["eligibility_gaps"] == gaps
+    end
 end
 
 @testset "Representative selector is deterministic and PFT-stratified" begin

@@ -1,12 +1,37 @@
 using Test
+import NCDatasets
+import TOML
 
 include(joinpath(@__DIR__, "native_corpse_c_reconstruction.jl"))
-include(joinpath(@__DIR__, "generate_corpse_c_full_grid_calibration.jl"))
+include(joinpath(@__DIR__, "generate_corpse_c_representative_calibration.jl"))
+include(joinpath(@__DIR__, "generate_representative_corpse_reference.jl"))
 
 const NativeCORPSE = TestbedNativeCORPSECReconstruction
-const CORPSECalibration = TestbedCORPSEFullGridCalibration
+const CORPSECalibration = TestbedCORPSERepresentativeCalibration
+const CORPSEReference = GenerateRepresentativeCORPSEReference
 
-@testset "CORPSE public full-grid seam" begin
+struct ConstantCORPSEFields
+    values::Vector{Float64}
+    fluxes::Vector{NTuple{37, Float64}}
+end
+
+function Base.getproperty(fields::ConstantCORPSEFields, name::Symbol)
+    name == :values && return getfield(fields, :values)
+    name == :fluxes && return getfield(fields, :fluxes)
+    name == :carbon_fluxes && return getfield(fields, :fluxes)
+    return getfield(fields, :values)
+end
+
+struct ConstantCORPSEState
+    fields::ConstantCORPSEFields
+end
+
+function Base.getproperty(state::ConstantCORPSEState, name::Symbol)
+    name == :fields && return getfield(state, :fields)
+    return getfield(state, :fields)
+end
+
+@testset "CORPSE public workflow seam" begin
     stages = NativeCORPSE.canonical_stages()
     @test getproperty.(stages, :name) ==
           (:prespin, :spin, :spin_continuation, :historical)
@@ -29,6 +54,76 @@ const CORPSECalibration = TestbedCORPSEFullGridCalibration
     @test NativeCORPSE.root_weighted_saturation(roots, frozen, 0.5) ≈ 0.7
 end
 
+@testset "CORPSE Representative population and reducers" begin
+    manifest = joinpath(@__DIR__, "validation", "scopes", "representative.toml")
+    scope = NativeCORPSE.representative_scope(manifest)
+    @test scope.name == "representative"
+    @test length(scope.cell_ids) == 80
+    @test scope.cell_ids == sort(unique(scope.cell_ids))
+    @test scope.gaps == Dict(51 => 17, 3442 => 11)
+    @test scope.eligible_cell_ids ==
+          filter(id -> !haskey(scope.gaps, id), scope.cell_ids)
+
+    tracker = NativeCORPSE.ReducedCORPSEHistorical(2)
+    @test length(NativeCORPSE.REDUCED_SAMPLE_DAYS) == 84
+    @test length(tracker.annual_mean) == 18
+    @test length(tracker.annual_total) == 4
+    @test all(
+        size(values) == (2, 114) for values in values(tracker.annual_mean)
+    )
+    @test all(
+        size(values) == (2, 114) for values in values(tracker.end_of_year)
+    )
+    @test all(size(values) == (2, 84) for values in values(tracker.samples))
+
+    state = ConstantCORPSEState(
+        ConstantCORPSEFields(
+            [1.0, 2.0],
+            [ntuple(_ -> value, 37) for value in (1.0, 2.0)],
+        ),
+    )
+    historical = (name = :historical,)
+    for day in 1:365
+        tracker(historical, day, state, state, nothing)
+    end
+    first_variable = first(NativeCORPSE.REDUCED_VARIABLES).name
+    @test tracker.annual_mean[first_variable][:, 1] == [365000.0, 730000.0]
+    @test tracker.end_of_year[first_variable][:, 1] == [1000.0, 2000.0]
+    @test tracker.samples[first_variable][:, 1] == [1000.0, 2000.0]
+    first_flux = first(NativeCORPSE.REDUCED_FLUX_VARIABLES).name
+    @test tracker.annual_total[first_flux][:, 1] ==
+          365 * NativeCORPSE.DAY_SECONDS * [1000.0, 2000.0]
+    mktempdir() do directory
+        path = joinpath(directory, "reduced.nc")
+        NativeCORPSE.write_reduced_historical(
+            path,
+            tracker,
+            [(cell_id = 1,), (cell_id = 2,)],
+            [true, true],
+        )
+        NCDatasets.NCDataset(path) do dataset
+            @test dataset["annual_mean__cleaf"].attrib["units"] == "g C m-2"
+            @test dataset["annual_total__cgpp"].attrib["units"] ==
+                  "g C m-2 year-1"
+            @test dataset["fixed_daily_sample__cgpp"].attrib["units"] ==
+                  "g C m-2 day-1"
+            @test dataset["fixed_daily_sample__Ts"].attrib["units"] == "K"
+        end
+    end
+
+    mktempdir() do directory
+        invalid = TOML.parsefile(manifest)
+        invalid["eligibility_gaps"][1]["reviewed"] = false
+        invalid_path = joinpath(directory, "unreviewed.toml")
+        open(invalid_path, "w") do io
+            TOML.print(io, invalid; sorted = true)
+        end
+        @test_throws ErrorException NativeCORPSE.representative_scope(
+            invalid_path,
+        )
+    end
+end
+
 @testset "CORPSE calibration policy derivation" begin
     grid = [(cell_id = index, pft = 1) for index in 1:8]
     expected = [0.0, 1e-6, 1e-3, 0.1, 1.0, 2.0, 3.0, 4.0]
@@ -37,22 +132,103 @@ end
         actual,
         expected,
         grid;
-        absolute_floor = 5e-7,
+        units = "kg C m-2",
     )
     policy = record["derived_policy"]
     @test policy["atol"] >= 1.05 * policy["raw_atol"]
     @test policy["rtol"] == 1.05 * policy["raw_rtol"]
-    @test policy["absolute_floor"] > 5e-7
+    @test policy["raw_atol"] >= 0
+    @test policy["raw_rtol"] >= 0
     @test policy["validation_failed_pairs"] == 0
     @test length(record["top_outlier"]) == 6
     @test record["finite_pair_count"] == length(grid)
+    @test record["units"] == "kg C m-2"
+    @test CORPSECalibration.CALIBRATION_ID ==
+          "corpse-c-representative-fresh-fortran-v1"
+
+    exact = CORPSECalibration.calibration_record(
+        expected,
+        expected,
+        grid;
+        units = "kg C m-2",
+    )
+    @test exact["derived_policy"]["raw_atol"] == 0
+    @test exact["derived_policy"]["raw_rtol"] == 0
+    @test exact["derived_policy"]["atol"] ==
+          exact["derived_policy"]["absolute_numerical_padding"]
+    @test exact["derived_policy"]["absolute_numerical_padding"] ==
+          64eps(Float64) * maximum(abs, expected)
+    applied = NativeCORPSE.calibrated_metrics(actual, expected, record)
+    @test applied["all_match"]
+    perturbed = copy(actual)
+    perturbed[end] += 1
+    @test !NativeCORPSE.calibrated_metrics(perturbed, expected, record)["all_match"]
+    @test_throws ErrorException NativeCORPSE.calibrated_metrics(
+        [Inf],
+        [1.0],
+        CORPSECalibration.calibration_record(
+            [1.0],
+            [1.0],
+            grid[1:1];
+            units = "kg C m-2",
+        ),
+    )
 
     @test_throws ErrorException CORPSECalibration.calibration_record(
         [1.0, Inf],
         [1.0, 2.0],
-        grid[1:2];
-        absolute_floor = 5e-7,
+        grid[1:2],
+        units = "kg C m-2",
     )
+
+    mktempdir() do directory
+        record(path, id) = Dict(
+            "id" => id,
+            "sha256" => NativeCORPSE.native_workflow().sha256sum(path),
+        )
+        report = joinpath(directory, "reconstruction_report.toml")
+        write(report, "status = \"complete\"\n")
+        stage_records = Dict{String, Any}()
+        for stage in NativeCORPSE.canonical_stages()
+            stage_name = String(stage.name)
+            stage_directory = NativeCORPSE.stage_directory(stage)
+            stage_root = joinpath(directory, "stages", stage_directory)
+            mkpath(stage_root)
+            paths = Dict(
+                "casa_boundary" => joinpath(stage_root, "casa_final.csv"),
+                "corpse_boundary" => joinpath(stage_root, "corpse_final.csv"),
+                "metadata" => joinpath(stage_root, "stage_metadata.toml"),
+            )
+            foreach(path -> write(path, stage_name), values(paths))
+            stage_records[stage_name] = Dict(
+                key => record(
+                    path,
+                    "fortran/$stage_directory/$(basename(path))",
+                ) for (key, path) in paths
+            )
+        end
+        boundary_calibration = Dict(
+            "provenance" => Dict(
+                "fortran_reconstruction_report" =>
+                    record(report, "fortran/reconstruction_report.toml"),
+                "fortran_stage" => stage_records,
+            ),
+        )
+        @test isnothing(
+            NativeCORPSE.verify_boundary_reference(
+                boundary_calibration,
+                directory,
+            ),
+        )
+        write(
+            joinpath(directory, "stages", "01-prespin", "casa_final.csv"),
+            "changed",
+        )
+        @test_throws ErrorException NativeCORPSE.verify_boundary_reference(
+            boundary_calibration,
+            directory,
+        )
+    end
 
     sleepy = `$(Base.julia_cmd()) --startup-file=no -e "sleep(1)"`
     @test_throws ErrorException NativeCORPSE.run_with_timeout(
@@ -63,4 +239,31 @@ end
         sleepy;
         timeout_seconds = 0.01,
     )
+end
+
+@testset "CORPSE reduced Fortran extraction" begin
+    mktempdir() do directory
+        path = joinpath(directory, "daily.nc")
+        NCDatasets.NCDataset(path, "c") do dataset
+            NCDatasets.defDim(dataset, "time", 3)
+            NCDatasets.defDim(dataset, "lat", 1)
+            NCDatasets.defDim(dataset, "lon", 2)
+            NCDatasets.defVar(dataset, "cellid", Int, ("lat", "lon"))[:, :] =
+                reshape([51, 532], 1, 2)
+            variable = NCDatasets.defVar(
+                dataset,
+                "cleaf",
+                Float64,
+                ("time", "lat", "lon"),
+            )
+            variable[:, :, :] = reshape(1.0:6.0, 3, 1, 2)
+        end
+        NCDatasets.NCDataset(path) do dataset
+            @test CORPSEReference.selected_series(
+                dataset,
+                "cleaf",
+                [532, 51],
+            ) == [4.0 5.0 6.0; 1.0 2.0 3.0]
+        end
+    end
 end

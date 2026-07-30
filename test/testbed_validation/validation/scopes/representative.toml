@@ -1,7 +1,28 @@
 cell_ids = [51, 532, 618, 626, 709, 833, 923, 1285, 1394, 1510, 1700, 1715, 1805, 1894, 2182, 2191, 2378, 2668, 3042, 3137, 3234, 3442, 3613, 3633, 3811, 3898, 3899, 3983, 3997, 4079, 4196, 4198, 4204, 4273, 4397, 4453, 4681, 4978, 5064, 5406, 5444, 5501, 5600, 5603, 5693, 5790, 5792, 6221, 6325, 7669, 7859, 7953, 8337, 8625, 8910, 9189, 9285, 9490, 9571, 9667, 9676, 9679, 9685, 9759, 9764, 9952, 10433, 10644, 10997, 11162, 11272, 11358, 11363, 11655, 12334, 13139, 13331, 13397, 13601, 13794]
-eligibility_gaps = []
 name = "representative"
 schema_version = 1
+
+[[eligibility_gaps]]
+cell_id = 51
+evidence_kind = "inactive_model_mask"
+evidence_variable = "veg%iveg2"
+first_ineligible_stage = "prespin"
+fortran_vegetation_category = 0
+model = "CORPSE"
+pft = 17
+reason = "PFT 17 (water) maps to Fortran vegetation category 0; corpse_cycle is outside its model applicability and is not executed."
+reviewed = true
+
+[[eligibility_gaps]]
+cell_id = 3442
+evidence_kind = "inactive_model_mask"
+evidence_variable = "veg%iveg2"
+first_ineligible_stage = "prespin"
+fortran_vegetation_category = 0
+model = "CORPSE"
+pft = 11
+reason = "PFT 11 (permanent wetland) maps to Fortran vegetation category 0 in the pinned parameter table; corpse_cycle is outside its model applicability and is not executed."
+reviewed = true
 
 [[partition]]
 cell_ids = [51, 532, 618, 626, 709, 833, 923, 1285, 1394, 1510, 1700, 1715, 1805, 1894, 2182, 2191, 2378, 2668, 3042, 3137, 3234, 3442, 3613, 3633, 3811, 3898, 3899, 3983, 3997, 4079, 4196, 4198, 4204, 4273, 4397, 4453, 4681, 4978, 5064, 5406, 5444, 5501, 5600, 5603, 5693, 5790, 5792, 6221, 6325, 7669, 7859, 7953, 8337, 8625, 8910, 9189, 9285, 9490, 9571, 9667, 9676, 9679, 9685, 9759, 9764, 9952, 10433, 10644, 10997, 11162, 11272, 11358, 11363, 11655, 12334, 13139, 13331, 13397, 13601, 13794]

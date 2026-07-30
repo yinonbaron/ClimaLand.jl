@@ -15,6 +15,30 @@ include(joinpath(@__DIR__, "generate_selected_casa_workflow_reference.jl"))
 const Selection = TestbedRepresentativeCellSelection
 const ReferenceCells = TestbedReferenceCellComparisons
 const Workflow = TestbedSelectedCASAWorkflow
+const CORPSE_REPRESENTATIVE_GAPS = [
+    Dict(
+        "model" => "CORPSE",
+        "cell_id" => 51,
+        "pft" => 17,
+        "reason" => "PFT 17 (water) maps to Fortran vegetation category 0; corpse_cycle is outside its model applicability and is not executed.",
+        "reviewed" => true,
+        "evidence_kind" => "inactive_model_mask",
+        "first_ineligible_stage" => "prespin",
+        "evidence_variable" => "veg%iveg2",
+        "fortran_vegetation_category" => 0,
+    ),
+    Dict(
+        "model" => "CORPSE",
+        "cell_id" => 3442,
+        "pft" => 11,
+        "reason" => "PFT 11 (permanent wetland) maps to Fortran vegetation category 0 in the pinned parameter table; corpse_cycle is outside its model applicability and is not executed.",
+        "reviewed" => true,
+        "evidence_kind" => "inactive_model_mask",
+        "first_ineligible_stage" => "prespin",
+        "evidence_variable" => "veg%iveg2",
+        "fortran_vegetation_category" => 0,
+    ),
+]
 
 function copy_payload(source, destination)
     for name in readdir(source)
@@ -79,6 +103,7 @@ function build(args)
         soil_path,
         smoke_manifest;
         seed = 31432026,
+        eligibility_gaps = CORPSE_REPRESENTATIVE_GAPS,
     )
 
     forcing_payload = joinpath(work_root, "representative_forcing")
