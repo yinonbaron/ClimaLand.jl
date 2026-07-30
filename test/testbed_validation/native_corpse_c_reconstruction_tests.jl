@@ -54,6 +54,45 @@ end
     @test NativeCORPSE.root_weighted_saturation(roots, frozen, 0.5) ≈ 0.7
 end
 
+@testset "pinned CORPSE Representative calibration" begin
+    calibration_path = joinpath(
+        @__DIR__,
+        "validation",
+        "corpse_c_representative_calibration.toml",
+    )
+    calibration = NativeCORPSE.calibration_policy(calibration_path)
+    stage_records = [
+        record for records in values(calibration["stage"]) for
+        record in values(records)
+    ]
+    reducer_records = [
+        record for records in values(calibration["reducer"]) for
+        record in values(records)
+    ]
+    @test length(stage_records) == 164
+    @test length(reducer_records) == 62
+    @test all(
+        record["derived_policy"]["validation_failed_pairs"] == 0 for
+        record in (stage_records..., reducer_records...)
+    )
+    @test all(
+        length(record["top_outlier"]) == 6 for
+        record in (stage_records..., reducer_records...)
+    )
+    @test calibration["provenance"]["scope_manifest"]["sha256"] ==
+          NativeCORPSE.native_workflow().sha256sum(
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml"),
+    )
+    for reducer in ("annual_total", "fixed_daily_sample")
+        litter = calibration["reducer"][reducer]["LitterLayer_CO2"]
+        @test litter["derived_policy"]["rtol"] < 1e-3
+        @test maximum(
+            abs(outlier["julia_value"]) for
+            outlier in litter["top_outlier"]
+        ) > 0
+    end
+end
+
 @testset "CORPSE Representative population and reducers" begin
     manifest = joinpath(@__DIR__, "validation", "scopes", "representative.toml")
     scope = NativeCORPSE.representative_scope(manifest)
