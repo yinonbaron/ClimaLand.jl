@@ -1,12 +1,17 @@
 using Test
+import SHA
 import TOML
 
 include(joinpath(@__DIR__, "selected_mimics_c_workflow.jl"))
 include(joinpath(@__DIR__, "generate_selected_mimics_c_reference.jl"))
+include(joinpath(@__DIR__, "generate_mimics_c_boundary_calibration.jl"))
+include(joinpath(@__DIR__, "generate_mimics_c_historical_calibration.jl"))
 
 const SelectedMIMICSC = TestbedSelectedMIMICSCWorkflow
 const GenerateMIMICSC = GenerateSelectedMIMICSCReference
 const MIMICSCCalibration = TestbedMIMICSCCalibration
+const BoundaryCalibration = GenerateMIMICSCBoundaryCalibration
+const HistoricalCalibration = GenerateMIMICSCHistoricalCalibration
 
 function mimics_c_test_collection(ids = [11, 22])
     return TestbedReferenceCellComparisons.ReferenceCellCollection(
@@ -58,6 +63,14 @@ function mimics_c_test_reference(ids = [11, 22])
         "model" => "MIMICS-C",
         "scope" => "representative",
         "cell_ids" => ids,
+        "cell" => [
+            Dict(
+                "cell_id" => id,
+                "pft" => index,
+                "latitude" => -45.0 + index,
+                "longitude" => 90.0 + index,
+            ) for (index, id) in enumerate(ids)
+        ],
         "provenance" => Dict(
             "fortran_source_revision" => repeat("a", 40),
             "generator_sha256" => repeat("b", 64),
@@ -91,11 +104,27 @@ function mimics_c_test_reference(ids = [11, 22])
     )
 end
 
-function write_mimics_c_test_reference(callback, reference)
+function write_mimics_c_test_reference(
+    callback,
+    reference;
+    gaps = Any[],
+)
     mktemp() do path, io
-        TOML.print(io, reference; sorted = true)
+        scope = Dict(
+            "schema_version" => 1,
+            "name" => "representative",
+            "cell_ids" => reference["cell_ids"],
+            "eligibility_gaps" => gaps,
+        )
+        TOML.print(io, scope; sorted = true)
         close(io)
-        callback(path)
+        reference["provenance"]["scope_manifest_sha256"] =
+            bytes2hex(SHA.sha256(read(path)))
+        mktemp() do reference_path, reference_io
+            TOML.print(reference_io, reference; sorted = true)
+            close(reference_io)
+            callback(reference_path, path)
+        end
     end
 end
 
@@ -134,40 +163,160 @@ end
     )
 end
 
-@testset "MIMICS-C consumes only fitted calibration policies" begin
+@testset "MIMICS-C calibration preserves observation coordinates" begin
     record = MIMICSCCalibration.calibration_record(
-        [1.0, 2.001],
-        [1.0, 2.0];
+        [1.2, 1.0],
+        [1.0, 1.0];
         units = "kg C m^-2",
+        observations = [
+            (; cell_id = 11, latitude = -10.0, longitude = 20.0),
+            (; cell_id = 22, latitude = 30.0, longitude = -40.0),
+        ],
+    )
+    @test record["top_outlier"][1]["cell_id"] == 11
+    @test record["top_outlier"][1]["latitude"] == -10.0
+    @test record["top_outlier"][1]["longitude"] == 20.0
+end
+
+@testset "MIMICS-C calibration populations are immutable" begin
+    population_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_c_boundary_population.toml",
+    )
+    population = TOML.parsefile(population_path)["population"]
+    @test population["label"] == "global"
+    @test population["cell_count"] == 4263
+    @test population["eligible_cell_count"] == 4263
+    @test isempty(population["eligibility_gaps"])
+    @test all(
+        value -> occursin(r"^[0-9a-f]{64}$", value),
+        (
+            population["cell_ids_sha256"],
+            population["grid_sha256"],
+            BoundaryCalibration.sha256sum(population_path),
+        ),
+    )
+    @test HistoricalCalibration.eligible_values(
+        [1.0, 2.0, 3.0, 4.0],
+        [11, 22],
+        [22],
+    ) == [2.0, 4.0]
+end
+
+@testset "MIMICS-C consumes only fitted calibration policies" begin
+    cells = (
+        (; cell_id = 11, pft = 1, latitude = -10.0, longitude = 20.0),
+        (; cell_id = 22, pft = 2, latitude = 30.0, longitude = -40.0),
+    )
+    record(observations, units = "kg C m^-2") =
+        MIMICSCCalibration.calibration_record(
+            fill(1.001, length(observations)),
+            ones(length(observations));
+            units,
+            observations,
+        )
+    annual_observations = [
+        merge(cell, (; year)) for year in 1901:2014 for cell in cells
+    ]
+    daily_observations = [
+        merge(
+            cell,
+            (;
+                sample_day,
+                year = 1901 + (sample_day - 1) ÷ 365,
+                day_of_year = mod1(sample_day, 365),
+            ),
+        ) for sample_day in SelectedMIMICSC.fixed_daily_sample_days() for
+        cell in cells
+    ]
+    digest() = Dict("sha256" => repeat("a", 64))
+    method = Dict(
+        "error" => "e_i = abs(Julia_i - Fortran_i)",
+        "reference_magnitude" => "x_i = abs(Fortran_i)",
+        "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
+        "selection" => "smallest minimizing r",
+        "safety_margin" => "5% plus scale-aware Float64 padding",
+        "nonfinite" => "fail",
+    )
+    boundary_provenance = Dict(
+        name => digest() for name in (
+            "population_manifest",
+            "grid",
+            "casa_parameters",
+            "mimics_parameters",
+            "fresh_fortran_build",
+            "fresh_fortran_workflow",
+        )
+    )
+    boundary_provenance["generator"] = Dict(
+        "sha256" => BoundaryCalibration.sha256sum(
+            joinpath(@__DIR__, "generate_mimics_c_boundary_calibration.jl"),
+        ),
+    )
+    boundary_provenance["calibration"] = Dict(
+        "sha256" => BoundaryCalibration.sha256sum(
+            joinpath(@__DIR__, "mimics_c_calibration.jl"),
+        ),
     )
     boundary = Dict(
+        "schema_version" => 1,
         "model" => "MIMICS-C",
+        "eligible_cell_count" => 2,
+        "method" => method,
+        "source_provenance" => boundary_provenance,
         "variable" => Dict(
-            stage => Dict(name => deepcopy(record) for name in
+            stage => Dict(name => record(cells) for name in
                 SelectedMIMICSC.BOUNDARY_NAMES) for
             stage in SelectedMIMICSC.STAGE_NAMES
         ),
     )
+    historical_provenance = Dict(
+        name => digest() for name in (
+            "scope_manifest",
+            "current_julia_output",
+            "current_julia_report",
+            "fresh_fortran_oracle",
+        )
+    )
+    historical_provenance["generator"] = Dict(
+        "sha256" => HistoricalCalibration.sha256sum(
+            joinpath(@__DIR__, "generate_mimics_c_historical_calibration.jl"),
+        ),
+    )
+    historical_provenance["calibration"] = Dict(
+        "sha256" => HistoricalCalibration.sha256sum(
+            joinpath(@__DIR__, "mimics_c_calibration.jl"),
+        ),
+    )
     historical = Dict(
+        "schema_version" => 1,
         "model" => "MIMICS-C",
+        "eligible_cell_count" => 2,
+        "method" => method,
+        "source_provenance" => historical_provenance,
         "annual" => Dict(
             "annual_mean" => Dict(
-                name => deepcopy(record) for
+                name => record(annual_observations) for
                 name in SelectedMIMICSC.ANNUAL_STATE_NAMES
             ),
             "end_of_year" => Dict(
-                name => deepcopy(record) for
+                name => record(annual_observations) for
                 name in SelectedMIMICSC.ANNUAL_STATE_NAMES
             ),
             "annual_total" => Dict(
-                name => deepcopy(record) for
+                name => record(
+                    annual_observations,
+                    "kg C m^-2 year^-1",
+                ) for
                 name in SelectedMIMICSC.ANNUAL_FLUX_NAMES
             ),
         ),
         "daily" => Dict(
-            name => deepcopy(record) for name in SelectedMIMICSC.DAILY_NAMES
+            name => record(daily_observations) for
+            name in SelectedMIMICSC.DAILY_NAMES
         ),
-        "budget" => deepcopy(record),
+        "budget" => record(cells, "kg C"),
     )
     mktempdir() do directory
         boundary_path = joinpath(directory, "boundary.toml")
@@ -186,8 +335,41 @@ end
         @test policy["fresh_fortran_daily"][first(
             SelectedMIMICSC.DAILY_NAMES,
         )] == Dict(
-            "atol" => record["derived_policy"]["atol"],
-            "rtol" => record["derived_policy"]["rtol"],
+            "atol" => historical["daily"][first(
+                SelectedMIMICSC.DAILY_NAMES,
+            )]["derived_policy"]["atol"],
+            "rtol" => historical["daily"][first(
+                SelectedMIMICSC.DAILY_NAMES,
+            )]["derived_policy"]["rtol"],
+        )
+
+        stale = deepcopy(boundary)
+        stale["source_provenance"]["calibration"]["sha256"] =
+            repeat("0", 64)
+        open(boundary_path, "w") do io
+            TOML.print(io, stale)
+        end
+        @test_throws ErrorException MIMICSCCalibration.comparison_policy(
+            boundary_path,
+            historical_path,
+        )
+
+        open(boundary_path, "w") do io
+            TOML.print(io, boundary)
+        end
+        incomplete = deepcopy(historical)
+        delete!(
+            incomplete["daily"][first(SelectedMIMICSC.DAILY_NAMES)][
+                "top_outlier"
+            ][1],
+            "latitude",
+        )
+        open(historical_path, "w") do io
+            TOML.print(io, incomplete)
+        end
+        @test_throws ErrorException MIMICSCCalibration.comparison_policy(
+            boundary_path,
+            historical_path,
         )
     end
 end
@@ -230,11 +412,12 @@ end
 @testset "MIMICS-C reduced oracle accepts a replaceable exact collection" begin
     collection = mimics_c_test_collection()
     reference = mimics_c_test_reference()
-    write_mimics_c_test_reference(reference) do path
+    write_mimics_c_test_reference(reference) do path, scope_path
         loaded = SelectedMIMICSC.workflow_reference(
             collection;
             path,
             comparison_policy = mimics_c_test_policy(),
+            scope_manifest_path = scope_path,
         )
         @test loaded.cell_ids == [11, 22]
         @test loaded.eligible_ids == [11, 22]
@@ -246,11 +429,12 @@ end
     end
 
     reversed = mimics_c_test_collection([22, 11])
-    write_mimics_c_test_reference(reference) do path
+    write_mimics_c_test_reference(reference) do path, scope_path
         @test_throws ErrorException SelectedMIMICSC.workflow_reference(
             reversed;
             path,
             comparison_policy = mimics_c_test_policy(),
+            scope_manifest_path = scope_path,
         )
     end
 end
@@ -261,12 +445,13 @@ end
     reference["oracle"]["annual"]["annual_mean"][first(
         SelectedMIMICSC.ANNUAL_STATE_NAMES,
     )][2] = Inf
-    write_mimics_c_test_reference(reference) do path
+    write_mimics_c_test_reference(reference) do path, scope_path
         error = try
             SelectedMIMICSC.workflow_reference(
                 collection;
                 path,
                 comparison_policy = mimics_c_test_policy(),
+                scope_manifest_path = scope_path,
             )
             nothing
         catch caught
@@ -287,15 +472,22 @@ end
         "first_nonfinite_variable" =>
             first(SelectedMIMICSC.ANNUAL_STATE_NAMES),
     )
-    write_mimics_c_test_reference(reference) do path
+    write_mimics_c_test_reference(reference; gaps = [gap]) do path, scope_path
         loaded = SelectedMIMICSC.workflow_reference(
             collection;
             path,
             comparison_policy = mimics_c_test_policy(),
-            eligibility_gaps = [gap],
+            scope_manifest_path = scope_path,
         )
         @test loaded.eligible_ids == [11]
         @test loaded.eligibility_gaps == [gap]
+        @test_throws ErrorException SelectedMIMICSC.workflow_reference(
+            collection;
+            path,
+            comparison_policy = mimics_c_test_policy(),
+            scope_manifest_path = scope_path,
+            eligibility_gaps = Any[],
+        )
     end
 end
 
@@ -317,11 +509,12 @@ end
     @test only(comparison["cell_failures"])["cell_id"] == 22
     @test comparison["variable"][variable]["failed_values"] == 1
 
-    write_mimics_c_test_reference(reference) do path
+    write_mimics_c_test_reference(reference) do path, scope_path
         loaded = SelectedMIMICSC.workflow_reference(
             collection;
             path,
             comparison_policy = mimics_c_test_policy(),
+            scope_manifest_path = scope_path,
         )
         budget = deepcopy(reference["oracle"]["budget"])
         budget["historical_residual_kg_c"][2] = 0.0

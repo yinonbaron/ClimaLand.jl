@@ -1,0 +1,10 @@
+model = "MIMICS-C"
+schema_version = 1
+
+[population]
+cell_count = 4263
+cell_ids_sha256 = "568d1274962e901163cc038504fece59a604414b14c7525d5585c19ca0e2748c"
+eligibility_gaps = []
+eligible_cell_count = 4263
+grid_sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
+label = "global"

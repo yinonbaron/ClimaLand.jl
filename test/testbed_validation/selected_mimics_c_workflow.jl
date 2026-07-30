@@ -178,8 +178,56 @@ function validate_provenance(provenance)
     return nothing
 end
 
+function validate_cells(reference, collection)
+    cells = get(reference, "cell", Dict{String, Any}[])
+    length(cells) == length(collection.cells) ||
+        error("Pinned MIMICS-C oracle has incompatible cell metadata")
+    for (record, cell) in zip(cells, collection.cells)
+        get(record, "cell_id", nothing) == cell.id &&
+            get(record, "pft", nothing) == cell.pft &&
+            all(
+                value -> value isa Real && isfinite(value),
+                (
+                    get(record, "latitude", nothing),
+                    get(record, "longitude", nothing),
+                ),
+            ) ||
+            error("Pinned MIMICS-C oracle has invalid cell metadata")
+    end
+    return nothing
+end
+
+function scope_contract(
+    collection,
+    reference,
+    scope_manifest_path,
+    runtime_gaps,
+)
+    isfile(scope_manifest_path) ||
+        error("MIMICS-C Scope Manifest is missing: $scope_manifest_path")
+    scope = TOML.parsefile(scope_manifest_path)
+    get(scope, "schema_version", nothing) == 1 ||
+        error("Unsupported MIMICS-C Scope Manifest schema")
+    get(scope, "name", nothing) == collection.name ||
+        error("MIMICS-C Scope Manifest name does not match the collection")
+    cell_ids = Int.(get(scope, "cell_ids", Int[]))
+    cell_ids == Int.(getproperty.(collection.cells, :id)) ||
+        error("MIMICS-C Scope Manifest cells do not match the collection")
+    digest = native_mimics.native_workflow().sha256sum(scope_manifest_path)
+    digest == reference["provenance"]["scope_manifest_sha256"] ||
+        error("MIMICS-C Scope Manifest hash does not match the oracle")
+    gaps = [
+        gap for
+        gap in get(scope, "eligibility_gaps", Dict{String, Any}[]) if
+        get(gap, "model", nothing) == "MIMICS-C"
+    ]
+    isnothing(runtime_gaps) || runtime_gaps == gaps ||
+        error("Runtime MIMICS-C Eligibility Gaps differ from the Scope Manifest")
+    return gaps
+end
+
 """
-    workflow_reference(collection; path, comparison_policy, eligibility_gaps)
+    workflow_reference(collection; path, comparison_policy, scope_manifest_path)
 
 Load and validate one reduced MIMICS-C Comparison Oracle against the exact
 supplied cell collection. Reviewed gaps remove a cell atomically; all values
@@ -189,7 +237,13 @@ function workflow_reference(
     collection;
     path,
     comparison_policy,
-    eligibility_gaps = Dict{String, Any}[],
+    scope_manifest_path = joinpath(
+        @__DIR__,
+        "validation",
+        "scopes",
+        "$(collection.name).toml",
+    ),
+    eligibility_gaps = nothing,
 )
     isfile(path) || error("Pinned MIMICS-C oracle is missing: $path")
     reference = TOML.parsefile(path)
@@ -203,6 +257,13 @@ function workflow_reference(
     supplied_ids = Int.(getproperty.(collection.cells, :id))
     cell_ids == supplied_ids ||
         error("Pinned MIMICS-C oracle cell IDs do not exactly match the supplied collection")
+    validate_cells(reference, collection)
+    eligibility_gaps = scope_contract(
+        collection,
+        reference,
+        scope_manifest_path,
+        eligibility_gaps,
+    )
     gap_ids = validate_gaps(eligibility_gaps, cell_ids)
     eligible_ids = filter(id -> id ∉ gap_ids, cell_ids)
     positions = findall(id -> id ∉ gap_ids, cell_ids)
@@ -735,7 +796,13 @@ function run_selected_case(
     compare_references = true,
     reference_path = nothing,
     comparison_policy = nothing,
-    eligibility_gaps = Dict{String, Any}[],
+    scope_manifest_path = joinpath(
+        @__DIR__,
+        "validation",
+        "scopes",
+        "$(collection.name).toml",
+    ),
+    eligibility_gaps = nothing,
 )
     reference = if compare_references
         isnothing(reference_path) &&
@@ -746,6 +813,7 @@ function run_selected_case(
             collection;
             path = reference_path,
             comparison_policy,
+            scope_manifest_path,
             eligibility_gaps,
         )
     else
@@ -862,7 +930,8 @@ function run_selected_case(
         result.report,
         collection,
         active_collection,
-        eligibility_gaps,
+        isnothing(reference) ? Dict{String, Any}[] :
+        reference.eligibility_gaps,
     )
     return result
 end

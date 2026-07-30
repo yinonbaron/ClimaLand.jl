@@ -2,6 +2,7 @@ module TestbedMIMICSCCalibration
 
 import Statistics
 import TOML
+import SHA
 
 const SAFETY_FACTOR = 1.05
 
@@ -198,6 +199,117 @@ function policy_record(record, location)
     return Dict("atol" => atol, "rtol" => rtol)
 end
 
+const DISTRIBUTION_KEYS =
+    Set(("minimum", "median", "p90", "p95", "p99", "p999", "maximum", "mean"))
+
+function validate_distribution(values, location; allow_empty = false)
+    allow_empty && isempty(values) && return nothing
+    Set(String.(keys(values))) == DISTRIBUTION_KEYS &&
+        all(value -> value isa Real && isfinite(value), Base.values(values)) ||
+        error("$location has an invalid distribution")
+    return nothing
+end
+
+function validate_record(record, location, pair_count, observation_fields)
+    get(record, "finite_pair_count", nothing) == pair_count ||
+        error("$location has the wrong calibration population")
+    !isempty(String(get(record, "units", ""))) ||
+        error("$location has no units")
+    validate_distribution(record["absolute_error"], "$location.absolute_error")
+    validate_distribution(
+        record["absolute_reference"],
+        "$location.absolute_reference",
+    )
+    relative = record["relative_error"]
+    get(relative, "zero_reference_count", -1) +
+        get(relative, "nonzero_reference_count", -1) == pair_count ||
+        error("$location has inconsistent zero-reference counts")
+    validate_distribution(
+        relative["distribution"],
+        "$location.relative_error";
+        allow_empty = get(relative, "nonzero_reference_count", 0) == 0,
+    )
+    active = record["active_constraint"]
+    get(active, "count", 0) > 0 ||
+        error("$location has no active constraint")
+    observations = get(active, "observation", Dict{String, Any}[])
+    length(observations) == min(6, active["count"]) ||
+        error("$location has incomplete active-constraint evidence")
+    top = get(record, "top_outlier", Dict{String, Any}[])
+    length(top) == min(6, pair_count) ||
+        error("$location has incomplete outlier evidence")
+    for observation in [observations; top]
+        all(field -> haskey(observation, field), observation_fields) ||
+            error("$location lacks observation coordinates")
+    end
+    for outlier in top
+        all(
+            field -> haskey(outlier, field),
+            ("rank", "julia", "fortran", "absolute_error", "relative_error"),
+        ) || error("$location has an incomplete outlier")
+        all(
+            isfinite,
+            (outlier["julia"], outlier["fortran"], outlier["absolute_error"]),
+        ) || error("$location has a nonfinite outlier")
+    end
+    policy_record(record, location)
+    return nothing
+end
+
+function validate_digest(record, location)
+    digest = get(record, "sha256", "")
+    length(digest) == 64 && all(isxdigit, digest) ||
+        error("$location has an invalid SHA-256")
+    return nothing
+end
+
+function validate_provenance(document, required, generator)
+    provenance = get(document, "source_provenance", Dict{String, Any}())
+    for name in required
+        validate_digest(
+            get(provenance, name, Dict{String, Any}()),
+            "source_provenance.$name",
+        )
+    end
+    validate_digest(provenance["generator"], "source_provenance.generator")
+    validate_digest(
+        provenance["calibration"],
+        "source_provenance.calibration",
+    )
+    provenance["generator"]["sha256"] ==
+        open(
+            joinpath(@__DIR__, generator),
+        ) do io
+            bytes2hex(SHA.sha256(io))
+        end ||
+        error("MIMICS-C calibration generator hash is stale")
+    provenance["calibration"]["sha256"] ==
+        open(joinpath(@__DIR__, "mimics_c_calibration.jl")) do io
+            bytes2hex(SHA.sha256(io))
+        end ||
+        error("MIMICS-C calibration helper hash is stale")
+    return nothing
+end
+
+function validate_method(document)
+    method = get(document, "method", Dict{String, Any}())
+    all(
+        name -> !isempty(String(get(method, name, ""))),
+        (
+            "error",
+            "reference_magnitude",
+            "raw_absolute",
+            "selection",
+            "safety_margin",
+            "nonfinite",
+        ),
+    ) || error("MIMICS-C calibration method is incomplete")
+    occursin("max(0", method["raw_absolute"]) &&
+        !occursin("absolute_floor", method["raw_absolute"]) ||
+        error("MIMICS-C calibration method contains a scientific floor")
+    return nothing
+end
+
 """
     comparison_policy(boundary_path, historical_path)
 
@@ -211,10 +323,88 @@ function comparison_policy(boundary_path, historical_path)
         error("boundary calibration is not for MIMICS-C")
     get(historical, "model", nothing) == "MIMICS-C" ||
         error("historical calibration is not for MIMICS-C")
+    get(boundary, "schema_version", nothing) == 1 &&
+        get(historical, "schema_version", nothing) == 1 ||
+        error("MIMICS-C calibration schema is unsupported")
+    validate_method(boundary)
+    validate_method(historical)
+    validate_provenance(
+        boundary,
+        (
+            "generator",
+            "calibration",
+            "population_manifest",
+            "grid",
+            "casa_parameters",
+            "mimics_parameters",
+            "fresh_fortran_build",
+            "fresh_fortran_workflow",
+        ),
+        "generate_mimics_c_boundary_calibration.jl",
+    )
+    validate_provenance(
+        historical,
+        (
+            "generator",
+            "calibration",
+            "scope_manifest",
+            "current_julia_output",
+            "current_julia_report",
+            "fresh_fortran_oracle",
+        ),
+        "generate_mimics_c_historical_calibration.jl",
+    )
     boundary_values = get(boundary, "variable", Dict{String, Any}())
     annual_values = get(historical, "annual", Dict{String, Any}())
     daily_values = get(historical, "daily", Dict{String, Any}())
     budget_value = get(historical, "budget", Dict{String, Any}())
+    boundary_pairs = Int(get(boundary, "eligible_cell_count", 0))
+    boundary_pairs > 0 ||
+        error("MIMICS-C boundary calibration has no eligible population")
+    for (stage, variables) in boundary_values
+        for (name, record) in variables
+            validate_record(
+                record,
+                "boundary.$stage.$name",
+                boundary_pairs,
+                ("cell_id", "pft", "latitude", "longitude"),
+            )
+        end
+    end
+    historical_pairs = Int(get(historical, "eligible_cell_count", 0))
+    historical_pairs > 0 ||
+        error("MIMICS-C historical calibration has no eligible population")
+    for (reducer, variables) in annual_values
+        for (name, record) in variables
+            validate_record(
+                record,
+                "annual.$reducer.$name",
+                historical_pairs * 114,
+                ("cell_id", "year", "latitude", "longitude"),
+            )
+        end
+    end
+    for (name, record) in daily_values
+        validate_record(
+            record,
+            "daily.$name",
+            historical_pairs * 84,
+            (
+                "cell_id",
+                "year",
+                "day_of_year",
+                "sample_day",
+                "latitude",
+                "longitude",
+            ),
+        )
+    end
+    validate_record(
+        budget_value,
+        "budget.historical_residual_kg_c",
+        historical_pairs,
+        ("cell_id", "latitude", "longitude"),
+    )
     return Dict(
         "fresh_fortran_boundary" => Dict(
             stage => Dict(

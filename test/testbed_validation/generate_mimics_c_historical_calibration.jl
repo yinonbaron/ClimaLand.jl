@@ -31,10 +31,44 @@ function units(reducer, name)
     return "kg C m^-2"
 end
 
-function historical_values(output_path, oracle, cell_ids)
+function eligible_values(values, cell_ids, eligible_ids)
+    length(values) % length(cell_ids) == 0 ||
+        error("MIMICS-C historical oracle values are not cell-aligned")
+    positions = indexin(eligible_ids, cell_ids)
+    any(isnothing, positions) &&
+        error("MIMICS-C eligible cells are outside the oracle")
+    count = length(values) ÷ length(cell_ids)
+    return vec(reshape(values, length(cell_ids), count)[Int.(positions), :])
+end
+
+function scope_contract(reference, scope_manifest_path)
+    scope = TOML.parsefile(scope_manifest_path)
+    Int.(get(scope, "cell_ids", Int[])) == Int.(reference["cell_ids"]) ||
+        error("MIMICS-C historical population differs from its Scope Manifest")
+    sha256sum(scope_manifest_path) ==
+        reference["provenance"]["scope_manifest_sha256"] ||
+        error("MIMICS-C historical Scope Manifest hash differs from the oracle")
+    gaps = [
+        gap for
+        gap in get(scope, "eligibility_gaps", Dict{String, Any}[]) if
+        get(gap, "model", nothing) == "MIMICS-C"
+    ]
+    excluded = Workflow.validate_gaps(gaps, Int.(reference["cell_ids"]))
+    eligible_ids =
+        filter(id -> id ∉ excluded, Int.(reference["cell_ids"]))
+    return (; gaps, eligible_ids)
+end
+
+function historical_values(
+    output_path,
+    oracle,
+    cell_ids,
+    eligible_ids;
+    coordinates = Dict(),
+)
     annual_observations = [
-        (; cell_id, year) for year in Workflow.HISTORICAL_YEARS for
-        cell_id in cell_ids
+        merge((; cell_id, year), get(coordinates, cell_id, (;))) for
+        year in Workflow.HISTORICAL_YEARS for cell_id in eligible_ids
     ]
     annual_actual = NCDatasets.NCDataset(output_path) do output
         Workflow.selected_casa.reduced_annual_values(
@@ -46,7 +80,7 @@ function historical_values(output_path, oracle, cell_ids)
         reducer => Dict(
             name => Calibration.calibration_record(
                 annual_actual[reducer][name],
-                expected;
+                eligible_values(expected, cell_ids, eligible_ids);
                 units = units(reducer, name),
                 observations = annual_observations,
             ) for (name, expected) in variables
@@ -64,7 +98,8 @@ function historical_values(output_path, oracle, cell_ids)
             year = first(Workflow.HISTORICAL_YEARS) +
                    (sample_day - 1) ÷ 365,
             day_of_year = mod1(sample_day, 365),
-        ) for sample_day in sample_days for cell_id in cell_ids
+            get(coordinates, cell_id, (;))...,
+        ) for sample_day in sample_days for cell_id in eligible_ids
     ]
     daily_actual = NCDatasets.NCDataset(output_path) do output
         Dict(
@@ -78,7 +113,7 @@ function historical_values(output_path, oracle, cell_ids)
     daily = Dict(
         name => Calibration.calibration_record(
             daily_actual[name],
-            expected;
+            eligible_values(expected, cell_ids, eligible_ids);
             units = units("daily", name),
             observations = daily_observations,
         ) for (name, expected) in oracle["daily"]["variable"]
@@ -86,7 +121,18 @@ function historical_values(output_path, oracle, cell_ids)
     return annual, daily
 end
 
-function write_calibration(output_path, report_path, oracle_path, path)
+function write_calibration(
+    output_path,
+    report_path,
+    oracle_path,
+    path;
+    scope_manifest_path = joinpath(
+        @__DIR__,
+        "validation",
+        "scopes",
+        "representative.toml",
+    ),
+)
     reference = TOML.parsefile(oracle_path)
     get(reference, "model", nothing) == "MIMICS-C" ||
         error("historical calibration oracle is not for MIMICS-C")
@@ -94,26 +140,55 @@ function write_calibration(output_path, report_path, oracle_path, path)
     length(cell_ids) == 80 ||
         error("historical calibration requires the exact 80-cell oracle")
     oracle = reference["oracle"]
-    annual, daily = historical_values(output_path, oracle, cell_ids)
+    contract = scope_contract(reference, scope_manifest_path)
+    coordinates = Dict(
+        Int(cell["cell_id"]) => (;
+            latitude = cell["latitude"],
+            longitude = cell["longitude"],
+        ) for cell in get(reference, "cell", Dict{String, Any}[])
+    )
+    length(coordinates) == length(cell_ids) ||
+        error("MIMICS-C historical oracle lacks cell coordinates")
+    annual, daily = historical_values(
+        output_path,
+        oracle,
+        cell_ids,
+        contract.eligible_ids;
+        coordinates,
+    )
     report = TOML.parsefile(report_path)
+    get(report["coverage"], "scope_cell_ids", Int[]) == cell_ids &&
+        get(report["coverage"], "eligible_cell_ids", Int[]) ==
+        contract.eligible_ids &&
+        get(report["coverage"], "eligibility_gaps", Any[]) ==
+        contract.gaps ||
+        error("MIMICS-C Julia report differs from the immutable Scope Manifest")
     julia_budget =
         report["historical_comparison"]["budget"]["historical_residual_kg_c"]
-    fortran_budget = oracle["budget"]["historical_residual_kg_c"]
+    fortran_budget = eligible_values(
+        oracle["budget"]["historical_residual_kg_c"],
+        cell_ids,
+        contract.eligible_ids,
+    )
     budget = Calibration.calibration_record(
         julia_budget,
         fortran_budget;
         units = "kg C",
-        observations = [(; cell_id) for cell_id in cell_ids],
+        observations = [
+            merge((; cell_id), coordinates[cell_id]) for
+            cell_id in contract.eligible_ids
+        ],
     )
+    eligible_count = length(contract.eligible_ids)
     all(
-        record["finite_pair_count"] == 80 * 114 for
+        record["finite_pair_count"] == eligible_count * 114 for
         reducer in values(annual) for record in values(reducer)
     ) || error("historical annual calibration population is incomplete")
     all(
-        record["finite_pair_count"] == 80 * 84 for
+        record["finite_pair_count"] == eligible_count * 84 for
         record in values(daily)
     ) || error("historical daily calibration population is incomplete")
-    budget["finite_pair_count"] == 80 ||
+    budget["finite_pair_count"] == eligible_count ||
         error("historical budget calibration population is incomplete")
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
     document = Dict(
@@ -124,6 +199,9 @@ function write_calibration(output_path, report_path, oracle_path, path)
         "scope" => reference["scope"],
         "cell_ids" => cell_ids,
         "cell_count" => length(cell_ids),
+        "eligible_cell_ids" => contract.eligible_ids,
+        "eligible_cell_count" => eligible_count,
+        "reviewed_exclusion" => contract.gaps,
         "method" => Dict(
             "error" => "e_i = abs(Julia_i - Fortran_i)",
             "reference_magnitude" => "x_i = abs(Fortran_i)",
@@ -142,6 +220,19 @@ function write_calibration(output_path, report_path, oracle_path, path)
             "generator" => Dict(
                 "id" => relpath(@__FILE__, repo_root),
                 "sha256" => sha256sum(@__FILE__),
+            ),
+            "calibration" => Dict(
+                "id" => relpath(
+                    joinpath(@__DIR__, "mimics_c_calibration.jl"),
+                    repo_root,
+                ),
+                "sha256" => sha256sum(
+                    joinpath(@__DIR__, "mimics_c_calibration.jl"),
+                ),
+            ),
+            "scope_manifest" => Dict(
+                "id" => relpath(scope_manifest_path, repo_root),
+                "sha256" => sha256sum(scope_manifest_path),
             ),
             "current_julia_output" => Dict(
                 "id" => "current_julia_representative_historical_output",

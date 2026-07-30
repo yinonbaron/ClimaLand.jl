@@ -268,6 +268,14 @@ function write_reference(
         "model" => "MIMICS-C",
         "scope" => collection.name,
         "cell_ids" => cell_ids,
+        "cell" => [
+            Dict(
+                "cell_id" => point.cell_id,
+                "latitude" => point.latitude,
+                "longitude" => point.longitude,
+                "pft" => point.pft,
+            ) for point in grid
+        ],
         "provenance" => Dict(
             "fortran_source_revision" => workflow["source_commit"],
             "generator_sha256" => sha256sum(@__FILE__),
