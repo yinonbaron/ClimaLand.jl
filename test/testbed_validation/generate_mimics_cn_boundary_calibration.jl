@@ -131,6 +131,10 @@ end
 cell_ids_sha256(cell_ids) =
     bytes2hex(SHA.sha256(join(string.(cell_ids), ",")))
 
+function compatible_duplicate(left, right)
+    return left.observation == right.observation
+end
+
 function population_contract(
     population_manifest_path,
     scope_manifest_path,
@@ -250,6 +254,10 @@ function write_calibration(
     )
     populations = Dict{String, Any}()
     exclusion_records = Dict{String, Any}[]
+    overlapping_cell_ids = Set{Int}()
+    duplicate_pair_count = 0
+    maximum_duplicate_julia_delta = 0.0
+    maximum_duplicate_fortran_delta = 0.0
     for specification in population_specs
         haskey(specification, "exclusions") &&
             error("runtime boundary population specifications cannot declare exclusions")
@@ -291,6 +299,8 @@ function write_calibration(
         )
         grid = Native.native_casa().read_grid(grid_path)
         cell_ids = getproperty.(grid, :cell_id)
+        length(unique(cell_ids)) == length(cell_ids) ||
+            error("MIMICS-CN boundary population contains duplicate cell IDs")
         excluded, records = population_contract(
             population_manifest_path,
             scope_manifest_path,
@@ -382,11 +392,22 @@ function write_calibration(
                         observation = values.observations[index],
                     )
                     existing = get(all_pairs[stage][name], cell_id, nothing)
-                    isnothing(existing) ||
-                        existing == pair ||
-                        error(
-                            "incompatible duplicate MIMICS-CN boundary pair for cell $cell_id at $stage.$name",
+                    if !isnothing(existing)
+                        compatible_duplicate(existing, pair) || error(
+                            "incompatible duplicate MIMICS-CN boundary pair for cell $cell_id at $stage.$name: existing=$existing candidate=$pair",
                         )
+                        push!(overlapping_cell_ids, cell_id)
+                        duplicate_pair_count += 1
+                        maximum_duplicate_julia_delta = max(
+                            maximum_duplicate_julia_delta,
+                            abs(existing.actual - pair.actual),
+                        )
+                        maximum_duplicate_fortran_delta = max(
+                            maximum_duplicate_fortran_delta,
+                            abs(existing.expected - pair.expected),
+                        )
+                        continue
+                    end
                     all_pairs[stage][name][cell_id] = pair
                 end
             end
@@ -520,6 +541,17 @@ function write_calibration(
                 "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
             "nonfinite" =>
                 "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
+        ),
+        "deduplication" => Dict(
+            "rule" =>
+                "one pair per cell/stage/variable; overlapping population metadata must match exactly, the first population is retained, and compatibility requires zero failed pairs when the fitted policy is applied independently to both complete populations",
+            "overlapping_cell_count" => length(overlapping_cell_ids),
+            "overlapping_cell_ids" => sort!(collect(overlapping_cell_ids)),
+            "duplicate_pair_count" => duplicate_pair_count,
+            "maximum_julia_absolute_delta" =>
+                maximum_duplicate_julia_delta,
+            "maximum_fortran_absolute_delta" =>
+                maximum_duplicate_fortran_delta,
         ),
         "source_provenance" => Dict(
             "git_revision_basis" =>

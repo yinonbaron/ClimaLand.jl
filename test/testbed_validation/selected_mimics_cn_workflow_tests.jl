@@ -296,6 +296,87 @@ end
     )
 end
 
+@testset "frozen MIMICS-CN calibrations cover both populations" begin
+    boundary_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_cn_boundary_calibration.toml",
+    )
+    historical_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_cn_historical_calibration.toml",
+    )
+    boundary = TOML.parsefile(boundary_path)
+    historical = TOML.parsefile(historical_path)
+
+    @test boundary["union_cell_count"] == 852
+    @test Set(keys(boundary["population_validation"])) ==
+          Set(("random_pft_800", "representative"))
+    @test boundary["source_provenance"]["population"]["random_pft_800"][
+        "eligible_cell_count"
+    ] == 790
+    @test boundary["source_provenance"]["population"]["representative"][
+        "eligible_cell_count"
+    ] == 80
+    @test boundary["deduplication"]["overlapping_cell_count"] == 18
+    @test boundary["deduplication"]["duplicate_pair_count"] == 18 * 4 * 24
+    @test all(
+        record["failed_pairs"] == 0 for population in
+        values(boundary["population_validation"]) for stage in
+        values(population) for record in values(stage)
+    )
+    @test all(
+        record["finite_pair_count"] == 852 &&
+        record["derived_policy"]["validation_failed_pairs"] == 0 &&
+        length(record["top_outlier"]) == 6 &&
+        all(
+            outlier -> all(
+                key -> haskey(outlier, key),
+                ("cell_id", "latitude", "longitude", "pft"),
+            ),
+            record["top_outlier"],
+        ) for stage in values(boundary["variable"]) for
+        record in values(stage)
+    )
+
+    annual = [
+        record for reducer in values(historical["annual"]) for
+        record in values(reducer)
+    ]
+    daily = collect(values(historical["daily"]))
+    budget = collect(values(historical["budget"]))
+    @test length(annual) + length(daily) + length(budget) == 109
+    @test all(record["finite_pair_count"] == 80 * 114 for record in annual)
+    @test all(record["finite_pair_count"] == 80 * 84 for record in daily)
+    @test all(record["finite_pair_count"] == 80 for record in budget)
+    @test all(
+        record["derived_policy"]["validation_failed_pairs"] == 0 for
+        record in vcat(annual, daily, budget)
+    )
+    @test Set(getindex.(budget, "units")) == Set(("kg C", "kg N"))
+
+    for (document, generator, calibration) in (
+        (
+            boundary,
+            "generate_mimics_cn_boundary_calibration.jl",
+            "mimics_cn_calibration.jl",
+        ),
+        (
+            historical,
+            "generate_mimics_cn_historical_calibration.jl",
+            "mimics_cn_calibration.jl",
+        ),
+    )
+        @test document["source_provenance"]["generator"]["sha256"] ==
+              BoundaryCalibration.sha256sum(joinpath(@__DIR__, generator))
+        @test document["source_provenance"]["calibration"]["sha256"] ==
+              BoundaryCalibration.sha256sum(joinpath(@__DIR__, calibration))
+    end
+    @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(boundary_path, String))
+    @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(historical_path, String))
+end
+
 @testset "MIMICS-CN generator reads only supplied NetCDF locations" begin
     mktempdir() do directory
         path = joinpath(directory, "fresh_daily.nc")
