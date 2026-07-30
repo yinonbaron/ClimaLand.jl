@@ -55,7 +55,13 @@ const STAGE_SPECS = (
     ),
 )
 
-function static_inputs(source_root, selected_root, prespin_parameters, stage)
+function static_inputs(
+    source_root,
+    selected_root,
+    fixture_root,
+    prespin_parameters,
+    stage,
+)
     casa_parameters =
         stage.name == "prespin" ? prespin_parameters :
         joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4_exud0.csv")
@@ -76,7 +82,7 @@ function static_inputs(source_root, selected_root, prespin_parameters, stage)
             "phenology.txt",
         ),
         HARNESS.workflow_input(
-            joinpath(FIXTURE_ROOT, "soil_selected_cells.csv"),
+            joinpath(fixture_root, "soil_selected_cells.csv"),
             "soil.csv",
         ),
         HARNESS.workflow_input(mimics_parameters, "mimics_parameters.csv"),
@@ -116,15 +122,15 @@ function forcing_inputs(forcing_root, stage)
     ]
 end
 
-function prepare_inputs(source_root, selected_root)
+function prepare_inputs(source_root, selected_root; fixture_root = FIXTURE_ROOT)
     mkpath(selected_root)
     SELECTED.write_fortran_grid(
-        joinpath(FIXTURE_ROOT, "grid_selected_cells.csv"),
+        joinpath(fixture_root, "grid_selected_cells.csv"),
         joinpath(selected_root, "grid_packed.csv"),
     )
     forcing_root = joinpath(selected_root, "forcing")
     mkpath(forcing_root)
-    source_forcing = joinpath(FIXTURE_ROOT, "forcing_1901_2014.nc")
+    source_forcing = joinpath(fixture_root, "forcing_1901_2014.nc")
     for year in YEARS
         destination = joinpath(forcing_root, "met_$(year)_$(year).nc")
         isfile(destination) || SELECTED.write_fortran_meteorology(
@@ -141,13 +147,16 @@ function write_workflow(
     reference_template,
     run_root;
     prepare = true,
+    fixture_root = FIXTURE_ROOT,
+    points = POINTS,
 )
     configuration = joinpath(run_root, "configuration")
     controls = joinpath(configuration, "controls")
     selected_root = joinpath(run_root, "selected_inputs")
     mkpath(controls)
     forcing_root =
-        prepare ? prepare_inputs(source_root, selected_root) :
+        prepare ?
+        prepare_inputs(source_root, selected_root; fixture_root) :
         joinpath(selected_root, "forcing")
     if prepare
         mimics_parameters = joinpath(
@@ -171,7 +180,7 @@ function write_workflow(
     for stage in STAGE_SPECS
         control = HARNESS.write_smoke_control(
             controls;
-            points = POINTS,
+            points,
             daily_output = stage.daily,
             soil_model = 2,
             loops = stage.loops,
@@ -192,6 +201,7 @@ function write_workflow(
             static_inputs(
                 source_root,
                 selected_root,
+                fixture_root,
                 prespin_parameters,
                 stage,
             ),
@@ -229,17 +239,25 @@ function run_fortran(executable, workflow_path, run_root)
     return HARNESS.run_stage_workflow(executable, workflow_path, run_root)
 end
 
-function run_julia(source_root, reference_template, run_root, output_root)
+function run_julia(
+    source_root,
+    reference_template,
+    run_root,
+    output_root;
+    fixture_root = FIXTURE_ROOT,
+    points = POINTS,
+)
     selected_root = joinpath(run_root, "selected_inputs")
     return NATIVE.run_gridded_case(
         source_root,
         joinpath(selected_root, "forcing"),
         run_root,
         output_root;
-        expected_points = POINTS,
+        expected_points = points,
         grid_path = joinpath(selected_root, "grid_packed.csv"),
-        soil_path = joinpath(FIXTURE_ROOT, "soil_selected_cells.csv"),
-        archive_grid_path = joinpath(FIXTURE_ROOT, "grid_selected_cells.csv"),
+        soil_path = joinpath(fixture_root, "soil_selected_cells.csv"),
+        archive_grid_path =
+            joinpath(fixture_root, "grid_selected_cells.csv"),
         prespin_parameters_path = joinpath(
             reference_template,
             "candidates",
