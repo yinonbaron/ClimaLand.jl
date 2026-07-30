@@ -294,6 +294,30 @@ function gridded_cn_initial_state(model, grid, parameter_path)
     return NamedTuple{components}(values)
 end
 
+function use_initial_plant_stoichiometry!(
+    model,
+    grid,
+    parameters,
+    initial_state,
+)
+    field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
+    values = vec(parent(field))
+    fixed = copy(values)
+    leaf_nitrogen = vec(parent(initial_state.casa_plant.n_leaf))
+    for (index, point) in enumerate(grid)
+        parameter = parameters[point.pft]
+        parameter.inactive && continue
+        values[index] = parameter.initial_leaf_phosphorus / leaf_nitrogen[index]
+    end
+    return fixed
+end
+
+function restore_plant_stoichiometry!(model, fixed)
+    field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
+    vec(parent(field)) .= fixed
+    return nothing
+end
+
 struct PackedForcing{P, B, F}
     gpp::Matrix{Float64}
     air_temperature::Matrix{Float64}
@@ -1235,7 +1259,34 @@ function run_selected_case(
         ) : nothing
     update! =
         SelectedForcingUpdater(setup.forcing, stoichiometry, model_for_stage)
-    after_step! = SelectedAfterStep(budget, configuration, stoichiometry)
+    selected_after_step =
+        SelectedAfterStep(budget, configuration, stoichiometry)
+    fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
+    function prepare_selected_stage!(stage, initial_state, model)
+        prepare_stage!(update!, stage, initial_state, model)
+        configuration == :carbon_nitrogen || return nothing
+        parameters =
+            stage.name == :prespin ?
+            setup.prespin.parameters : setup.normal.parameters
+        fixed_plant_stoichiometry[stage.name] =
+            use_initial_plant_stoichiometry!(
+                model,
+                setup.grid,
+                parameters,
+                initial_state,
+            )
+        return nothing
+    end
+    function after_step!(stage, step, Y, p, time)
+        selected_after_step(stage, step, Y, p, time)
+        if configuration == :carbon_nitrogen && step == 1
+            restore_plant_stoichiometry!(
+                model_for_stage(stage),
+                fixed_plant_stoichiometry[stage.name],
+            )
+        end
+        return nothing
+    end
     function carbon_budget(stage, result, _, _, initial_state, model)
         name = stage.name
         final_state = native_casa().state_as_initial_state(result.state, model)
@@ -1323,8 +1374,7 @@ function run_selected_case(
         nitrogen_budget = configuration == :carbon_nitrogen ? nitrogen_budget :
                           nothing,
         workflow_budget,
-        prepare_stage! = (stage, initial_state, model) ->
-            prepare_stage!(update!, stage, initial_state, model),
+        prepare_stage! = prepare_selected_stage!,
         restore_passive! = configuration == :carbon_nitrogen ?
                            restore_passive_carbon_nitrogen! :
                            native_casa().restore_passive_carbon!,

@@ -258,6 +258,33 @@ end
     @test values(setup.initial_state.casa_soil.n_mineral)[2:end] == ones(10)
 end
 
+@testset "selected-cell CASA-CN preserves the legacy first-step P:N" begin
+    workflow = TestbedSelectedCASAWorkflow
+    setup = workflow.load_setup(:carbon_nitrogen)
+    model = setup.prespin.model
+    field = model.casa_plant.parameters.leaf_phosphorus_to_nitrogen
+    configured = copy(vec(parent(field)))
+
+    fixed = workflow.use_initial_plant_stoichiometry!(
+        model,
+        setup.grid,
+        setup.prespin.parameters,
+        setup.initial_state,
+    )
+
+    initial_nitrogen = vec(parent(setup.initial_state.casa_plant.n_leaf))
+    for (index, point) in enumerate(setup.grid)
+        parameter = setup.prespin.parameters[point.pft]
+        parameter.inactive && continue
+        @test vec(parent(field))[index] ==
+              parameter.initial_leaf_phosphorus / initial_nitrogen[index]
+    end
+    @test fixed == configured
+
+    workflow.restore_plant_stoichiometry!(model, fixed)
+    @test vec(parent(field)) == configured
+end
+
 @testset "selected-cell CASA-C setup" begin
     collection = TestbedReferenceCellComparisons.ordinary_cell_collection()
     setup = TestbedSelectedCASAWorkflow.load_setup(:carbon_only; collection)
