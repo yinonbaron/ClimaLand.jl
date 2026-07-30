@@ -353,6 +353,47 @@ end
     )
     @test Set(getindex.(budget, "units")) == Set(("kg C", "kg N"))
 
+    absolute_records = [
+        (
+            "zero_centered_conservation_residual",
+            historical["budget"]["historical_residual_kg_c"],
+        ),
+        (
+            "zero_centered_conservation_residual",
+            historical["budget"]["historical_residual_kg_n"],
+        ),
+        (
+            "nonnegative_guard_residual",
+            historical["annual"]["annual_total"][
+                "diagnostic.mimics_overflow_r"
+            ],
+        ),
+        (
+            "nonnegative_guard_residual",
+            historical["annual"]["annual_total"][
+                "diagnostic.mimics_overflow_k"
+            ],
+        ),
+        (
+            "nonnegative_guard_residual",
+            historical["daily"]["diagnostic.mimics_overflow_r"],
+        ),
+        (
+            "nonnegative_guard_residual",
+            historical["daily"]["diagnostic.mimics_overflow_k"],
+        ),
+    ]
+    for (semantics, record) in absolute_records
+        policy = record["derived_policy"]
+        @test record["comparison_semantics"] == semantics
+        @test policy["raw_rtol"] == 0.0
+        @test policy["rtol"] == 0.0
+        @test policy["atol"] ==
+              MIMICSCNCalibration.SAFETY_FACTOR * policy["raw_atol"] +
+              policy["float_padding"]
+        @test policy["validation_failed_pairs"] == 0
+    end
+
     for (document, generator, calibration) in (
         (
             boundary,
