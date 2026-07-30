@@ -209,6 +209,83 @@ end
     ) == [2.0, 4.0]
 end
 
+@testset "MIMICS-C audited 80-cell calibration is immutable" begin
+    calibration_path = joinpath(
+        @__DIR__,
+        "validation",
+        "mimics_c_historical_calibration.toml",
+    )
+    calibration_text = read(calibration_path, String)
+    calibration = TOML.parse(calibration_text)
+    @test calibration["model"] == "MIMICS-C"
+    @test calibration["scope"] == "representative"
+    @test calibration["cell_count"] == 80
+    @test calibration["eligible_cell_count"] == 80
+    @test calibration["cell_ids"] == calibration["eligible_cell_ids"]
+    @test isempty(calibration["reviewed_exclusion"])
+    @test !occursin("/Users/", calibration_text)
+    @test !occursin("/private/tmp", calibration_text)
+    @test !occursin("absolute_floor", calibration_text)
+
+    provenance = calibration["source_provenance"]
+    @test provenance["scope_manifest"]["sha256"] ==
+          HistoricalCalibration.sha256sum(
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml"),
+    )
+    @test provenance["fresh_fortran_oracle"]["sha256"] ==
+          "7ad1ace39dc01b0449d0b44e5c2d64f51d323d0bf2ac28b9ed69bbcc5a296fe0"
+    MIMICSCCalibration.validate_method(calibration)
+    MIMICSCCalibration.validate_provenance(
+        calibration,
+        (
+            "generator",
+            "calibration",
+            "scope_manifest",
+            "current_julia_output",
+            "current_julia_report",
+            "fresh_fortran_oracle",
+        ),
+        "generate_mimics_c_historical_calibration.jl",
+    )
+
+    policy_count = 0
+    for (reducer, variables) in calibration["annual"]
+        for (name, record) in variables
+            MIMICSCCalibration.validate_record(
+                record,
+                "annual.$reducer.$name",
+                80 * 114,
+                ("cell_id", "year", "latitude", "longitude"),
+            )
+            policy_count += 1
+        end
+    end
+    for (name, record) in calibration["daily"]
+        MIMICSCCalibration.validate_record(
+            record,
+            "daily.$name",
+            80 * 84,
+            (
+                "cell_id",
+                "year",
+                "day_of_year",
+                "sample_day",
+                "latitude",
+                "longitude",
+            ),
+        )
+        policy_count += 1
+    end
+    MIMICSCCalibration.validate_record(
+        calibration["budget"],
+        "budget.historical_residual_kg_c",
+        80,
+        ("cell_id", "latitude", "longitude"),
+    )
+    policy_count += 1
+    @test policy_count == 46
+end
+
 @testset "MIMICS-C consumes only fitted calibration policies" begin
     cells = (
         (; cell_id = 11, pft = 1, latitude = -10.0, longitude = 20.0),
