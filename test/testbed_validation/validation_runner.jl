@@ -5,6 +5,7 @@ import SHA
 import TOML
 
 include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
+include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
 
 # ============================================================================
 # Command-line interface
@@ -32,8 +33,51 @@ const CASA_C_BOUNDARY_VARIABLES = Set((
     "casa_soil.c_soil_slow",
     "casa_soil.c_soil_passive",
 ),)
+const CASA_CN_BOUNDARY_VARIABLES = union(
+    CASA_C_BOUNDARY_VARIABLES,
+    Set((
+        "casa_plant.n_leaf",
+        "casa_plant.n_wood",
+        "casa_plant.n_fine_root",
+        "casa_soil.n_litter_metabolic",
+        "casa_soil.n_litter_structural",
+        "casa_soil.n_litter_cwd",
+        "casa_soil.n_soil_microbial",
+        "casa_soil.n_soil_slow",
+        "casa_soil.n_soil_passive",
+        "casa_soil.n_mineral",
+    )),
+)
+const CASA_CN_ANNUAL_MEAN_VARIABLES =
+    setdiff(CASA_CN_BOUNDARY_VARIABLES, Set(("casa_plant.c_labile",)))
+const CASA_CN_ANNUAL_TOTAL_VARIABLES = Set((
+    "diagnostic.cgpp",
+    "diagnostic.cnpp",
+    "diagnostic.cresp",
+    "diagnostic.c_litter_metabolic_input",
+    "diagnostic.c_litter_structural_input",
+    "diagnostic.c_passive_input",
+    "diagnostic.n_deposition",
+    "diagnostic.n_fixation",
+    "diagnostic.n_plant_uptake",
+    "diagnostic.n_leaching",
+    "diagnostic.n_gaseous_loss",
+    "diagnostic.n_litter_mineralization",
+    "diagnostic.n_soil_mineralization",
+    "diagnostic.n_soil_immobilization",
+    "diagnostic.n_net_mineralization",
+    "diagnostic.n_litter_metabolic_input",
+))
+const CASA_CN_DAILY_VARIABLES = union(
+    CASA_CN_BOUNDARY_VARIABLES,
+    CASA_CN_ANNUAL_TOTAL_VARIABLES,
+    Set(("diagnostic.n_litter_structural_input",)),
+)
 const REPORT_FILENAME = "validation_report.toml"
-const REFERENCE_OVERRIDE = "CLIMALAND_VALIDATION_CASA_C_REFERENCE"
+const REFERENCE_OVERRIDE = Dict(
+    "CASA-C" => "CLIMALAND_VALIDATION_CASA_C_REFERENCE",
+    "CASA-CN" => "CLIMALAND_VALIDATION_CASA_CN_REFERENCE",
+)
 const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
@@ -147,9 +191,10 @@ end
 # Validation Report
 # ============================================================================
 
-sha256sum(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256sum(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function parse_toml(path, description)
     isfile(path) || throw(RunnerError("$description is missing at $path"))
@@ -269,7 +314,7 @@ function load_scope_manifests(scope)
     )
     representative_ids = manifests["representative"].cell_ids
     all(id -> id in representative_ids, smoke_ids) &&
-    smoke_ids != representative_ids || throw(
+        smoke_ids != representative_ids || throw(
         RunnerError(
             "Nested Validation Scopes require Smoke to be a strict subset of Representative",
         ),
@@ -277,7 +322,7 @@ function load_scope_manifests(scope)
     return manifests[scope]
 end
 
-function comparison_policy()
+function comparison_policy(model_name = "CASA-C")
     path = DEFAULT_COMPARISON_POLICY
     policy = parse_toml(path, "Comparison Policy")
     get(policy, "schema_version", nothing) == 2 || throw(
@@ -285,27 +330,29 @@ function comparison_policy()
     )
     acceptance = get(policy, "acceptance", Dict{String, Any}())
     get(acceptance, "eligible_nonfinite", nothing) == "fail" &&
-    get(acceptance, "eligibility_gaps", nothing) ==
-    "reviewed_scope_manifest_only" || throw(
+        get(acceptance, "eligibility_gaps", nothing) ==
+        "reviewed_scope_manifest_only" || throw(
         RunnerError(
             "Comparison Policy at $path has incompatible acceptance rules",
         ),
     )
-    model = get(get(policy, "model", Dict{String, Any}()), "CASA-C", nothing)
-    isnothing(model) &&
-        throw(RunnerError("Comparison Policy at $path has no CASA-C policy"))
+    model = get(get(policy, "model", Dict{String, Any}()), model_name, nothing)
+    isnothing(model) && throw(
+        RunnerError("Comparison Policy at $path has no $model_name policy"),
+    )
     required_rules = (
         "native_julia_initialization",
         "native_julia_boundary",
         "native_julia_historical",
         "fresh_fortran_boundary",
     )
-    all(rule -> haskey(model, rule), required_rules) ||
-        throw(RunnerError("Comparison Policy at $path is missing CASA-C rules"))
+    all(rule -> haskey(model, rule), required_rules) || throw(
+        RunnerError("Comparison Policy at $path is missing $model_name rules"),
+    )
     budget_rtol = get(model, "budget_rtol", nothing)
     budget_rtol isa Real && isfinite(budget_rtol) && budget_rtol >= 0 || throw(
         RunnerError(
-            "Comparison Policy at $path has invalid CASA-C budget rtol",
+            "Comparison Policy at $path has invalid $model_name budget rtol",
         ),
     )
     tolerance = Dict{String, Any}(
@@ -317,58 +364,63 @@ function comparison_policy()
     fresh = model["fresh_fortran_boundary"]
     calibration_name = get(fresh, "calibration_manifest", nothing)
     calibration_name isa String &&
-    basename(calibration_name) == calibration_name || throw(
+        basename(calibration_name) == calibration_name || throw(
         RunnerError(
             "Comparison Policy at $path has an invalid calibration manifest",
         ),
     )
     calibration_path = joinpath(dirname(path), calibration_name)
-    calibration = parse_toml(calibration_path, "CASA-C Calibration")
+    calibration = parse_toml(calibration_path, "$model_name Calibration")
     get(calibration, "schema_version", nothing) == 1 &&
-    get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
-    get(calibration, "cell_count", nothing) == 4263 || throw(
-        RunnerError("CASA-C Calibration at $calibration_path is incompatible"),
+        get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
+        get(calibration, "cell_count", nothing) == 4263 || throw(
+        RunnerError(
+            "$model_name Calibration at $calibration_path is incompatible",
+        ),
     )
     calibrated_variables = get(calibration, "variable", Dict{String, Any}())
+    boundary_variables =
+        model_name == "CASA-C" ? CASA_C_BOUNDARY_VARIABLES :
+        CASA_CN_BOUNDARY_VARIABLES
     stages = ("prespin", "accelerated_spin", "normal_spin", "historical")
     tolerance["fresh_fortran_boundary"] = Dict(
         stage => begin
             values = get(calibrated_variables, stage, nothing)
             values isa AbstractDict && !isempty(values) || throw(
                 RunnerError(
-                    "CASA-C Calibration at $calibration_path is missing $stage rules",
+                    "$model_name Calibration at $calibration_path is missing $stage rules",
                 ),
             )
             names = Set(String.(keys(values)))
-            names == CASA_C_BOUNDARY_VARIABLES || throw(
+            names == boundary_variables || throw(
                 RunnerError(
-                    "CASA-C Calibration at $calibration_path has incompatible boundary variables",
+                    "$model_name Calibration at $calibration_path has incompatible boundary variables",
                 ),
             )
             Dict(
                 String(name) => begin
                     get(values[name], "finite_pair_count", nothing) == 4263 || throw(
                         RunnerError(
-                            "CASA-C Calibration at $calibration_path is not full-grid",
+                            "$model_name Calibration at $calibration_path is not full-grid",
                         ),
                     )
                     derived = get(values[name], "derived_policy", nothing)
                     derived isa AbstractDict || throw(
                         RunnerError(
-                            "CASA-C Calibration at $calibration_path has no derived policy",
+                            "$model_name Calibration at $calibration_path has no derived policy",
                         ),
                     )
                     atol = get(derived, "atol", nothing)
                     rtol = get(derived, "rtol", nothing)
                     atol isa Real &&
-                    isfinite(atol) &&
-                    atol >= 0 &&
-                    rtol isa Real &&
-                    isfinite(rtol) &&
-                    rtol >= 0 &&
-                    get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                        isfinite(atol) &&
+                        atol >= 0 &&
+                        rtol isa Real &&
+                        isfinite(rtol) &&
+                        rtol >= 0 &&
+                        get(derived, "validation_failed_pairs", nothing) == 0 || throw(
                         RunnerError(
-                            "CASA-C Calibration at $calibration_path has an invalid tolerance",
+                            "$model_name Calibration at $calibration_path has an invalid tolerance",
                         ),
                     )
                     Dict("atol" => Float64(atol), "rtol" => Float64(rtol))
@@ -376,6 +428,112 @@ function comparison_policy()
             )
         end for stage in stages
     )
+    if model_name == "CASA-CN"
+        for rule in (
+            "native_julia_annual",
+            "fresh_fortran_annual",
+            "annual_reducers",
+            "fixed_daily_samples",
+            "invalid_oracle_variables",
+        )
+            haskey(model, rule) || throw(
+                RunnerError(
+                    "Comparison Policy at $path is missing $model_name $rule",
+                ),
+            )
+        end
+        get(model["fresh_fortran_annual"], "calibration_manifest", nothing) ==
+        calibration_name || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name annual calibration",
+            ),
+        )
+        tolerance["native_julia_annual"] = Dict(
+            "atol" => Float64(model["native_julia_annual"]["atol"]),
+            "rtol" => Float64(model["native_julia_annual"]["rtol"]),
+        )
+        annual_variables =
+            get(calibration, "annual_variable", Dict{String, Any}())
+        isempty(annual_variables) && throw(
+            RunnerError(
+                "$model_name Calibration at $calibration_path has no annual rules",
+            ),
+        )
+        annual_tolerance = Dict(
+            "annual_mean" => Dict{String, Any}(),
+            "annual_total" => Dict{String, Any}(),
+        )
+        for (key, values) in annual_variables
+            reducer, name = split(key, '.'; limit = 2)
+            reducer in keys(annual_tolerance) || throw(
+                RunnerError(
+                    "$model_name Calibration at $calibration_path has an invalid annual reducer",
+                ),
+            )
+            get(values, "finite_pair_count", nothing) == 4263 * 114 || throw(
+                RunnerError(
+                    "$model_name Calibration at $calibration_path is not full-grid annual",
+                ),
+            )
+            derived = get(values, "derived_policy", Dict{String, Any}())
+            atol = get(derived, "atol", nothing)
+            rtol = get(derived, "rtol", nothing)
+            atol isa Real &&
+                rtol isa Real &&
+                isfinite(atol) &&
+                isfinite(rtol) &&
+                atol >= 0 &&
+                rtol >= 0 &&
+                get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                RunnerError(
+                    "$model_name Calibration at $calibration_path has an invalid annual tolerance",
+                ),
+            )
+            annual_tolerance[reducer][name] =
+                Dict("atol" => Float64(atol), "rtol" => Float64(rtol))
+        end
+        Set(keys(annual_tolerance["annual_mean"])) ==
+        CASA_CN_ANNUAL_MEAN_VARIABLES &&
+            Set(keys(annual_tolerance["annual_total"])) ==
+            CASA_CN_ANNUAL_TOTAL_VARIABLES || throw(
+            RunnerError(
+                "$model_name Calibration at $calibration_path has incompatible annual variables",
+            ),
+        )
+        reducers = model["annual_reducers"]
+        get(get(reducers, "state_pool", Dict{String, Any}()), "reducers", []) ==
+        ["annual_mean", "end_of_year"] &&
+            get(get(reducers, "flux", Dict{String, Any}()), "reducers", []) ==
+            ["annual_total"] &&
+            get(get(reducers, "budget", Dict{String, Any}()), "reducers", []) ==
+            ["maximum_absolute_residual"] || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name annual reducers",
+            ),
+        )
+        samples = model["fixed_daily_samples"]
+        get(samples, "years", []) == [1901, 1957, 2014] &&
+            get(samples, "months", []) == [1, 4, 7, 10] &&
+            get(samples, "days_per_window", nothing) == 7 &&
+            get(samples, "sample_count_per_variable_cell", nothing) == 84 ||
+            throw(
+                RunnerError(
+                    "Comparison Policy at $path has incompatible $model_name fixed daily samples",
+                ),
+            )
+        invalid = model["invalid_oracle_variables"]
+        Set(keys(invalid)) == Set(("nLitInptStruc",)) &&
+            get(invalid["nLitInptStruc"], "scope", nothing) ==
+            "fresh_fortran" &&
+            get(invalid["nLitInptStruc"], "kind", nothing) ==
+            "variable_level" &&
+            get(invalid["nLitInptStruc"], "reviewed", false) === true || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name invalid-oracle variables",
+            ),
+        )
+        tolerance["fresh_fortran_annual"] = annual_tolerance
+    end
     for rule in required_rules[1:3]
         rule_values = tolerance[rule]
         all(value -> isfinite(value) && value >= 0, values(rule_values)) ||
@@ -406,9 +564,12 @@ function eligible_cell_ids(scope, model)
 end
 
 function initial_report(configuration, output_root, scope, policy)
+    model_name =
+        hasproperty(configuration, :models) ? only(configuration.models) :
+        "CASA-C"
     cell_ids = scope.cell_ids
-    eligibility_gaps = model_eligibility_gaps(scope, "CASA-C")
-    eligible_ids = eligible_cell_ids(scope, "CASA-C")
+    eligibility_gaps = model_eligibility_gaps(scope, model_name)
+    eligible_ids = eligible_cell_ids(scope, model_name)
     return Dict(
         "schema_version" => 1,
         "scope" => Dict(
@@ -420,7 +581,7 @@ function initial_report(configuration, output_root, scope, policy)
         ),
         "comparison_policy" => Dict(
             "id" => String(policy.document["policy_id"]),
-            "model" => "CASA-C",
+            "model" => model_name,
             "path" => policy.path,
             "sha256" => sha256sum(policy.path),
             "acceptance" => policy.document["acceptance"],
@@ -428,6 +589,11 @@ function initial_report(configuration, output_root, scope, policy)
             "applied_rules" => sort!(collect(String.(keys(policy.model)))),
             "fresh_fortran_boundary" =>
                 policy.tolerance["fresh_fortran_boundary"],
+            "fresh_fortran_annual" => get(
+                policy.tolerance,
+                "fresh_fortran_annual",
+                Dict{String, Any}(),
+            ),
             "calibration" => Dict(
                 "id" => String(policy.calibration["calibration_id"]),
                 "source" => String(policy.calibration["source"]),
@@ -437,6 +603,18 @@ function initial_report(configuration, output_root, scope, policy)
                 "path" => policy.calibration_path,
                 "sha256" => sha256sum(policy.calibration_path),
             ),
+            "annual_reducers" =>
+                get(policy.model, "annual_reducers", Dict{String, Any}()),
+            "fixed_daily_samples" => get(
+                policy.model,
+                "fixed_daily_samples",
+                Dict{String, Any}(),
+            ),
+            "invalid_oracle_variables" => get(
+                policy.model,
+                "invalid_oracle_variables",
+                Dict{String, Any}(),
+            ),
         ),
         "reference_mode" => configuration.reference_mode,
         "workers" => configuration.workers,
@@ -445,7 +623,7 @@ function initial_report(configuration, output_root, scope, policy)
         "seconds" => 0.0,
         "model" => [
             Dict(
-                "name" => "CASA-C",
+                "name" => model_name,
                 "reference_mode" => configuration.reference_mode,
                 "coverage" => Dict(
                     "scope_cells" => length(cell_ids),
@@ -494,9 +672,10 @@ function validate_available(configuration)
             "$(titlecase(configuration.scope)) Scope is not available yet; use --scope core",
         ),
     )
-    configuration.models == ["CASA-C"] || throw(
+    length(configuration.models) == 1 &&
+        only(configuration.models) in ("CASA-C", "CASA-CN") || throw(
         RunnerError(
-            "only CASA-C is available in the first Validation Runner slice; use --models CASA-C",
+            "only one of CASA-C or CASA-CN is available in this Validation Runner slice; select one explicitly",
         ),
     )
     configuration.reference_mode == "pinned" || throw(
@@ -527,18 +706,24 @@ function artifact_directory(name, description)
     return Pkg.Artifacts.artifact_path(hash), string(hash)
 end
 
-function reference_path(scope)
-    haskey(ENV, REFERENCE_OVERRIDE) && return ENV[REFERENCE_OVERRIDE], nothing
-    scope != "representative" && return DEFAULT_REFERENCE, nothing
-    directory, hash = artifact_directory(
-        "representative_casa_c_reference",
-        "Representative CASA-C reference",
-    )
+function reference_path(scope, model = "CASA-C")
+    override = REFERENCE_OVERRIDE[model]
+    haskey(ENV, override) && return ENV[override], nothing
+    scope != "representative" &&
+        model == "CASA-C" &&
+        return DEFAULT_REFERENCE, nothing
+    artifact_name =
+        model == "CASA-C" ? "representative_casa_c_reference" :
+        "representative_casa_cn_reference"
+    directory, hash =
+        artifact_directory(artifact_name, "Representative $model reference")
     return joinpath(directory, "complete_casa_workflow.toml"), hash
 end
 
-function fixture_manifest_path(scope)
-    scope != "representative" && return SELECTED_CELL_MANIFEST, nothing
+function fixture_manifest_path(scope, model = "CASA-C")
+    scope != "representative" &&
+        model == "CASA-C" &&
+        return SELECTED_CELL_MANIFEST, nothing
     directory, hash =
         artifact_directory("representative_forcing", "Representative forcing")
     return joinpath(directory, "fixture.toml"), hash
@@ -557,10 +742,10 @@ function validate_fixture_scope_provenance(path, scope)
     return nothing
 end
 
-function validate_reference_file(path)
+function validate_reference_file(path, model = "CASA-C")
     isfile(path) || throw(
         RunnerError(
-            "Pinned CASA-C reference is missing at $path. Restore the pinned reference; pinned mode never falls back to fresh Fortran.",
+            "Pinned $model reference is missing at $path. Restore the pinned reference; pinned mode never falls back to fresh Fortran.",
         ),
     )
     reference = try
@@ -568,13 +753,13 @@ function validate_reference_file(path)
     catch error
         throw(
             RunnerError(
-                "Pinned CASA-C reference is unreadable at $path: $(sprint(showerror, error))",
+                "Pinned $model reference is unreadable at $path: $(sprint(showerror, error))",
             ),
         )
     end
     get(reference, "schema_version", nothing) == 1 || throw(
         RunnerError(
-            "Pinned CASA-C reference at $path has an incompatible schema",
+            "Pinned $model reference at $path has an incompatible schema",
         ),
     )
     return reference
@@ -585,6 +770,7 @@ function validate_finite_reference_values(
     location,
     reference_cell_ids,
     eligible_positions,
+    model = "CASA-C",
 )
     if value isa AbstractDict
         for name in sort!(collect(String.(keys(value))))
@@ -594,6 +780,7 @@ function validate_finite_reference_values(
                 "$location.$name",
                 reference_cell_ids,
                 eligible_positions,
+                model,
             )
         end
     elseif value isa AbstractVector &&
@@ -605,7 +792,7 @@ function validate_finite_reference_values(
                 cell_id = reference_cell_ids[position]
                 throw(
                     RunnerError(
-                        "Pinned CASA-C reference has an eligible nonfinite reference value for CASA-C cell $cell_id at $location",
+                        "Pinned $model reference has an eligible nonfinite reference value for $model cell $cell_id at $location",
                     ),
                 )
             end
@@ -614,46 +801,58 @@ function validate_finite_reference_values(
     return nothing
 end
 
-function validate_eligible_reference_values(reference, scope)
+function validate_eligible_reference_values(reference, scope, model = "CASA-C")
     reference_cell_ids = try
         Int.(reference["cell_ids"])
     catch
-        throw(RunnerError("Pinned CASA-C reference has invalid cell IDs"))
+        throw(RunnerError("Pinned $model reference has invalid cell IDs"))
     end
     !isempty(reference_cell_ids) &&
-    length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
-        throw(RunnerError("Pinned CASA-C reference has invalid cell IDs"))
-    eligible_ids = eligible_cell_ids(scope, "CASA-C")
+        length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
+        throw(RunnerError("Pinned $model reference has invalid cell IDs"))
+    eligible_ids = eligible_cell_ids(scope, model)
     positions = Int[]
     for cell_id in eligible_ids
         position = findfirst(==(cell_id), reference_cell_ids)
         isnothing(position) &&
-            throw(RunnerError("Pinned CASA-C reference has no cell $cell_id"))
+            throw(RunnerError("Pinned $model reference has no cell $cell_id"))
         push!(positions, position)
     end
+    configuration_key = model == "CASA-C" ? "carbon_only" : "carbon_nitrogen"
     configuration = get(
         get(reference, "configuration", Dict{String, Any}()),
-        "carbon_only",
+        configuration_key,
         Dict{String, Any}(),
     )
     native = get(configuration, "native_julia", Dict{String, Any}())
     fresh = get(configuration, "fresh_fortran", Dict{String, Any}())
+    if model == "CASA-CN"
+        historical = get(native, "historical", Dict{String, Any}())
+        Set(keys(historical)) ==
+        union(CASA_CN_DAILY_VARIABLES, Set(("sample_days",))) || throw(
+            RunnerError(
+                "Pinned $model reference has incompatible fixed daily variables",
+            ),
+        )
+    end
     validate_finite_reference_values(
         native,
-        "carbon_only.native_julia",
+        "$configuration_key.native_julia",
         reference_cell_ids,
         positions,
+        model,
     )
     validate_finite_reference_values(
         fresh,
-        "carbon_only.fresh_fortran",
+        "$configuration_key.fresh_fortran",
         reference_cell_ids,
         positions,
+        model,
     )
     return nothing
 end
 
-function scientific_outcome(report, result)
+function scientific_outcome(report, result, model = "CASA-C")
     initialization =
         get(report, "initialization_comparison", Dict{String, Any}())
     boundaries = get(report, "boundary_comparison", Dict{String, Any}())
@@ -682,22 +881,46 @@ function scientific_outcome(report, result)
             getproperty.(result.stages, :checkpoint_roundtrip_verified),
         ),
     )
+    if model == "CASA-CN"
+        nitrogen_budget = get(report, "nitrogen_budget", Dict{String, Any}())
+        historical = get(report, "historical_comparison", Dict{String, Any}())
+        checks["nitrogen_budget"] = get(nitrogen_budget, "all_close", false)
+        checks["annual_reducers_and_daily_samples"] =
+            get(historical, "all_match", false)
+    end
     return (; passed = all(values(checks)), checks)
 end
 
-function stage_casa(scope, pinned_reference, policy, fixture_manifest)
+function stage_casa(
+    scope,
+    pinned_reference,
+    policy,
+    fixture_manifest,
+    model = "CASA-C",
+)
     collection = TestbedReferenceCellComparisons.selected_cell_collection(
         scope.name,
-        eligible_cell_ids(scope, "CASA-C");
+        eligible_cell_ids(scope, model);
         manifest_path = fixture_manifest,
     )
     TestbedSelectedCASAWorkflow.workflow_reference(
-        :carbon_only,
+        model == "CASA-C" ? :carbon_only : :carbon_nitrogen,
         collection;
         path = pinned_reference,
         comparison_policy = policy.tolerance,
     )
     return collection
+end
+
+function summarize_budget(budget, units)
+    summary = Dict{String, Any}(budget)
+    reports = collect(values(get(budget, "stage", Dict{String, Any}())))
+    haskey(budget, "workflow") && push!(reports, budget["workflow"])
+    residual = "residual_$units"
+    summary["maximum_absolute_residual_$units"] =
+        maximum(abs(get(report, residual, Inf)) for report in reports)
+    summary["reducer"] = "maximum_absolute_residual"
+    return summary
 end
 
 function run_casa!(
@@ -707,11 +930,12 @@ function run_casa!(
     pinned_reference,
     collection,
     policy,
+    model = "CASA-C",
 )
     started = time_ns()
     result = TestbedSelectedCASAWorkflow.run_selected_case(
-        joinpath(output_root, "CASA-C");
-        configuration = :carbon_only,
+        joinpath(output_root, model);
+        configuration = model == "CASA-C" ? :carbon_only : :carbon_nitrogen,
         collection,
         concurrency_budget = TestbedReferenceCellComparisons.ConcurrencyBudget(
             configuration.workers,
@@ -719,10 +943,15 @@ function run_casa!(
         reference_path = pinned_reference,
         comparison_policy = policy.tolerance,
         budget_rtol = policy.budget_rtol,
+        diagnostics = model == "CASA-CN" ?
+                      setup ->
+            TestbedNativeCASACNReconstruction.casa_cn_diagnostics(
+                setup.normal.model.casa_soil.parameters,
+            ) : nothing,
     )
     seconds = (time_ns() - started) / 1e9
     scientific_report = TOML.parsefile(result.report)
-    outcome = scientific_outcome(scientific_report, result)
+    outcome = scientific_outcome(scientific_report, result, model)
     model_report = only(report["model"])
     model_report["coverage"]["compared_cells"] =
         model_report["coverage"]["eligible_cells"]
@@ -730,6 +959,25 @@ function run_casa!(
     model_report["seconds"] = seconds
     model_report["comparison_report"] = abspath(result.report)
     model_report["comparison"] = outcome.checks
+    model_report["budget"] = Dict(
+        "carbon" => summarize_budget(
+            get(scientific_report, "carbon_budget", Dict{String, Any}()),
+            "kg_c",
+        ),
+    )
+    if model == "CASA-CN"
+        model_report["budget"]["nitrogen"] = summarize_budget(
+            get(scientific_report, "nitrogen_budget", Dict{String, Any}()),
+            "kg_n",
+        )
+        historical =
+            get(scientific_report, "historical_comparison", Dict{String, Any}())
+        model_report["historical"] = Dict(
+            "annual" => get(historical, "annual", Dict{String, Any}()),
+            "fixed_daily_samples" =>
+                get(historical, "selected_dates", Dict{String, Any}()),
+        )
+    end
     model_report["reference"] = Dict(
         "path" => abspath(pinned_reference),
         "sha256" => sha256sum(pinned_reference),
@@ -768,8 +1016,9 @@ function main(args = ARGS)
         println(stderr, "Validation Runner: ", error.message)
         return 2
     end
+    model = only(configuration.models)
     policy = try
-        comparison_policy()
+        comparison_policy(model)
     catch error
         error isa RunnerError || rethrow()
         println(stderr, "Validation Runner: ", error.message)
@@ -779,18 +1028,18 @@ function main(args = ARGS)
     started = time_ns()
     try
         pinned_reference, reference_artifact =
-            reference_path(configuration.scope)
-        reference = validate_reference_file(pinned_reference)
-        validate_eligible_reference_values(reference, scope)
+            reference_path(configuration.scope, model)
+        reference = validate_reference_file(pinned_reference, model)
+        validate_eligible_reference_values(reference, scope, model)
         fixture_manifest, forcing_artifact =
-            fixture_manifest_path(configuration.scope)
+            fixture_manifest_path(configuration.scope, model)
         validate_fixture_scope_provenance(fixture_manifest, scope)
         collection = try
-            stage_casa(scope, pinned_reference, policy, fixture_manifest)
+            stage_casa(scope, pinned_reference, policy, fixture_manifest, model)
         catch error
             throw(
                 RunnerError(
-                    "Pinned CASA-C inputs are incompatible: $(sprint(showerror, error))",
+                    "Pinned $model inputs are incompatible: $(sprint(showerror, error))",
                 ),
             )
         end
@@ -801,6 +1050,7 @@ function main(args = ARGS)
             pinned_reference,
             collection,
             policy,
+            model,
         )
         model_report = only(report["model"])
         model_report["forcing"] = Dict(
@@ -858,7 +1108,7 @@ end
 function write_timeout_report(args, output_root, limit_seconds)
     configuration = parse_args(args)
     scope = load_scope_manifests(configuration.scope)
-    policy = comparison_policy()
+    policy = comparison_policy(only(configuration.models))
     report = initial_report(configuration, output_root, scope, policy)
     message = "hard timeout after $(round(limit_seconds; digits = 3)) seconds"
     report["outcome"] = "timed_out"

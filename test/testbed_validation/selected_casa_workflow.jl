@@ -553,6 +553,51 @@ function workflow_reference(
     if !isnothing(comparison_policy)
         configuration_reference = copy(configuration_reference)
         configuration_reference["tolerance"] = comparison_policy
+        if haskey(comparison_policy, "fresh_fortran_annual")
+            for source in ("fresh_fortran", "native_julia")
+                annual = get(
+                    configuration_reference[source],
+                    "annual",
+                    Dict{String, Any}(),
+                )
+                isempty(annual) && error(
+                    "Pinned CASA-CN reference is missing $source annual reducers",
+                )
+                required =
+                    source == "fresh_fortran" ?
+                    Set(("years", "annual_mean", "annual_total")) :
+                    Set(("years", "annual_mean", "end_of_year", "annual_total"))
+                Set(keys(annual)) == required && all(
+                    !isempty(annual[reducer]) for
+                    reducer in setdiff(required, Set(("years",)))
+                ) || error(
+                    "Pinned CASA-CN reference has incomplete $source annual reducers",
+                )
+                fresh_rules = comparison_policy["fresh_fortran_annual"]
+                expected_names =
+                    source == "fresh_fortran" ?
+                    Dict(
+                        reducer => Set(keys(fresh_rules[reducer])) for
+                        reducer in ("annual_mean", "annual_total")
+                    ) :
+                    Dict(
+                        "annual_mean" => Set(keys(fresh_rules["annual_mean"])),
+                        "end_of_year" => Set(keys(fresh_rules["annual_mean"])),
+                        "annual_total" =>
+                            Set(keys(fresh_rules["annual_total"])),
+                    )
+                all(
+                    Set(keys(annual[reducer])) == names for
+                    (reducer, names) in expected_names
+                ) || error(
+                    "Pinned CASA-CN reference has incompatible $source annual variables",
+                )
+            end
+            samples = configuration_reference["native_julia"]["historical"]
+            length(get(samples, "sample_days", Int[])) == 84 || error(
+                "Pinned CASA-CN reference must retain 84 fixed daily samples",
+            )
+        end
     end
     reference_ids = Int.(reference["cell_ids"])
     by_id = Dict(id => index for (index, id) in enumerate(reference_ids))
@@ -566,6 +611,10 @@ function workflow_reference(
         String(provenance["native_julia_report_sha256"]),
         String.(values(provenance["fresh_fortran_boundary_sha256"]))...,
     ]
+    for name in
+        ("fresh_fortran_annual_sha256", "fresh_fortran_calibration_sha256")
+        haskey(provenance, name) && push!(hashes, String(provenance[name]))
+    end
     all(hash -> length(hash) == 64 && all(isxdigit, hash), hashes) ||
         error("Pinned CASA reference integrity hash is invalid")
     return (;
@@ -662,12 +711,101 @@ function compare_historical_reference(
     comparison["pfts"] = sort!(unique(getproperty.(collection.cells, :pft)))
     comparison["forcing_regimes"] =
         sort!(unique(vcat(getproperty.(collection.cells, :reasons)...)))
+    annual = compare_annual_reference(
+        reference,
+        path,
+        collection,
+        concurrency_budget,
+    )
     return Dict(
         "output" => Dict("records" => output_records(path)),
         "reference" => reference.path,
         "provenance" => reference.provenance,
         "selected_dates" => comparison,
-        "all_match" => comparison["all_match"],
+        "annual" => annual,
+        "all_match" => comparison["all_match"] && annual["all_match"],
+    )
+end
+
+function reduced_annual_values(output, expected)
+    values = Dict{String, Any}()
+    for reducer in ("annual_mean", "end_of_year", "annual_total")
+        variables = get(expected, reducer, Dict{String, Any}())
+        reduced = Dict{String, Any}()
+        for name in keys(variables)
+            native = output[replace(name, "." => "__")]
+            reduced[name] = if reducer == "annual_mean"
+                vec(
+                    hcat(
+                        [
+                            sum(
+                                native[:, ((year - 1) * 365 + 1):(year * 365)];
+                                dims = 2,
+                            ) ./ 365 for year in 1:114
+                        ]...,
+                    ),
+                )
+            elseif reducer == "end_of_year"
+                vec(Array(native[:, collect(365:365:(114 * 365))]))
+            else
+                vec(
+                    hcat(
+                        [
+                            sum(
+                                native[:, ((year - 1) * 365 + 1):(year * 365)];
+                                dims = 2,
+                            ) .* native_casa().DAY_SECONDS for year in 1:114
+                        ]...,
+                    ),
+                )
+            end
+        end
+        isempty(reduced) || (values[reducer] = reduced)
+    end
+    return values
+end
+
+function compare_annual_reference(
+    reference,
+    path,
+    collection,
+    concurrency_budget,
+)
+    reports = Dict{String, Any}()
+    NCDatasets.NCDataset(path) do output
+        for source in ("fresh_fortran", "native_julia")
+            expected = get(
+                reference.configuration[source],
+                "annual",
+                Dict{String, Any}(),
+            )
+            isempty(expected) && continue
+            actual = reduced_annual_values(output, expected)
+            reducer_reports = Dict{String, Any}()
+            tolerance = reference.configuration["tolerance"]["$(source)_annual"]
+            for reducer in keys(actual)
+                reducer_tolerance =
+                    haskey(tolerance, reducer) ? tolerance[reducer] : tolerance
+                reducer_reports[reducer] = compare_snapshot(
+                    actual[reducer],
+                    expected[reducer],
+                    reducer_tolerance,
+                    collection,
+                    reference.indices,
+                    concurrency_budget,
+                )
+            end
+            reports[source] = Dict(
+                "reducers" => reducer_reports,
+                "all_match" => all(
+                    report["all_match"] for report in values(reducer_reports)
+                ),
+            )
+        end
+    end
+    return Dict(
+        "source" => reports,
+        "all_match" => all(report["all_match"] for report in values(reports)),
     )
 end
 

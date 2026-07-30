@@ -1,4 +1,5 @@
 import ClimaLand
+import NCDatasets
 import SHA
 import Statistics
 import TOML
@@ -66,35 +67,55 @@ function fortran_values(path, reference_name)
     return [parse(Float64, row[index]) / 1000 for row in rows]
 end
 
-function right_derivative(r, errors, references, absolute_floor)
-    residuals = errors .- r .* references
-    maximum_residual = maximum(residuals)
-    maximum_value = max(absolute_floor, maximum_residual)
-    slopes = Float64[]
-    if absolute_floor == maximum_value
-        push!(slopes, Statistics.mean(references))
+function right_derivative(r, errors, references, absolute_floor, mean_reference)
+    maximum_value = absolute_floor
+    maximum_slope = mean_reference
+    for index in eachindex(errors, references)
+        residual = errors[index] - r * references[index]
+        if residual > maximum_value
+            maximum_value = residual
+            maximum_slope = mean_reference - references[index]
+        elseif residual == maximum_value
+            maximum_slope =
+                max(maximum_slope, mean_reference - references[index])
+        end
     end
-    for index in eachindex(residuals)
-        residuals[index] == maximum_value &&
-            push!(slopes, Statistics.mean(references) - references[index])
-    end
-    return maximum(slopes)
+    return maximum_slope
 end
 
 function calibrated_envelope(errors, references)
     absolute_floor = 5.0e-10 + 64eps(Float64)
+    mean_reference = Statistics.mean(references)
     relative = 0.0
-    if right_derivative(relative, errors, references, absolute_floor) < 0
+    if right_derivative(
+        relative,
+        errors,
+        references,
+        absolute_floor,
+        mean_reference,
+    ) < 0
         upper = eps(Float64)
-        while right_derivative(upper, errors, references, absolute_floor) < 0
+        while right_derivative(
+            upper,
+            errors,
+            references,
+            absolute_floor,
+            mean_reference,
+        ) < 0
             upper *= 2
             isfinite(upper) ||
                 error("unable to bracket calibrated relative tolerance")
         end
         lower = 0.0
-        for _ in 1:256
+        for _ in 1:80
             middle = (lower + upper) / 2
-            if right_derivative(middle, errors, references, absolute_floor) < 0
+            if right_derivative(
+                middle,
+                errors,
+                references,
+                absolute_floor,
+                mean_reference,
+            ) < 0
                 lower = middle
             else
                 upper = middle
@@ -129,9 +150,9 @@ function distribution(values)
     )
 end
 
-function calibration_record(actual, expected, grid)
-    length(actual) == length(expected) == length(grid) == 4263 ||
-        error("full-grid calibration requires exactly 4,263 aligned cells")
+function calibration_record(actual, expected, grid; quantity = "c")
+    length(actual) == length(expected) == length(grid) ||
+        error("full-grid calibration requires aligned cell pairs")
     all(isfinite, actual) ||
         error("eligible Julia full-grid boundary contains a nonfinite value")
     all(isfinite, expected) ||
@@ -169,9 +190,9 @@ function calibration_record(actual, expected, grid)
             "rank" => rank,
             "cell_id" => grid[index].cell_id,
             "pft" => grid[index].pft,
-            "julia_kg_c_m2" => actual[index],
-            "fortran_kg_c_m2" => expected[index],
-            "absolute_error_kg_c_m2" => errors[index],
+            "julia_kg_$(quantity)_m2" => actual[index],
+            "fortran_kg_$(quantity)_m2" => expected[index],
+            "absolute_error_kg_$(quantity)_m2" => errors[index],
             "relative_error" =>
                 iszero(references[index]) ? "undefined_zero_reference" :
                 errors[index] / references[index],
@@ -179,9 +200,9 @@ function calibration_record(actual, expected, grid)
     ]
     return Dict(
         "finite_pair_count" => length(errors),
-        "absolute_error_kg_c_m2" => distribution(errors),
+        "absolute_error_kg_$(quantity)_m2" => distribution(errors),
         "relative_error" => relative_distribution,
-        "absolute_reference_kg_c_m2" => distribution(references),
+        "absolute_reference_kg_$(quantity)_m2" => distribution(references),
         "active_constraint_cell_ids" =>
             [grid[index].cell_id for index in active],
         "active_constraint_objective_slopes" => [
@@ -220,6 +241,12 @@ function generate(
     fortran_root,
     output_path;
     execution_revision = "HEAD",
+    boundary_variables = BOUNDARY_VARIABLES,
+    calibration_id = "casa-c-fresh-fortran-full-grid-v1",
+    units = "kg C m^-2",
+    model_source = "native_casa_c_reconstruction.jl",
+    annual_variables = (),
+    additional_sources = (),
 )
     stage_root = joinpath(fortran_root, "stages")
     grid_path = joinpath(stage_root, "01-prespin", "grid.csv")
@@ -256,21 +283,76 @@ function generate(
             )
         )
         stage_records = Dict{String, Any}()
-        for (reference_name, (component, variable)) in BOUNDARY_VARIABLES
+        for (reference_name, specification) in boundary_variables
+            component, variable = specification[1:2]
+            quantity = length(specification) == 3 ? specification[3] : "c"
             actual = checkpoint_values(checkpoint, component, variable)
             expected = fortran_values(fortran_boundary, reference_name)
             stage_records["$component.$variable"] =
-                calibration_record(actual, expected, grid)
+                calibration_record(actual, expected, grid; quantity)
         end
         variables[stage] = stage_records
+    end
+    annual = Dict{String, Any}()
+    annual_sources = Dict{String, Any}()
+    if !isempty(annual_variables)
+        reduced_path = joinpath(output_root, "reduced_historical.nc")
+        fortran_path = joinpath(
+            fortran_root,
+            "fresh_reference",
+            "ann_casaclm_pool_flux_1901_2014.nc",
+        )
+        annual_sources = Dict(
+            "julia_reduced_historical" => source_file_record(
+                reduced_path,
+                "julia/reduced_historical.nc",
+            ),
+            "fresh_fortran_annual" => source_file_record(
+                fortran_path,
+                "fortran/fresh_reference/ann_casaclm_pool_flux_1901_2014.nc",
+            ),
+        )
+        NCDatasets.NCDataset(reduced_path) do julia
+            NCDatasets.NCDataset(fortran_path) do fortran
+                cell_ids = vec(Int.(Array(fortran["cellid"])))
+                positions =
+                    Dict(id => index for (index, id) in enumerate(cell_ids))
+                indices = [positions[cell.cell_id] for cell in grid]
+                repeated_grid = repeat(grid, 114)
+                for (reference_name, native_name, reducer, quantity) in
+                    annual_variables
+                    actual = vec(Array(julia["$(reducer)__$(reference_name)"]))
+                    raw = reshape(
+                        Array(fortran[reference_name]),
+                        length(cell_ids),
+                        114,
+                    )
+                    expected = vec(raw[indices, :])
+                    any(ismissing, expected) &&
+                        error("eligible fresh-Fortran annual value is missing")
+                    expected =
+                        reducer == "annual_total" ?
+                        Float64.(expected) .* 365 ./ 1000 :
+                        Float64.(expected) ./ 1000
+                    annual["$reducer.$native_name"] = calibration_record(
+                        actual,
+                        expected,
+                        repeated_grid;
+                        quantity,
+                    )
+                end
+            end
+        end
     end
 
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
     model_sources = Dict(
         relpath(path, repo_root) =>
             source_file_record(path, relpath(path, repo_root)) for path in (
-            joinpath(@__DIR__, "native_casa_c_reconstruction.jl"),
+            joinpath(@__DIR__, model_source),
             joinpath(@__DIR__, "native_workflow.jl"),
+            joinpath(@__DIR__, "generate_casa_c_full_grid_calibration.jl"),
+            (joinpath(@__DIR__, source) for source in additional_sources)...,
             joinpath(repo_root, "src", "integrated", "casa_biogeochemistry.jl"),
             joinpath(
                 repo_root,
@@ -291,14 +373,14 @@ function generate(
     manifest_revision = readchomp(`git -C $repo_root rev-parse HEAD`)
     document = Dict(
         "schema_version" => 1,
-        "calibration_id" => "casa-c-fresh-fortran-full-grid-v1",
+        "calibration_id" => calibration_id,
         "source" => "fresh_fortran_full_grid",
         "cell_count" => 4263,
-        "units" => "kg C m^-2",
+        "units" => units,
         "method" => Dict(
             "error" => "e_i = abs(Julia_i - Fortran_i)",
             "reference_magnitude" => "x_i = abs(Fortran_i)",
-            "raw_absolute" => "a(r) = max(5e-10 kg C m^-2 + 64eps(Float64), max_i(e_i - r*x_i))",
+            "raw_absolute" => "a(r) = max(5e-10 in the declared variable units + 64eps(Float64), max_i(e_i - r*x_i))",
             "selection" => "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
             "safety_margin" => "multiply both raw envelope coefficients by 1.05, then add 64eps(Float64) to atol",
             "acceptance" => "e_i <= atol + rtol*x_i for every eligible pair",
@@ -321,9 +403,11 @@ function generate(
             ),
             "julia" => julia_sources,
             "fortran" => fortran_sources,
+            "annual" => annual_sources,
             "model_source" => model_sources,
         ),
         "variable" => variables,
+        "annual_variable" => annual,
     )
     mkpath(dirname(output_path))
     open(output_path, "w") do io

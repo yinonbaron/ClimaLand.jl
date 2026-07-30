@@ -9,11 +9,15 @@ include(joinpath(@__DIR__, "native_workflow.jl"))
 include(joinpath(@__DIR__, "native_casa_c_reconstruction.jl"))
 include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
 include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
+include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
 
 const Workflow = TestbedSelectedCASAWorkflow
 const NativeCASA = TestbedNativeCASACReconstruction
+const NativeCASACN = TestbedNativeCASACNReconstruction
 const CASA_C_CALIBRATION_PATH =
     joinpath(@__DIR__, "validation", "casa_c_full_grid_calibration.toml")
+const CASA_CN_CALIBRATION_PATH =
+    joinpath(@__DIR__, "validation", "casa_cn_full_grid_calibration.toml")
 
 const FORTRAN_BOUNDARY_VARIABLES = Dict(
     "casapool%clabile" => "casa_plant.c_labile",
@@ -141,30 +145,91 @@ function julia_historical(output_root)
     end
 end
 
-function measured_fortran_tolerance(fortran, julia)
-    tolerance = Dict{String, Any}()
-    for stage in keys(fortran)
-        stage_tolerance = Dict{String, Any}()
-        for name in keys(fortran[stage])
-            maximum_error =
-                maximum(abs.(fortran[stage][name] .- julia[stage][name]))
-            stage_tolerance[name] = Dict(
-                "atol" => 1.05 * maximum_error + 64eps(Float64),
-                "rtol" => 0.0,
-                "measured_maximum_absolute_error" => maximum_error,
-                "method" => "1.05 times the measured fresh-Fortran/native-Julia maximum plus 64 eps",
-            )
+function julia_annual(output_root)
+    path = joinpath(output_root, "stages", "historical", "historical.nc")
+    stock_names = Set(first.(NativeCASACN.STOCK_VARIABLES))
+    return NCDatasets.NCDataset(path) do output
+        annual_mean = Dict{String, Any}()
+        end_of_year = Dict{String, Any}()
+        annual_total = Dict{String, Any}()
+        for (reference_name, variable) in NativeCASACN.historical_variables()
+            reference_name == "nLitInptStruc" && continue
+            name = replace(variable.native_name, "__" => ".")
+            values = output[variable.native_name]
+            if reference_name in stock_names
+                annual_mean[name] = vec(
+                    hcat(
+                        [
+                            sum(
+                                values[:, ((year - 1) * 365 + 1):(year * 365)];
+                                dims = 2,
+                            ) ./ 365 for year in 1:114
+                        ]...,
+                    ),
+                )
+                end_of_year[name] =
+                    vec(Array(values[:, collect(365:365:(114 * 365))]))
+            else
+                annual_total[name] = vec(
+                    hcat(
+                        [
+                            sum(
+                                values[:, ((year - 1) * 365 + 1):(year * 365)];
+                                dims = 2,
+                            ) .* NativeCASA.DAY_SECONDS for year in 1:114
+                        ]...,
+                    ),
+                )
+            end
         end
-        tolerance[stage] = stage_tolerance
+        Dict(
+            "years" => collect(1901:2014),
+            "annual_mean" => annual_mean,
+            "end_of_year" => end_of_year,
+            "annual_total" => annual_total,
+        )
     end
-    return tolerance
+end
+
+function fortran_annual(fortran_root, cell_ids)
+    path = joinpath(
+        fortran_root,
+        "fresh_reference",
+        "ann_casaclm_pool_flux_1901_2014.nc",
+    )
+    stock_names = Set(first.(NativeCASACN.STOCK_VARIABLES))
+    return NCDatasets.NCDataset(path) do output
+        ids = vec(Int.(Array(output["cellid"])))
+        by_id = Dict(id => index for (index, id) in enumerate(ids))
+        indices = [by_id[id] for id in cell_ids]
+        annual_mean = Dict{String, Any}()
+        annual_total = Dict{String, Any}()
+        for (reference_name, variable) in NativeCASACN.historical_variables()
+            reference_name == "nLitInptStruc" && continue
+            raw = reshape(Array(output[reference_name]), length(ids), 114)
+            any(ismissing, raw[indices, :]) &&
+                error("Fresh Fortran annual oracle is missing $reference_name")
+            name = replace(variable.native_name, "__" => ".")
+            if reference_name in stock_names
+                annual_mean[name] = vec(Float64.(raw[indices, :])) ./ 1000
+            else
+                annual_total[name] =
+                    vec(Float64.(raw[indices, :])) .* 365 ./ 1000
+            end
+        end
+        Dict(
+            "years" => collect(1901:2014),
+            "annual_mean" => annual_mean,
+            "annual_total" => annual_total,
+        )
+    end
 end
 
 function calibrated_fortran_tolerance(path = CASA_C_CALIBRATION_PATH)
     calibration = TOML.parsefile(path)
     calibration["source"] == "fresh_fortran_full_grid" &&
         calibration["cell_count"] == 4263 ||
-        error("CASA-C calibration must use the full fresh-Fortran grid")
+        error("CASA calibration must use the full fresh-Fortran grid")
     return Dict(
         stage => Dict(
             name => Dict(
@@ -174,6 +239,26 @@ function calibrated_fortran_tolerance(path = CASA_C_CALIBRATION_PATH)
             ) for (name, values) in stage_values
         ) for (stage, stage_values) in calibration["variable"]
     )
+end
+
+function calibrated_fortran_annual_tolerance(path = CASA_CN_CALIBRATION_PATH)
+    calibration = TOML.parsefile(path)
+    calibration["source"] == "fresh_fortran_full_grid" &&
+        calibration["cell_count"] == 4263 ||
+        error("CASA-CN calibration must use the full fresh-Fortran grid")
+    tolerance = Dict(
+        "annual_mean" => Dict{String, Any}(),
+        "annual_total" => Dict{String, Any}(),
+    )
+    for (key, values) in calibration["annual_variable"]
+        reducer, name = split(key, '.'; limit = 2)
+        tolerance[reducer][name] = Dict(
+            "atol" => values["derived_policy"]["atol"],
+            "rtol" => values["derived_policy"]["rtol"],
+            "method" => calibration["calibration_id"],
+        )
+    end
+    return tolerance
 end
 
 function generate_reference(
@@ -192,6 +277,12 @@ function generate_reference(
     )
     julia = julia_boundaries(output_root, setup)
     historical = julia_historical(output_root)
+    annual =
+        configuration == :carbon_nitrogen ? julia_annual(output_root) :
+        Dict{String, Any}()
+    fortran_annual_reference =
+        configuration == :carbon_nitrogen ?
+        fortran_annual(fortran_root, metadata.ids) : Dict{String, Any}()
     reference = isfile(path) ? TOML.parsefile(path) : Dict{String, Any}()
     reference["schema_version"] = 1
     reference["tier"] = collection.name
@@ -221,24 +312,40 @@ function generate_reference(
             "equivalence" => "archived accelerated-spin parameter file",
         ),
     )
+    if configuration == :carbon_nitrogen
+        provenance["fresh_fortran_annual_sha256"] =
+            TestbedNativeWorkflow.sha256sum(
+                joinpath(
+                    fortran_root,
+                    "fresh_reference",
+                    "ann_casaclm_pool_flux_1901_2014.nc",
+                ),
+            )
+        provenance["fresh_fortran_calibration_sha256"] =
+            TestbedNativeWorkflow.sha256sum(CASA_CN_CALIBRATION_PATH)
+    end
     configuration == :carbon_only && (
         provenance["fresh_fortran_calibration_sha256"] =
             TestbedNativeWorkflow.sha256sum(CASA_C_CALIBRATION_PATH)
     )
     configurations = get!(reference, "configuration", Dict{String, Any}())
     configurations[String(configuration)] = Dict(
-        "fresh_fortran" => Dict("boundary" => fortran),
+        "fresh_fortran" => Dict(
+            "boundary" => fortran,
+            "annual" => fortran_annual_reference,
+        ),
         "native_julia" => Dict(
             "initialization" =>
                 Workflow.state_snapshot(setup.initial_state),
             "boundary" => julia,
             "historical" => historical,
+            "annual" => annual,
         ),
         "tolerance" => Dict(
-            "fresh_fortran_boundary" =>
+            "fresh_fortran_boundary" => calibrated_fortran_tolerance(
                 configuration == :carbon_only ?
-                calibrated_fortran_tolerance() :
-                measured_fortran_tolerance(fortran, julia),
+                CASA_C_CALIBRATION_PATH : CASA_CN_CALIBRATION_PATH,
+            ),
             "native_julia_boundary" => Dict(
                 "atol" => 256eps(Float64),
                 "rtol" => 256eps(Float64),
@@ -253,6 +360,15 @@ function generate_reference(
                 "atol" => 256eps(Float64),
                 "rtol" => 256eps(Float64),
                 "method" => "256 machine eps for pinned Float64 native history",
+            ),
+            "fresh_fortran_annual" =>
+                configuration == :carbon_nitrogen ?
+                calibrated_fortran_annual_tolerance() :
+                Dict{String, Any}(),
+            "native_julia_annual" => Dict(
+                "atol" => 256eps(Float64),
+                "rtol" => 256eps(Float64),
+                "method" => "256 machine eps for pinned Float64 annual reducers",
             ),
         ),
         "provenance" => provenance,

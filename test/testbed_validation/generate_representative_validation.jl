@@ -157,11 +157,87 @@ function build(args)
     return 0
 end
 
+function build_casa_cn(args)
+    length(args) == 4 || error(
+        "usage: generate_representative_validation.jl build-casa-cn FORTRAN_ROOT WORK_ROOT ARTIFACTS_TOML SCOPE_MANIFEST",
+    )
+    fortran_root, work_root, artifacts_toml, scope_manifest = args
+    scope = TOML.parsefile(scope_manifest)
+    cell_ids = Int.(scope["cell_ids"])
+    get(scope, "name", nothing) == "representative" &&
+        get(scope, "schema_version", nothing) == 1 &&
+        length(cell_ids) == 80 &&
+        cell_ids == sort(unique(cell_ids)) || error(
+        "CASA-CN artifact requires the immutable 80-cell Representative scope",
+    )
+    forcing_hash =
+        Pkg.Artifacts.artifact_hash("representative_forcing", artifacts_toml)
+    isnothing(forcing_hash) &&
+        error("Representative forcing artifact binding is missing")
+    Pkg.Artifacts.artifact_exists(forcing_hash) ||
+        error("Representative forcing artifact is unavailable locally")
+    fixture_manifest =
+        joinpath(Pkg.Artifacts.artifact_path(forcing_hash), "fixture.toml")
+    fixture = TOML.parsefile(fixture_manifest)
+    get(
+        get(fixture, "selection", Dict{String, Any}()),
+        "scope_manifest_sha256",
+        nothing,
+    ) == Selection.sha256sum(scope_manifest) ||
+        error("Representative forcing has stale scope provenance")
+    collection = ReferenceCells.selected_cell_collection(
+        "representative",
+        cell_ids;
+        manifest_path = fixture_manifest,
+    )
+    native_output = joinpath(work_root, "representative_casa_cn_native")
+    result = Workflow.run_selected_case(
+        native_output;
+        configuration = :carbon_nitrogen,
+        collection,
+        concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+        compare_references = false,
+        diagnostics = setup -> NativeCASACN.casa_cn_diagnostics(
+            setup.normal.model.casa_soil.parameters,
+        ),
+    )
+    reference_payload = joinpath(work_root, "representative_casa_cn_reference")
+    mkpath(reference_payload)
+    reference_path = joinpath(reference_payload, "complete_casa_workflow.toml")
+    generate_reference(
+        :carbon_nitrogen,
+        collection,
+        native_output,
+        fortran_root,
+        reference_path,
+    )
+    reference_hash = bind_local_artifact!(
+        artifacts_toml,
+        "representative_casa_cn_reference",
+        reference_payload,
+    )
+    TOML.print(
+        stdout,
+        Dict(
+            "scope_manifest" => abspath(scope_manifest),
+            "forcing_artifact" => string(forcing_hash),
+            "reference_artifact" => string(reference_hash),
+            "reference_path" => Pkg.Artifacts.artifact_path(reference_hash),
+            "native_report" => result.report,
+        );
+        sorted = true,
+    )
+    println()
+    return 0
+end
+
 function main(args = ARGS)
-    isempty(args) &&
-        error("usage: generate_representative_validation.jl build ...")
-    first(args) == "build" || error("Only the build command is supported")
-    return build(args[2:end])
+    isempty(args) && error(
+        "usage: generate_representative_validation.jl build|build-casa-cn ...",
+    )
+    first(args) == "build" && return build(args[2:end])
+    first(args) == "build-casa-cn" && return build_casa_cn(args[2:end])
+    error("Only build and build-casa-cn are supported")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

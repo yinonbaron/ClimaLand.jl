@@ -14,6 +14,7 @@ module TestbedNativeCASACNReconstruction
 
 import NCDatasets
 import TOML
+import LinearAlgebra
 
 native_workflow() = getfield(parentmodule(@__MODULE__), :TestbedNativeWorkflow)
 native_casa() =
@@ -482,6 +483,10 @@ function gridded_provenance(stage, parameter_path, reference_root)
         "model" => "ClimaLand integrated CASA carbon-nitrogen",
         "configuration" => "issue-30 4,263-point gridded reconstruction",
         "pft" => "IGBP 1:18 in pinned grid order",
+        "execution" => Dict(
+            "julia_threads" => Threads.nthreads(),
+            "blas_threads" => LinearAlgebra.BLAS.get_num_threads(),
+        ),
         "parameter_file" => Dict(
             "source" => abspath(parameter_path),
             "sha256" => native_workflow().sha256sum(parameter_path),
@@ -576,6 +581,107 @@ function (callback::GriddedCNAfterStep)(stage, step, _, p, _)
     return nothing
 end
 
+const REDUCED_SAMPLE_DAYS = sort!([
+    (year - 1901) * 365 + start + offset for year in (1901, 1957, 2014) for
+    start in (1, 91, 182, 274) for offset in 0:6
+],)
+
+mutable struct ReducedCNHistorical{D}
+    diagnostics::D
+    reference_name_by_diagnostic::Dict{String, String}
+    annual_mean::Dict{String, Matrix{Float64}}
+    end_of_year::Dict{String, Matrix{Float64}}
+    annual_total::Dict{String, Matrix{Float64}}
+    samples::Dict{String, Matrix{Float64}}
+    sample_position::Dict{Int, Int}
+end
+
+function ReducedCNHistorical(point_count, soil_parameters)
+    stocks = Dict(
+        reference_name => zeros(point_count, 114) for
+        (reference_name, _) in STOCK_VARIABLES
+    )
+    diagnostics = casa_cn_diagnostics(soil_parameters)
+    reference_name_by_diagnostic =
+        Dict(native_name => name for (name, native_name) in FLUX_VARIABLES)
+    totals = Dict(
+        reference_name_by_diagnostic[diagnostic.name] =>
+            zeros(point_count, 114) for diagnostic in diagnostics
+    )
+    sample_names = (keys(stocks)..., keys(totals)...)
+    return ReducedCNHistorical(
+        diagnostics,
+        reference_name_by_diagnostic,
+        stocks,
+        Dict(name => zeros(point_count, 114) for name in keys(stocks)),
+        totals,
+        Dict(
+            name => zeros(point_count, length(REDUCED_SAMPLE_DAYS)) for
+            name in sample_names
+        ),
+        Dict(day => index for (index, day) in enumerate(REDUCED_SAMPLE_DAYS)),
+    )
+end
+
+field_values(field) = vec(parent(parent(field)))
+
+function (tracker::ReducedCNHistorical)(stage, step, Y, p, _)
+    stage.name == :historical || return nothing
+    year = cld(step, 365)
+    day = mod1(step, 365)
+    sample = get(tracker.sample_position, step, 0)
+    for (name, (component, variable)) in STOCK_VARIABLES
+        values = field_values(getproperty(getproperty(Y, component), variable))
+        view(tracker.annual_mean[name], :, year) .+= values
+        day == 365 && (view(tracker.end_of_year[name], :, year) .= values)
+        sample == 0 || (view(tracker.samples[name], :, sample) .= values)
+    end
+    for diagnostic in tracker.diagnostics
+        name = tracker.reference_name_by_diagnostic[diagnostic.name]
+        values = field_values(diagnostic.compute(Y, p))
+        view(tracker.annual_total[name], :, year) .+=
+            native_casa().DAY_SECONDS .* values
+        sample == 0 || (view(tracker.samples[name], :, sample) .= values)
+    end
+    return nothing
+end
+
+function write_reduced_historical(path, tracker)
+    mkpath(dirname(path))
+    NCDatasets.NCDataset(path, "c") do output
+        NCDatasets.defDim(
+            output,
+            "point",
+            size(first(values(tracker.annual_mean)), 1),
+        )
+        NCDatasets.defDim(output, "year", 114)
+        NCDatasets.defDim(output, "sample", length(REDUCED_SAMPLE_DAYS))
+        NCDatasets.defVar(output, "year", Int, ("year",))[:] = 1901:2014
+        NCDatasets.defVar(output, "sample_day", Int, ("sample",))[:] =
+            REDUCED_SAMPLE_DAYS
+        for (reducer, values) in (
+            "annual_mean" => tracker.annual_mean,
+            "end_of_year" => tracker.end_of_year,
+            "annual_total" => tracker.annual_total,
+            "fixed_daily_sample" => tracker.samples,
+        )
+            for (name, data) in values
+                reducer == "annual_mean" && (data ./= 365)
+                dimension = reducer == "fixed_daily_sample" ? "sample" : "year"
+                variable = NCDatasets.defVar(
+                    output,
+                    "$(reducer)__$(name)",
+                    Float64,
+                    ("point", dimension);
+                    deflatelevel = 1,
+                )
+                variable[:, :] = data
+            end
+        end
+    end
+    return path
+end
+
 """
     run_gridded_case(source_root, forcing_root, reference_root, output_root; ...)
 
@@ -597,7 +703,14 @@ function run_gridded_case(
     archive_atol = 5e-3,
     archive_rtol = 1e-3,
     budget_rtol = 5e-12,
+    boundary_only = false,
 )
+    if boundary_only
+        Threads.nthreads() == 1 ||
+            error("CASA-CN calibration requires exactly one Julia thread")
+        LinearAlgebra.BLAS.get_num_threads() == 1 ||
+            error("CASA-CN calibration requires exactly one BLAS thread")
+    end
     grid_path =
         joinpath(source_root, "GRID_CN", "gridinfo_igbpz_CLM5_GSWP3.csv")
     soil_path = joinpath(source_root, "GRID_CN", "gridinfo_soil_CLM5_GSWP3.csv")
@@ -670,7 +783,12 @@ function run_gridded_case(
     )
     budget = selected_casa().BudgetAccumulator(grid)
     bookkeeping = BoundaryBookkeeping(length(grid))
+    reduced =
+        boundary_only ?
+        ReducedCNHistorical(length(grid), normal.model.casa_soil.parameters) :
+        nothing
     function carbon_budget(stage, result, _, _, initial_state, model)
+        boundary_only && return Dict("skipped" => "boundary calibration only")
         name = stage.name
         final_state = native_casa().state_as_initial_state(result.state, model)
         return selected_casa().budget_report(
@@ -692,6 +810,7 @@ function run_gridded_case(
         )
     end
     function nitrogen_budget(stage, result, initial_state, model)
+        boundary_only && return Dict("skipped" => "boundary calibration only")
         name = stage.name
         final_state = native_casa().state_as_initial_state(result.state, model)
         return selected_casa().budget_report(
@@ -717,6 +836,7 @@ function run_gridded_case(
         nitrogen_stage_budgets,
         passive_restoration,
     )
+        boundary_only && return Dict("skipped" => "boundary calibration only")
         return Dict(
             "carbon" => selected_casa().workflow_budget_report(
                 carbon_stage_budgets,
@@ -743,16 +863,19 @@ function run_gridded_case(
             atol = boundary_atol,
             rtol = boundary_rtol,
         )
-        balance = compare_bookkeeping_csv(
-            bookkeeping,
-            joinpath(directory, "casa_flux_final.csv");
-            atol = boundary_atol,
-            rtol = boundary_rtol,
-        )
+        balance =
+            boundary_only ? Dict("skipped" => "boundary calibration only") :
+            compare_bookkeeping_csv(
+                bookkeeping,
+                joinpath(directory, "casa_flux_final.csv");
+                atol = boundary_atol,
+                rtol = boundary_rtol,
+            )
         return Dict(
             "state" => state,
             "bookkeeping" => balance,
-            "all_match" => state["all_match"] && balance["all_match"],
+            "all_match" =>
+                state["all_match"] && (boundary_only || balance["all_match"]),
         )
     end
     tolerances = Dict(
@@ -773,8 +896,10 @@ function run_gridded_case(
             output_root;
             model_for_stage,
             update_forcing! = GriddedCNForcingUpdate(forcing),
-            after_step! = GriddedCNAfterStep(budget, bookkeeping),
-            diagnostics = casa_cn_diagnostics(
+            after_step! = boundary_only ? reduced :
+                          GriddedCNAfterStep(budget, bookkeeping),
+            diagnostics = boundary_only ? () :
+                          casa_cn_diagnostics(
                 normal.model.casa_soil.parameters,
             ),
             provenance = stage -> gridded_provenance(
@@ -783,7 +908,12 @@ function run_gridded_case(
                 reference_root,
             ),
             compare_boundary,
-            compare_historical = (path, _) -> compare_historical_outputs(
+            compare_historical = boundary_only ?
+                                 (_, _) -> Dict(
+                "output" => Dict("records" => 0),
+                "skipped" => "boundary calibration only",
+            ) :
+                                 (path, _) -> compare_historical_outputs(
                 path,
                 grid,
                 joinpath(reference_root, "fresh_reference"),
@@ -800,8 +930,15 @@ function run_gridded_case(
             output_eltype = Float32,
             deflatelevel = 1,
         )
-        augment_report!(result.report, normal, accelerated, tolerances)
-        require_acceptance!(result.report)
+        if !boundary_only
+            augment_report!(result.report, normal, accelerated, tolerances)
+            require_acceptance!(result.report)
+        else
+            write_reduced_historical(
+                joinpath(output_root, "reduced_historical.nc"),
+                reduced,
+            )
+        end
         return result
     finally
         native_casa().close_forcing!(forcing)

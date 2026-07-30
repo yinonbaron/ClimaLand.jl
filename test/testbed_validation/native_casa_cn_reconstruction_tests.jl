@@ -117,6 +117,47 @@ end
     ) == 0
 end
 
+@testset "native CASA-CN streams reduced historical products" begin
+    workflow = TestbedSelectedCASAWorkflow
+    reconstruction = TestbedNativeCASACNReconstruction
+    setup = workflow.load_setup(:carbon_nitrogen)
+    model_for_stage = workflow.StageModelSelector(setup)
+    update_forcing! =
+        workflow.SelectedForcingUpdater(setup.forcing, nothing, model_for_stage)
+    reduced = reconstruction.ReducedCNHistorical(
+        length(setup.grid),
+        setup.normal.model.casa_soil.parameters,
+    )
+    stage = TestbedNativeWorkflow.NativeStage(
+        :historical,
+        1,
+        1;
+        write_output = false,
+    )
+    mktempdir() do output_root
+        TestbedNativeWorkflow.run_workflow(
+            setup.normal.model,
+            setup.initial_state,
+            [stage],
+            output_root;
+            update_forcing!,
+            after_step! = reduced,
+            diagnostics = (),
+            provenance = workflow.stage_provenance(setup, stage),
+        )
+        path = reconstruction.write_reduced_historical(
+            joinpath(output_root, "reduced_historical.nc"),
+            reduced,
+        )
+        NCDatasets.NCDataset(path) do output
+            @test output["sample_day"][:] == reconstruction.REDUCED_SAMPLE_DAYS
+            @test any(!iszero, output["annual_mean__cleaf"][:, 1])
+            @test any(!iszero, output["annual_total__cgpp"][:, 1])
+            @test any(!iszero, output["fixed_daily_sample__cleaf"][:, 1])
+        end
+    end
+end
+
 @testset "native CASA-CN synthetic handoff and reports" begin
     mktempdir() do output_root
         result =

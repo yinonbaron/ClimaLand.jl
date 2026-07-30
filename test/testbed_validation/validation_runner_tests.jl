@@ -341,7 +341,10 @@ end
 @testset "Validation Runner rejects unavailable defaults and invalid values" begin
     defaults = run_validation()
     @test defaults.exitcode == 2
-    @test occursin("only CASA-C is available", defaults.stderr)
+    @test occursin(
+        "only one of CASA-C or CASA-CN is available",
+        defaults.stderr,
+    )
 
     invalid = run_validation("--scope", "unknown")
     @test invalid.exitcode == 2
@@ -423,6 +426,30 @@ end
     end
 end
 
+@testset "Validation Runner accepts explicit CASA-CN and fails closed" begin
+    mktempdir() do output
+        missing = joinpath(output, "missing-reference.toml")
+        result = run_validation(
+            "--scope",
+            "core",
+            "--models",
+            "CASA-CN",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_CASA_CN_REFERENCE" => missing,
+            ),
+        )
+
+        @test result.exitcode == 2
+        @test occursin("Pinned CASA-CN reference is missing", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test report["model"][1]["name"] == "CASA-CN"
+        @test report["model"][1]["coverage"]["compared_cells"] == 0
+        @test !isdir(joinpath(output, "CASA-CN", "stages"))
+    end
+end
+
 @testset "Validation Runner completes pinned Core and Smoke comparisons" begin
     for (scope, cell_count) in (("core", 11), ("smoke", 37))
         mktempdir() do output
@@ -465,5 +492,118 @@ end
             @test applied["rtol"] == policy["rtol"]
             @test report["outcome"] == "passed"
         end
+    end
+end
+
+@testset "Validation Runner completes pinned Representative CASA-CN" begin
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "CASA-CN",
+            "--reference",
+            "pinned",
+            "--workers",
+            "1",
+            "--output",
+            output,
+        )
+
+        @test result.exitcode == 0
+        @test occursin("Validation: passed", result.stdout)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        model = only(report["model"])
+        @test model["name"] == "CASA-CN"
+        @test model["coverage"]["scope_cells"] == 80
+        @test model["coverage"]["compared_cells"] == 80
+        @test model["outcome"] == "passed"
+        @test all(values(model["comparison"]))
+        @test haskey(model["budget"], "carbon")
+        @test haskey(model["budget"], "nitrogen")
+        @test model["budget"]["carbon"]["reducer"] ==
+              "maximum_absolute_residual"
+        @test model["budget"]["nitrogen"]["reducer"] ==
+              "maximum_absolute_residual"
+        @test model["historical"]["annual"]["all_match"]
+        @test model["historical"]["fixed_daily_samples"]["all_match"]
+        @test report["comparison_policy"]["fixed_daily_samples"]["sample_count_per_variable_cell"] ==
+              84
+        @test report["comparison_policy"]["annual_reducers"]["state_pool"]["reducers"] ==
+              ["annual_mean", "end_of_year"]
+        @test report["comparison_policy"]["invalid_oracle_variables"]["nLitInptStruc"]["kind"] ==
+              "variable_level"
+        scientific = TOML.parsefile(model["comparison_report"])
+        applied =
+            scientific["historical_comparison"]["annual"]["source"]["fresh_fortran"]["reducers"]["annual_mean"]["variable"]["casa_plant.c_leaf"]
+        policy =
+            report["comparison_policy"]["fresh_fortran_annual"]["annual_mean"]["casa_plant.c_leaf"]
+        @test applied["atol"] == policy["atol"]
+        @test applied["rtol"] == policy["rtol"]
+    end
+end
+
+@testset "Validation Runner aggregates a CASA-CN scientific failure" begin
+    pinned, _ =
+        VALIDATION_RUNNER_MODULE.reference_path("representative", "CASA-CN")
+    reference = TOML.parsefile(pinned)
+    incomplete = deepcopy(reference)
+    delete!(
+        incomplete["configuration"]["carbon_nitrogen"]["native_julia"]["historical"],
+        "diagnostic.n_litter_structural_input",
+    )
+    scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+    @test_throws VALIDATION_RUNNER_MODULE.RunnerError VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+        incomplete,
+        scope,
+        "CASA-CN",
+    )
+    nonfinite = deepcopy(reference)
+    nonfinite["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"][1] =
+        Inf
+    nonfinite_error = try
+        VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+            nonfinite,
+            scope,
+            "CASA-CN",
+        )
+        nothing
+    catch error
+        error
+    end
+    @test nonfinite_error isa VALIDATION_RUNNER_MODULE.RunnerError
+    @test occursin("carbon_nitrogen.fresh_fortran", nonfinite_error.message)
+    leaf =
+        reference["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"]
+    leaf[1] += 1.0e6
+    mktempdir() do directory
+        altered = joinpath(directory, "altered-reference.toml")
+        open(altered, "w") do io
+            TOML.print(io, reference; sorted = true)
+        end
+        output = joinpath(directory, "output")
+        result = run_validation(
+            "--scope",
+            "core",
+            "--models",
+            "CASA-CN",
+            "--reference",
+            "pinned",
+            "--workers",
+            "1",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_CASA_CN_REFERENCE" => altered,
+            ),
+        )
+
+        @test result.exitcode == 1
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        model = only(report["model"])
+        @test model["coverage"]["compared_cells"] == 11
+        @test model["outcome"] == "failed"
+        @test !model["comparison"]["fresh_fortran_boundaries"]
+        @test report["outcome"] == "failed"
     end
 end

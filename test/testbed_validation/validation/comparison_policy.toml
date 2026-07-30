@@ -1,5 +1,5 @@
 schema_version = 2
-policy_id = "casa-c-fresh-fortran-full-grid-v1"
+policy_id = "casa-representative-validation-v2"
 
 [acceptance]
 eligible_nonfinite = "fail"
@@ -26,3 +26,58 @@ rtol = 5.684341886080802e-14
 [model."CASA-C".fresh_fortran_boundary]
 calibration_manifest = "casa_c_full_grid_calibration.toml"
 method = "mixed absolute-relative envelope calibrated from all 4,263 current-Julia/fresh-Fortran cell pairs"
+
+[model."CASA-CN"]
+budget_rtol = 5.0e-12
+
+[model."CASA-CN".native_julia_initialization]
+atol = 1.4210854715202004e-14
+method = "64 machine eps for pinned Float64 initialization"
+rtol = 1.4210854715202004e-14
+
+[model."CASA-CN".native_julia_boundary]
+atol = 5.684341886080802e-14
+method = "256 machine eps for pinned Float64 native checkpoints"
+rtol = 5.684341886080802e-14
+
+[model."CASA-CN".native_julia_historical]
+atol = 5.684341886080802e-14
+method = "256 machine eps for pinned Float64 native fixed daily samples"
+rtol = 5.684341886080802e-14
+
+[model."CASA-CN".native_julia_annual]
+atol = 5.684341886080802e-14
+method = "256 machine eps for pinned Float64 native annual reducers"
+rtol = 5.684341886080802e-14
+
+[model."CASA-CN".fresh_fortran_boundary]
+calibration_manifest = "casa_cn_full_grid_calibration.toml"
+method = "mixed absolute-relative envelope calibrated from all 4,263 current-Julia/fresh-Fortran cell pairs"
+
+[model."CASA-CN".fresh_fortran_annual]
+calibration_manifest = "casa_cn_full_grid_calibration.toml"
+method = "variable-aware annual reducers with mixed envelopes calibrated from all 485,982 current-Julia/fresh-Fortran year-cell pairs"
+
+[model."CASA-CN".annual_reducers.state_pool]
+reducers = ["annual_mean", "end_of_year"]
+units = "kg C or N m^-2"
+
+[model."CASA-CN".annual_reducers.flux]
+reducers = ["annual_total"]
+units = "kg C or N m^-2 year^-1"
+
+[model."CASA-CN".annual_reducers.budget]
+reducers = ["maximum_absolute_residual"]
+units = "kg C or N"
+
+[model."CASA-CN".fixed_daily_samples]
+days_per_window = 7
+months = [1, 4, 7, 10]
+years = [1901, 1957, 2014]
+sample_count_per_variable_cell = 84
+
+[model."CASA-CN".invalid_oracle_variables.nLitInptStruc]
+scope = "fresh_fortran"
+kind = "variable_level"
+reviewed = true
+reason = "Fortran casa_delsoil adds an uninitialized local nwd2str work array; Julia's initialized diagnostic remains pinned as a native regression value"

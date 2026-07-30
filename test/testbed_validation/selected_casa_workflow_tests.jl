@@ -15,6 +15,46 @@ import NCDatasets
           (:carbon_only, :carbon_nitrogen)
 end
 
+@testset "selected CASA annual reducers preserve physical quantities" begin
+    mktempdir() do directory
+        path = joinpath(directory, "historical.nc")
+        NCDatasets.NCDataset(path, "c") do output
+            NCDatasets.defDim(output, "point", 2)
+            NCDatasets.defDim(output, "time", 114 * 365)
+            pool = NCDatasets.defVar(
+                output,
+                "casa_plant__c_leaf",
+                Float64,
+                ("point", "time"),
+            )
+            pool[:, :] .= 2
+            flux = NCDatasets.defVar(
+                output,
+                "diagnostic__cgpp",
+                Float64,
+                ("point", "time"),
+            )
+            flux[:, :] .= 3
+        end
+        NCDatasets.NCDataset(path) do output
+            reduced = TestbedSelectedCASAWorkflow.reduced_annual_values(
+                output,
+                Dict(
+                    "annual_mean" => Dict("casa_plant.c_leaf" => Float64[]),
+                    "end_of_year" => Dict("casa_plant.c_leaf" => Float64[]),
+                    "annual_total" => Dict("diagnostic.cgpp" => Float64[]),
+                ),
+            )
+            @test all(==(2), reduced["annual_mean"]["casa_plant.c_leaf"])
+            @test all(==(2), reduced["end_of_year"]["casa_plant.c_leaf"])
+            @test all(
+                ==(3 * 365 * 86400),
+                reduced["annual_total"]["diagnostic.cgpp"],
+            )
+        end
+    end
+end
+
 @testset "selected-cell pinned reference contract" begin
     collection = TestbedReferenceCellComparisons.extended_cell_collection()
     reference =

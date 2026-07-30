@@ -768,8 +768,15 @@ ordering, and cell-context failure aggregation remain inside
 compares the complete initialized state and every stage boundary with compact
 fresh-Fortran and native-Julia references in `complete_casa_workflow.toml`,
 checks early/middle/late historical dates, and reports both stage and
-complete-workflow C/N budgets. Regenerate one reference configuration only
-from completed native and fresh-Fortran runs:
+complete-workflow C/N budgets.
+
+The regular 80-cell CI contracts are documented in
+[`CASA_C_REPRESENTATIVE_VALIDATION.md`](CASA_C_REPRESENTATIVE_VALIDATION.md)
+and
+[`CASA_CN_REPRESENTATIVE_VALIDATION.md`](CASA_CN_REPRESENTATIVE_VALIDATION.md).
+
+Regenerate one reference configuration only from completed native and
+fresh-Fortran runs:
 
 ```sh
 julia --project=test \
