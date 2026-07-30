@@ -9,7 +9,9 @@ and source hashes in `validation/scopes/representative.toml`.
 
 The reduced forcing and CASA-C reference are local Julia artifacts declared in
 `validation/Artifacts.toml`. Pinned mode resolves those artifacts and never
-silently computes or substitutes a reference.
+silently computes or substitutes a reference. The compact reference records
+the exact forcing artifact tree hash, and the runner rejects a reference that
+was generated from any other forcing artifact.
 
 ## Full-grid tolerance calibration
 
@@ -45,17 +47,18 @@ allowed only as reviewed scope-manifest gaps.
 ## Verified run
 
 The public runner completed the pinned Representative CASA-C workflow with
-80/80 coverage and no eligibility gaps in 1,125 seconds on the calibration
+80/80 coverage and no eligibility gaps in 381.321 seconds on the calibration
 host:
 
 ```sh
 julia --project=test test/testbed_validation/validation_runner.jl \
-    --scope representative --models CASA-C --reference pinned --workers 6
+    --scope representative --models CASA-C --reference pinned --workers 1
 ```
 
 Initialization, all four fresh-Fortran boundaries, the carbon budget, passive
 pool restoration, and every checkpoint round trip passed. The underlying
 current-Julia 4,263-cell calibration run completed in approximately 1 hour
-53 minutes under the same bound. The public runner enforces a 7,200-second
-process deadline; a timeout exits with status 124 and records
+57 minutes (7,040 filesystem-measured seconds) under concurrent calibration
+load. The public runner enforces a 7,200-second process deadline; a timeout
+exits with status 124 and records
 `outcome = "timed_out"` in the standard report.

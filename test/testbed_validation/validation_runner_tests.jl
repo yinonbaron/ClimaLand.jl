@@ -380,6 +380,26 @@ end
 end
 
 @testset "Validation Runner fails closed before CASA-C simulation" begin
+    mktempdir() do directory
+        policy_path = joinpath(directory, "comparison_policy.toml")
+        calibration_path =
+            joinpath(directory, "casa_c_full_grid_calibration.toml")
+        cp(VALIDATION_COMPARISON_POLICY, policy_path)
+        obsolete = TOML.parsefile(CASA_C_CALIBRATION)
+        obsolete["method"]["raw_absolute"] = "a(r) = max(5e-10, max_i(e_i - r*x_i))"
+        open(calibration_path, "w") do io
+            TOML.print(io, obsolete; sorted = true)
+        end
+        error = try
+            VALIDATION_RUNNER_MODULE.comparison_policy("CASA-C"; path = policy_path)
+            nothing
+        catch exception
+            exception
+        end
+        @test error isa VALIDATION_RUNNER_MODULE.RunnerError
+        @test occursin("obsolete absolute floor", error.message)
+    end
+
     mktempdir() do output
         missing = joinpath(output, "missing-reference.toml")
         result = run_validation(
@@ -599,6 +619,36 @@ end
     end
     @test nonfinite_error isa VALIDATION_RUNNER_MODULE.RunnerError
     @test occursin("carbon_nitrogen.fresh_fortran", nonfinite_error.message)
+    invalid_provenance = deepcopy(reference)
+    invalid_provenance["configuration"]["carbon_nitrogen"]["provenance"]["fresh_fortran_daily_sha256"]["2014"] =
+        "not-a-sha256"
+    provenance_error = try
+        VALIDATION_RUNNER_MODULE.validate_eligible_reference_values(
+            invalid_provenance,
+            scope,
+            "CASA-CN",
+        )
+        nothing
+    catch error
+        error
+    end
+    @test provenance_error isa VALIDATION_RUNNER_MODULE.RunnerError
+    @test occursin("daily provenance", provenance_error.message)
+    invalid_forcing = deepcopy(reference)
+    invalid_forcing["configuration"]["carbon_nitrogen"]["provenance"]["forcing_artifact_git_tree_sha1"] = "0000000000000000000000000000000000000000"
+    forcing_error = try
+        VALIDATION_RUNNER_MODULE.validate_reference_forcing_artifact(
+            invalid_forcing,
+            "836b4cda5912f1bea5f27abd326789285b02ed46",
+            "CASA-CN",
+            scope,
+        )
+        nothing
+    catch error
+        error
+    end
+    @test forcing_error isa VALIDATION_RUNNER_MODULE.RunnerError
+    @test occursin("Representative forcing artifact", forcing_error.message)
     leaf =
         reference["configuration"]["carbon_nitrogen"]["fresh_fortran"]["boundary"]["prespin"]["casa_plant.c_leaf"]
     leaf[1] += 1.0e6

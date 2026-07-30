@@ -316,6 +316,8 @@ function generate_reference(
     output_root,
     fortran_root,
     path,
+    ;
+    forcing_artifact_hash = nothing,
 )
     metadata = fixture_metadata(collection)
     setup = Workflow.load_setup(configuration; collection)
@@ -389,6 +391,10 @@ function generate_reference(
     configuration == :carbon_only && (
         provenance["fresh_fortran_calibration_sha256"] =
             TestbedNativeWorkflow.sha256sum(CASA_C_CALIBRATION_PATH)
+    )
+    isnothing(forcing_artifact_hash) || (
+        provenance["forcing_artifact_git_tree_sha1"] =
+            string(forcing_artifact_hash)
     )
     configurations = get!(reference, "configuration", Dict{String, Any}())
     configurations[String(configuration)] = Dict(

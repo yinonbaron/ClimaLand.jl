@@ -50,7 +50,9 @@ julia --project=test test/testbed_validation/validation_runner.jl \
 
 The public runner resolves the reduced forcing and reference exclusively from
 their Julia artifact bindings. Pinned mode never falls back to running
-Fortran. It runs in a supervised process with a hard 7,200-second deadline and
-records scope coverage, Eligibility Gaps, policy and artifact provenance,
-annual reducers, fixed daily samples, carbon and nitrogen budgets, scientific
-checks, and timing in `validation_report.toml`.
+Fortran. Each compact reference records the exact forcing artifact tree hash,
+and the runner rejects cross-artifact combinations before simulation. It runs
+in a supervised process with a hard 7,200-second deadline and records scope
+coverage, Eligibility Gaps, policy and artifact provenance, annual reducers,
+fixed daily samples, carbon and nitrogen budgets, scientific checks, and
+timing in `validation_report.toml`.

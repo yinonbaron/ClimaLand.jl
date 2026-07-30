@@ -325,8 +325,10 @@ function load_scope_manifests(scope)
     return manifests[scope]
 end
 
-function comparison_policy(model_name = "CASA-C")
-    path = DEFAULT_COMPARISON_POLICY
+function comparison_policy(
+    model_name = "CASA-C";
+    path = DEFAULT_COMPARISON_POLICY,
+)
     policy = parse_toml(path, "Comparison Policy")
     get(policy, "schema_version", nothing) == 2 || throw(
         RunnerError("Comparison Policy at $path has an incompatible schema"),
@@ -840,6 +842,32 @@ function validate_fixture_scope_provenance(path, scope)
     return nothing
 end
 
+function validate_reference_forcing_artifact(
+    reference,
+    forcing_artifact,
+    model,
+    scope,
+)
+    scope.name == "representative" || return nothing
+    configuration_key = model == "CASA-C" ? "carbon_only" : "carbon_nitrogen"
+    provenance = get(
+        get(
+            get(reference, "configuration", Dict{String, Any}()),
+            configuration_key,
+            Dict{String, Any}(),
+        ),
+        "provenance",
+        Dict{String, Any}(),
+    )
+    get(provenance, "forcing_artifact_git_tree_sha1", nothing) ==
+    forcing_artifact || throw(
+        RunnerError(
+            "Pinned $model reference was not generated from the pinned Representative forcing artifact",
+        ),
+    )
+    return nothing
+end
+
 function validate_reference_file(path, model = "CASA-C")
     isfile(path) || throw(
         RunnerError(
@@ -938,6 +966,19 @@ function validate_eligible_reference_values(reference, scope, model = "CASA-C")
             length(get(fresh_historical, "sample_days", [])) == 56 || throw(
             RunnerError(
                 "Pinned $model reference has incompatible fresh-Fortran daily variables",
+            ),
+        )
+        daily_hashes = get(
+            get(configuration, "provenance", Dict{String, Any}()),
+            "fresh_fortran_daily_sha256",
+            Dict{String, Any}(),
+        )
+        Set(keys(daily_hashes)) == Set(("1901", "2014")) && all(
+            hash isa String && length(hash) == 64 && all(isxdigit, hash) for
+            hash in values(daily_hashes)
+        ) || throw(
+            RunnerError(
+                "Pinned $model reference has invalid fresh-Fortran daily provenance",
             ),
         )
     end
@@ -1196,24 +1237,18 @@ function main(args = ARGS)
         fixture_manifest, forcing_artifact =
             fixture_manifest_path(configuration.scope, model)
         validate_fixture_scope_provenance(fixture_manifest, scope)
+        validate_reference_forcing_artifact(
+            reference,
+            forcing_artifact,
+            model,
+            scope,
+        )
         collection = try
             stage_casa(scope, pinned_reference, policy, fixture_manifest, model)
         catch error
             throw(
                 RunnerError(
                     "Pinned $model inputs are incompatible: $(sprint(showerror, error))",
-                ),
-            )
-            daily_hashes = get(
-                get(configuration, "provenance", Dict{String, Any}()),
-                "fresh_fortran_daily_sha256",
-                Dict{String, Any}(),
-            )
-            Set(keys(daily_hashes)) == Set(("1901", "2014")) && all(
-                hash isa String && length(hash) == 64 && all(isxdigit, hash) for hash in values(daily_hashes)
-            ) || throw(
-                RunnerError(
-                    "Pinned $model reference has invalid fresh-Fortran daily provenance",
                 ),
             )
         end

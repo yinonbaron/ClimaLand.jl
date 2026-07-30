@@ -160,6 +160,8 @@ function build(args)
         native_output,
         fortran_root,
         reference_path,
+        ;
+        forcing_artifact_hash = forcing_hash,
     )
     reference_hash = bind_local_artifact!(
         artifacts_toml,
@@ -239,6 +241,8 @@ function build_casa_cn(args)
             native_output,
             fortran_root,
             reference_path,
+            ;
+            forcing_artifact_hash = forcing_hash,
         )
         Selection.sha256sum(result.report)
     end
