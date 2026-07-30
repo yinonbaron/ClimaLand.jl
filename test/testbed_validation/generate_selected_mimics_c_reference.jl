@@ -34,6 +34,8 @@ sha256sum(path) =
         bytes2hex(SHA.sha256(io))
     end
 
+source_record(id, path) = Dict("id" => id, "sha256" => sha256sum(path))
+
 function source_indices(fortran_root, cell_ids)
     rows = Native.casa().parse_rows(
         joinpath(fortran_root, "stages", "01-prespin", "grid.csv"),
@@ -49,16 +51,16 @@ function source_indices(fortran_root, cell_ids)
     end
 end
 
-function finite_vector(values, location)
+function finite_vector(values, eligible_positions, location)
     any(ismissing, values) &&
         error("MIMICS-C Fortran oracle is missing $location")
     result = vec(Float64.(values))
-    all(isfinite, result) ||
+    all(isfinite, result[eligible_positions]) ||
         error("MIMICS-C Fortran oracle is nonfinite at $location")
     return result
 end
 
-function boundary_values(fortran_root, cell_ids)
+function boundary_values(fortran_root, cell_ids, eligible_positions)
     indices = source_indices(fortran_root, cell_ids)
     boundary = Dict{String, Any}()
     sources = Dict{String, Any}()
@@ -79,10 +81,10 @@ function boundary_values(fortran_root, cell_ids)
             scale = source == :casa ? 1 / 1000 : 1.0
             values["$(component).$(variable)"] = finite_vector(
                 [
-                    scale *
-                    parse(Float64, rows[index][columns[fortran_name]]) for
+                    scale * parse(Float64, rows[index][columns[fortran_name]]) for
                     index in indices
                 ],
+                eligible_positions,
                 "boundary.$stage.$fortran_name",
             )
         end
@@ -105,7 +107,13 @@ function reference_dataset(root, source, year)
     )
 end
 
-function reference_matrix(dataset, path, name, grid)
+function reference_matrix(
+    dataset,
+    path,
+    name,
+    grid,
+    eligible_positions = eachindex(grid),
+)
     locations = map(grid) do point
         (;
             cell_id = point.cell_id,
@@ -114,20 +122,21 @@ function reference_matrix(dataset, path, name, grid)
         )
     end
     selected = Fixtures.selected_values(dataset[name], locations)
-    ndims(selected) == 2 ||
-        error("MIMICS-C Fortran oracle has unexpected dimensions at $path:$name")
+    ndims(selected) == 2 || error(
+        "MIMICS-C Fortran oracle has unexpected dimensions at $path:$name",
+    )
     raw = permutedims(selected)
     any(ismissing, raw) &&
         error("MIMICS-C Fortran oracle is missing $path:$name")
     values = Float64.(raw)
     size(values) == (length(grid), 365) ||
         error("MIMICS-C Fortran oracle has unexpected shape at $path:$name")
-    all(isfinite, values) ||
+    all(isfinite, values[eligible_positions, :]) ||
         error("MIMICS-C Fortran oracle is nonfinite at $path:$name")
     return values
 end
 
-function historical_values(fortran_root, grid)
+function historical_values(fortran_root, grid, eligible_positions)
     points = length(grid)
     year_count = length(Workflow.HISTORICAL_YEARS)
     annual_mean = Dict(
@@ -142,11 +151,9 @@ function historical_values(fortran_root, grid)
         name => zeros(points * year_count) for
         name in Workflow.ANNUAL_FLUX_NAMES
     )
-    daily =
-        Dict(name => zeros(points * 84) for name in Workflow.DAILY_NAMES)
-    local_days = vcat(
-        (collect(start:(start + 6)) for start in (1, 91, 182, 274))...,
-    )
+    daily = Dict(name => zeros(points * 84) for name in Workflow.DAILY_NAMES)
+    local_days =
+        vcat((collect(start:(start + 6)) for start in (1, 91, 182, 274))...)
     sampled_years = Dict(1901 => 0, 1957 => 1, 2014 => 2)
     sources = Dict{String, String}()
     for (year_index, year) in enumerate(Workflow.HISTORICAL_YEARS)
@@ -171,8 +178,13 @@ function historical_values(fortran_root, grid)
                     Native.HISTORICAL_VARIABLES
                     dataset = source == :casa ? casa : mimics
                     path = paths[source]
-                    raw =
-                        reference_matrix(dataset, path, fortran_name, grid)
+                    raw = reference_matrix(
+                        dataset,
+                        path,
+                        fortran_name,
+                        grid,
+                        eligible_positions,
+                    )
                     name = replace(native_name, "__" => ".")
                     if scale == 1000.0
                         annual_mean[name][annual_destination] .=
@@ -186,9 +198,9 @@ function historical_values(fortran_root, grid)
                     haskey(sampled_years, year) || continue
                     sample = sampled_years[year]
                     daily_destination =
-                        (sample * points * length(local_days) + 1):(
-                            (sample + 1) * points * length(local_days)
-                        )
+                        (sample * points * length(local_days) + 1):((sample + 1) * points * length(
+                            local_days,
+                        ))
                     canonical_scale =
                         scale == 1000.0 ? 1 / 1000 :
                         1 / (1000 * Native.DAY_SECONDS)
@@ -211,7 +223,7 @@ function historical_values(fortran_root, grid)
     return annual, samples, sources
 end
 
-function budget_values(boundary, annual, grid)
+function budget_values(boundary, annual, grid, eligible_positions)
     cell_count = length(grid)
     years = length(Workflow.HISTORICAL_YEARS)
     start = zeros(cell_count)
@@ -221,11 +233,7 @@ function budget_values(boundary, annual, grid)
         stop .+= boundary["historical"][name]
     end
     annual_total = annual["annual_total"]
-    npp = reshape(
-        annual_total["diagnostic.cnpp"],
-        cell_count,
-        years,
-    )
+    npp = reshape(annual_total["diagnostic.cnpp"], cell_count, years)
     respiration = reshape(
         annual_total["diagnostic.mimics_respiration"],
         cell_count,
@@ -236,33 +244,38 @@ function budget_values(boundary, annual, grid)
     return Dict(
         "units" => "kg C",
         "reducer" => "maximum_absolute_residual",
-        "maximum_absolute_residual_kg_c" => maximum(abs, residual_kg),
+        "maximum_absolute_residual_kg_c" =>
+            maximum(abs, residual_kg[eligible_positions]),
         "historical_residual_kg_c" => residual_kg,
     )
 end
 
-function write_reference(
-    collection,
-    scope_manifest_path,
-    fortran_root,
-    path,
-)
+function write_reference(collection, scope_manifest_path, fortran_root, path)
     cell_ids = Int.(getproperty.(collection.cells, :id))
     length(cell_ids) == 80 ||
         error("Representative MIMICS-C oracle requires exactly 80 cells")
     scope = TOML.parsefile(scope_manifest_path)
     Int.(scope["cell_ids"]) == cell_ids ||
         error("MIMICS-C oracle collection does not match the Scope Manifest")
-    grid = Workflow.selected_casa.selected_grid(
-        collection.files["grid"],
-        cell_ids,
-    )
-    boundary, boundary_sources = boundary_values(fortran_root, cell_ids)
+    gaps = [
+        gap for
+        gap in get(scope, "eligibility_gaps", Dict{String, Any}[]) if
+        get(gap, "model", nothing) == "MIMICS-C"
+    ]
+    excluded = Workflow.validate_gaps(gaps, cell_ids)
+    eligible_positions = findall(id -> id ∉ excluded, cell_ids)
+    isempty(eligible_positions) &&
+        error("MIMICS-C Scope Manifest has no eligible cells")
+    grid =
+        Workflow.selected_casa.selected_grid(collection.files["grid"], cell_ids)
+    boundary, boundary_sources =
+        boundary_values(fortran_root, cell_ids, eligible_positions)
     annual, daily, historical_sources =
-        historical_values(fortran_root, grid)
-    workflow = TOML.parsefile(
-        joinpath(fortran_root, "configuration", "workflow.toml"),
-    )
+        historical_values(fortran_root, grid, eligible_positions)
+    workflow_path = joinpath(fortran_root, "configuration", "workflow.toml")
+    workflow = TOML.parsefile(workflow_path)
+    fortran_grid_path =
+        joinpath(fortran_root, "stages", "01-prespin", "grid.csv")
     document = Dict(
         "schema_version" => 1,
         "model" => "MIMICS-C",
@@ -280,6 +293,18 @@ function write_reference(
             "fortran_source_revision" => workflow["source_commit"],
             "generator_sha256" => sha256sum(@__FILE__),
             "scope_manifest_sha256" => sha256sum(scope_manifest_path),
+            "fortran_grid" => source_record(
+                "stages/01-prespin/grid.csv",
+                fortran_grid_path,
+            ),
+            "fixture_grid" => source_record(
+                "selected_cell_fixture_grid",
+                collection.files["grid"],
+            ),
+            "fortran_workflow" => source_record(
+                "configuration/workflow.toml",
+                workflow_path,
+            ),
             "fortran_build_sha256" => sha256sum(
                 joinpath(fortran_root, "build", "build_metadata.toml"),
             ),
@@ -290,7 +315,12 @@ function write_reference(
             "boundary" => boundary,
             "annual" => annual,
             "daily" => daily,
-            "budget" => budget_values(boundary, annual, grid),
+            "budget" => budget_values(
+                boundary,
+                annual,
+                grid,
+                eligible_positions,
+            ),
         ),
     )
     mkpath(dirname(abspath(path)))

@@ -33,11 +33,9 @@ sha256sum(path) =
         bytes2hex(SHA.sha256(io))
     end
 
-source_record(path) =
-    Dict("sha256" => sha256sum(path))
+source_record(path) = Dict("sha256" => sha256sum(path))
 
-cell_ids_sha256(cell_ids) =
-    bytes2hex(SHA.sha256(join(string.(cell_ids), ",")))
+cell_ids_sha256(cell_ids) = bytes2hex(SHA.sha256(join(string.(cell_ids), ",")))
 
 function population_contract(path, grid_path, cell_ids)
     document = TOML.parsefile(path)
@@ -63,20 +61,18 @@ function population_contract(path, grid_path, cell_ids)
             cell_id in cell_ids &&
             get(gap, "first_nonfinite_stage", nothing) in
             keys(STAGE_DIRECTORIES) &&
-            get(gap, "first_nonfinite_variable", nothing) in
-            boundary_names &&
+            get(gap, "first_nonfinite_variable", nothing) in boundary_names &&
             get(gap, "evidence_side", nothing) in ("julia", "fortran") &&
             occursin(
                 r"^\d{4}-\d{2}-\d{2}$",
                 String(get(gap, "first_nonfinite_date", "")),
-            ) ||
-            error("MIMICS-C boundary exclusion lacks reviewed evidence")
+            ) || error("MIMICS-C boundary exclusion lacks reviewed evidence")
         cell_id in excluded &&
             error("MIMICS-C boundary exclusion is duplicated")
         push!(excluded, cell_id)
     end
     get(population, "eligible_cell_count", nothing) ==
-        length(cell_ids) - length(excluded) ||
+    length(cell_ids) - length(excluded) ||
         error("MIMICS-C boundary eligibility count changed")
     return (; population, gaps, excluded)
 end
@@ -133,14 +129,13 @@ function boundary_values(
                     ) for point in grid[eligible]
                 ],
             )
-        end for (fortran_name, source, component, variable) in
-        Native.BOUNDARY_VARIABLES
+        end for
+        (fortran_name, source, component, variable) in Native.BOUNDARY_VARIABLES
     )
 end
 
 function checkpoint_path(output_root, stage)
-    directory =
-        joinpath(output_root, "stages", stage, "checkpoints", stage)
+    directory = joinpath(output_root, "stages", stage, "checkpoints", stage)
     return only(
         filter(
             path -> endswith(path, ".hdf5"),
@@ -162,10 +157,8 @@ function write_calibration(
 )
     grid_path =
         joinpath(source_root, "GRID_CN", "gridinfo_igbpz_CLM5_GSWP3.csv")
-    soil_path =
-        joinpath(source_root, "GRID_CN", "gridinfo_soil_CLM5_GSWP3.csv")
-    plant_path =
-        joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4.csv")
+    soil_path = joinpath(source_root, "GRID_CN", "gridinfo_soil_CLM5_GSWP3.csv")
+    plant_path = joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4.csv")
     mimics_path = joinpath(
         source_root,
         "GRID_CN",
@@ -199,21 +192,19 @@ function write_calibration(
             joinpath(reference_root, "stages", directory, "casa_final.csv")
         mimics_reference =
             joinpath(reference_root, "stages", directory, "mimics_final.csv")
-        variables[stage] =
-            boundary_values(
-                state,
-                casa_path,
-                mimics_reference,
-                grid,
-                contract.excluded,
-            )
+        variables[stage] = boundary_values(
+            state,
+            casa_path,
+            mimics_reference,
+            grid,
+            contract.excluded,
+        )
         sources[stage] = Dict(
             "checkpoint" => source_record(checkpoint),
             "fresh_fortran_casa" => source_record(casa_path),
             "fresh_fortran_mimics" => source_record(mimics_reference),
-            "fresh_fortran_grid" => source_record(
-                joinpath(dirname(casa_path), "grid.csv"),
-            ),
+            "fresh_fortran_grid" =>
+                source_record(joinpath(dirname(casa_path), "grid.csv")),
         )
     end
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
@@ -222,25 +213,14 @@ function write_calibration(
     fortran_workflow = TOML.parsefile(fortran_workflow_path)
     document = Dict(
         "schema_version" => 1,
-        "calibration_id" =>
-            "mimics-c-current-julia-fresh-fortran-full-grid-boundary-v2",
+        "calibration_id" => "mimics-c-current-julia-fresh-fortran-full-grid-boundary-v2",
         "model" => "MIMICS-C",
         "source" => "fresh_fortran_full_grid",
         "cell_count" => 4263,
         "eligible_cell_count" => 4263 - length(contract.excluded),
         "units" => "kg C m^-2",
         "reviewed_exclusion" => contract.gaps,
-        "method" => Dict(
-            "error" => "e_i = abs(Julia_i - Fortran_i)",
-            "reference_magnitude" => "x_i = abs(Fortran_i)",
-            "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
-            "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
-            "safety_margin" =>
-                "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
-            "nonfinite" =>
-                "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
-        ),
+        "method" => Calibration.calibration_method(),
         "source_provenance" => Dict(
             "git_revision_basis" =>
                 readchomp(`git -C $repo_root rev-parse HEAD`),
@@ -267,8 +247,7 @@ function write_calibration(
                 "cell_count" => contract.population["cell_count"],
                 "eligible_cell_count" =>
                     contract.population["eligible_cell_count"],
-                "cell_ids_sha256" =>
-                    contract.population["cell_ids_sha256"],
+                "cell_ids_sha256" => contract.population["cell_ids_sha256"],
                 "grid_sha256" => contract.population["grid_sha256"],
             ),
             "grid" => source_record(grid_path),
@@ -278,10 +257,7 @@ function write_calibration(
                 joinpath(reference_root, "build", "build_metadata.toml"),
             ),
             "fresh_fortran_workflow" => merge(
-                Dict(
-                    "source_revision" =>
-                        fortran_workflow["source_commit"],
-                ),
+                Dict("source_revision" => fortran_workflow["source_commit"]),
                 source_record(fortran_workflow_path),
             ),
             "stage" => sources,

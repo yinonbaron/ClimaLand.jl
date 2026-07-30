@@ -16,12 +16,12 @@ safety_margin = "multiply raw atol and rtol by 1.05, then add 64eps(Float64) tim
 selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x)"
 
 [source_provenance]
-git_revision_basis = "ed75a82ea8d35558a757edaaae275560c8d300fb"
+git_revision_basis = "8c3ea8cac1f252bb47e0fbcf05f9e06b364084d1"
 julia_version = "1.12.6"
 
     [source_provenance.calibration]
     id = "test/testbed_validation/mimics_c_calibration.jl"
-    sha256 = "a3eb94940acf7b96973fc2add6b400cbf3b89bed10a201a33a4d13c8b4947bf8"
+    sha256 = "dcfb8dfb2eb333265422961297ee404b4d55bac157d1bf778378451a8d04cce1"
 
     [source_provenance.casa_parameters]
     sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
@@ -35,7 +35,7 @@ julia_version = "1.12.6"
 
     [source_provenance.generator]
     id = "test/testbed_validation/generate_mimics_c_boundary_calibration.jl"
-    sha256 = "b44a01e08aea42d4822beede40bcfe2b47b48d65ba23e882540f57ddcd3326dd"
+    sha256 = "b0b0676cd8b90d52f88dc60b7f94cb3f3af881160031db01c220c9f5ebd36582"
 
     [source_provenance.grid]
     sha256 = "b2d19ac5e67b8935639a9525dce422de865d29e4ff3078110fe6f2387c4f732b"
@@ -145,6 +145,20 @@ units = "kg C m^-2"
         p95 = 6.817776687518638e-8
         p99 = 3.5375918841535795e-5
         p999 = 0.020019979778244473
+
+    [variable.historical."casa_plant.c_fine_root".signed_error]
+    maximum = 7.727680277902493e-7
+    mean_bias = 3.319404455467591e-11
+    median = 0.0
+    minimum = -1.0643082665184878e-6
+
+    [variable.historical."casa_plant.c_fine_root".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 1.0643082665184878e-6
+    maximum_cell_mean_absolute_error_cell_id = 12138
+    maximum_cell_mean_absolute_error_latitude = -12.32
+    maximum_cell_mean_absolute_error_longitude = 315.0
+    mean_cell_absolute_error = 8.980592789168824e-10
 
     [[variable.historical."casa_plant.c_fine_root".top_outlier]]
     absolute_error = 1.0643082665184878e-6
@@ -280,6 +294,20 @@ units = "kg C m^-2"
 
         [variable.historical."casa_plant.c_labile".relative_error.distribution]
 
+    [variable.historical."casa_plant.c_labile".signed_error]
+    maximum = 0.0
+    mean_bias = 0.0
+    median = 0.0
+    minimum = 0.0
+
+    [variable.historical."casa_plant.c_labile".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0
+    maximum_cell_mean_absolute_error_cell_id = 11012
+    maximum_cell_mean_absolute_error_latitude = 36.95
+    maximum_cell_mean_absolute_error_longitude = 285.0
+    mean_cell_absolute_error = 0.0
+
     [[variable.historical."casa_plant.c_labile".top_outlier]]
     absolute_error = 0.0
     cell_id = 10
@@ -396,6 +424,20 @@ units = "kg C m^-2"
         p95 = 2.3651085158692168e-7
         p99 = 0.0008372504072359603
         p999 = 0.0026046866563412766
+
+    [variable.historical."casa_plant.c_leaf".signed_error]
+    maximum = 2.5354180322277944e-5
+    mean_bias = -2.306776585642658e-9
+    median = 0.0
+    minimum = -1.0777589269027246e-5
+
+    [variable.historical."casa_plant.c_leaf".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 2.5354180322277944e-5
+    maximum_cell_mean_absolute_error_cell_id = 2075
+    maximum_cell_mean_absolute_error_latitude = 19.89
+    maximum_cell_mean_absolute_error_longitude = 52.5
+    mean_cell_absolute_error = 3.736218837641348e-8
 
     [[variable.historical."casa_plant.c_leaf".top_outlier]]
     absolute_error = 2.5354180322277944e-5
@@ -514,6 +556,20 @@ units = "kg C m^-2"
         p99 = 0.00018029597289490312
         p999 = 0.02022060107165801
 
+    [variable.historical."casa_plant.c_wood".signed_error]
+    maximum = 9.994039196214999e-8
+    mean_bias = -3.651815549408469e-9
+    median = 0.0
+    minimum = -6.634580586251104e-6
+
+    [variable.historical."casa_plant.c_wood".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 6.634580586251104e-6
+    maximum_cell_mean_absolute_error_cell_id = 622
+    maximum_cell_mean_absolute_error_latitude = -4.74
+    maximum_cell_mean_absolute_error_longitude = 15.0
+    mean_cell_absolute_error = 4.634633696010292e-9
+
     [[variable.historical."casa_plant.c_wood".top_outlier]]
     absolute_error = 6.634580586251104e-6
     cell_id = 622
@@ -630,6 +686,20 @@ units = "kg C m^-2"
         p95 = 1.888860271100123e-6
         p99 = 0.0005111961067834681
         p999 = 0.13419091829994775
+
+    [variable.historical."mimics_soil.c_litter_cwd".signed_error]
+    maximum = 1.4681240223524128e-8
+    mean_bias = -4.708207914913116e-10
+    median = 0.0
+    minimum = -7.353246794794543e-7
+
+    [variable.historical."mimics_soil.c_litter_cwd".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 7.353246794794543e-7
+    maximum_cell_mean_absolute_error_cell_id = 622
+    maximum_cell_mean_absolute_error_latitude = -4.74
+    maximum_cell_mean_absolute_error_longitude = 15.0
+    mean_cell_absolute_error = 6.544002071019945e-10
 
     [[variable.historical."mimics_soil.c_litter_cwd".top_outlier]]
     absolute_error = 7.353246794794543e-7
@@ -748,6 +818,20 @@ units = "kg C m^-2"
         p99 = 6.510648411352894e-5
         p999 = 0.005053131246344505
 
+    [variable.historical."mimics_soil.c_litter_metabolic".signed_error]
+    maximum = 1.3296897945283548e-5
+    mean_bias = -4.9606468555383084e-8
+    median = 0.0
+    minimum = -0.00023452584461683412
+
+    [variable.historical."mimics_soil.c_litter_metabolic".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.00023452584461683412
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 9.33838094098093e-8
+
     [[variable.historical."mimics_soil.c_litter_metabolic".top_outlier]]
     absolute_error = 0.00023452584461683412
     cell_id = 13696
@@ -865,6 +949,20 @@ units = "kg C m^-2"
         p99 = 1.3517225894621832e-5
         p999 = 0.00010101414817474028
 
+    [variable.historical."mimics_soil.c_litter_structural".signed_error]
+    maximum = 0.00011518192350296053
+    mean_bias = -4.799636395972754e-7
+    median = 0.0
+    minimum = -0.0020762354284684648
+
+    [variable.historical."mimics_soil.c_litter_structural".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0020762354284684648
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 5.573996566618908e-7
+
     [[variable.historical."mimics_soil.c_litter_structural".top_outlier]]
     absolute_error = 0.0020762354284684648
     cell_id = 13696
@@ -981,6 +1079,20 @@ units = "kg C m^-2"
         p95 = 8.26542049588903e-8
         p99 = 2.9081641582054602e-5
         p999 = 0.11746971950599819
+
+    [variable.historical."mimics_soil.c_microbe_k".signed_error]
+    maximum = 0.00024179089916807181
+    mean_bias = 5.5986477442098715e-8
+    median = 0.0
+    minimum = -5.985449912107588e-6
+
+    [variable.historical."mimics_soil.c_microbe_k".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.00024179089916807181
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 5.948802542737993e-8
 
     [[variable.historical."mimics_soil.c_microbe_k".top_outlier]]
     absolute_error = 0.00024179089916807181
@@ -1104,6 +1216,20 @@ units = "kg C m^-2"
         p99 = 6.851855755504953e-5
         p999 = 0.0015846303555284813
 
+    [variable.historical."mimics_soil.c_microbe_r".signed_error]
+    maximum = 1.8344536915031857e-6
+    mean_bias = -2.4168805020830643e-10
+    median = 0.0
+    minimum = -4.867596924224005e-6
+
+    [variable.historical."mimics_soil.c_microbe_r".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.867596924224005e-6
+    maximum_cell_mean_absolute_error_cell_id = 12138
+    maximum_cell_mean_absolute_error_latitude = -12.32
+    maximum_cell_mean_absolute_error_longitude = 315.0
+    mean_cell_absolute_error = 2.9297104042431718e-9
+
     [[variable.historical."mimics_soil.c_microbe_r".top_outlier]]
     absolute_error = 4.867596924224005e-6
     cell_id = 12138
@@ -1220,6 +1346,20 @@ units = "kg C m^-2"
         p95 = 5.660644079276027e-8
         p99 = 1.448166727522209e-6
         p999 = 3.229587677360446e-5
+
+    [variable.historical."mimics_soil.c_soil_available".signed_error]
+    maximum = 0.0008267218113557906
+    mean_bias = 1.805380339006e-7
+    median = 0.0
+    minimum = -3.403922092903855e-5
+
+    [variable.historical."mimics_soil.c_soil_available".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0008267218113557906
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 2.3178524137429016e-7
 
     [[variable.historical."mimics_soil.c_soil_available".top_outlier]]
     absolute_error = 0.0008267218113557906
@@ -1338,6 +1478,20 @@ units = "kg C m^-2"
         p99 = 8.347855015182559e-7
         p999 = 5.602727362988068e-6
 
+    [variable.historical."mimics_soil.c_soil_chemical".signed_error]
+    maximum = 4.731343788055842e-5
+    mean_bias = -1.3326903447405082e-7
+    median = 0.0
+    minimum = -0.0005721735395767258
+
+    [variable.historical."mimics_soil.c_soil_chemical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0005721735395767258
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 1.72527367368276e-7
+
     [[variable.historical."mimics_soil.c_soil_chemical".top_outlier]]
     absolute_error = 0.0005721735395767258
     cell_id = 13696
@@ -1455,6 +1609,20 @@ units = "kg C m^-2"
         p99 = 0.003202776879487332
         p999 = 0.19635382393205747
 
+    [variable.historical."mimics_soil.c_soil_physical".signed_error]
+    maximum = 3.470939339194181e-5
+    mean_bias = 2.0875287444623953e-9
+    median = 0.0
+    minimum = -7.668663865700864e-6
+
+    [variable.historical."mimics_soil.c_soil_physical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 3.470939339194181e-5
+    maximum_cell_mean_absolute_error_cell_id = 13696
+    maximum_cell_mean_absolute_error_latitude = 29.37
+    maximum_cell_mean_absolute_error_longitude = 355.0
+    mean_cell_absolute_error = 2.2631546649268503e-8
+
     [[variable.historical."mimics_soil.c_soil_physical".top_outlier]]
     absolute_error = 3.470939339194181e-5
     cell_id = 13696
@@ -1571,6 +1739,20 @@ units = "kg C m^-2"
         p95 = 8.354975793384726e-8
         p99 = 1.4976137840197481e-5
         p999 = 0.12086106872262778
+
+    [variable.prespin."casa_plant.c_fine_root".signed_error]
+    maximum = 4.99912555795845e-10
+    mean_bias = -1.3512873836183808e-12
+    median = 0.0
+    minimum = -4.999468061761547e-10
+
+    [variable.prespin."casa_plant.c_fine_root".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.999468061761547e-10
+    maximum_cell_mean_absolute_error_cell_id = 991
+    maximum_cell_mean_absolute_error_latitude = -33.16
+    maximum_cell_mean_absolute_error_longitude = 25.0
+    mean_cell_absolute_error = 1.740841888534916e-10
 
     [[variable.prespin."casa_plant.c_fine_root".top_outlier]]
     absolute_error = 4.999468061761547e-10
@@ -1706,6 +1888,20 @@ units = "kg C m^-2"
 
         [variable.prespin."casa_plant.c_labile".relative_error.distribution]
 
+    [variable.prespin."casa_plant.c_labile".signed_error]
+    maximum = 0.0
+    mean_bias = 0.0
+    median = 0.0
+    minimum = 0.0
+
+    [variable.prespin."casa_plant.c_labile".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0
+    maximum_cell_mean_absolute_error_cell_id = 11012
+    maximum_cell_mean_absolute_error_latitude = 36.95
+    maximum_cell_mean_absolute_error_longitude = 285.0
+    mean_cell_absolute_error = 0.0
+
     [[variable.prespin."casa_plant.c_labile".top_outlier]]
     absolute_error = 0.0
     cell_id = 10
@@ -1827,6 +2023,20 @@ units = "kg C m^-2"
         p95 = 1.0336736386812486e-7
         p99 = 2.123580740976878e-7
         p999 = 2.41511349778216e-7
+
+    [variable.prespin."casa_plant.c_leaf".signed_error]
+    maximum = 4.997697811148782e-10
+    mean_bias = 2.1404158442742686e-12
+    median = 0.0
+    minimum = -4.989795659993135e-10
+
+    [variable.prespin."casa_plant.c_leaf".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.997697811148782e-10
+    maximum_cell_mean_absolute_error_cell_id = 3899
+    maximum_cell_mean_absolute_error_latitude = 19.89
+    maximum_cell_mean_absolute_error_longitude = 100.0
+    mean_cell_absolute_error = 1.7543780549292048e-10
 
     [[variable.prespin."casa_plant.c_leaf".top_outlier]]
     absolute_error = 4.997697811148782e-10
@@ -1950,6 +2160,20 @@ units = "kg C m^-2"
         p99 = 0.0002621316374049105
         p999 = 0.08285938230561841
 
+    [variable.prespin."casa_plant.c_wood".signed_error]
+    maximum = 4.998277347567637e-10
+    mean_bias = -2.414995076589284e-12
+    median = 0.0
+    minimum = -4.994733515673033e-10
+
+    [variable.prespin."casa_plant.c_wood".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.998277347567637e-10
+    maximum_cell_mean_absolute_error_cell_id = 4563
+    maximum_cell_mean_absolute_error_latitude = 4.74
+    maximum_cell_mean_absolute_error_longitude = 117.5
+    mean_cell_absolute_error = 1.1468332708759786e-10
+
     [[variable.prespin."casa_plant.c_wood".top_outlier]]
     absolute_error = 4.998277347567637e-10
     cell_id = 4563
@@ -2066,6 +2290,20 @@ units = "kg C m^-2"
         p95 = 3.710628195889972e-6
         p99 = 0.0007981001275732528
         p999 = 0.12231667856653594
+
+    [variable.prespin."mimics_soil.c_litter_cwd".signed_error]
+    maximum = 4.99929471951821e-10
+    mean_bias = 1.1944841629876399e-12
+    median = 0.0
+    minimum = -4.998725018981465e-10
+
+    [variable.prespin."mimics_soil.c_litter_cwd".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.99929471951821e-10
+    maximum_cell_mean_absolute_error_cell_id = 3237
+    maximum_cell_mean_absolute_error_latitude = 38.84
+    maximum_cell_mean_absolute_error_longitude = 82.5
+    mean_cell_absolute_error = 1.1410731305422116e-10
 
     [[variable.prespin."mimics_soil.c_litter_cwd".top_outlier]]
     absolute_error = 4.99929471951821e-10
@@ -2189,6 +2427,20 @@ units = "kg C m^-2"
         p99 = 7.85738889722894e-8
         p999 = 3.96282250778927e-7
 
+    [variable.prespin."mimics_soil.c_litter_metabolic".signed_error]
+    maximum = 4.99050800684131e-11
+    mean_bias = 2.648048796269561e-13
+    median = 0.0
+    minimum = -5.0821569175241166e-11
+
+    [variable.prespin."mimics_soil.c_litter_metabolic".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.0821569175241166e-11
+    maximum_cell_mean_absolute_error_cell_id = 10165
+    maximum_cell_mean_absolute_error_latitude = 69.16
+    maximum_cell_mean_absolute_error_longitude = 262.5
+    mean_cell_absolute_error = 1.6998156899605495e-11
+
     [[variable.prespin."mimics_soil.c_litter_metabolic".top_outlier]]
     absolute_error = 5.0821569175241166e-11
     cell_id = 10165
@@ -2310,6 +2562,20 @@ units = "kg C m^-2"
         p95 = 1.6424030308195268e-10
         p99 = 6.578384901528513e-10
         p999 = 1.2194547460254942e-9
+
+    [variable.prespin."mimics_soil.c_litter_structural".signed_error]
+    maximum = 5.0828230513388917e-11
+    mean_bias = 1.4704877185461226e-13
+    median = 0.0
+    minimum = -5.0179416177797975e-11
+
+    [variable.prespin."mimics_soil.c_litter_structural".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.0828230513388917e-11
+    maximum_cell_mean_absolute_error_cell_id = 9970
+    maximum_cell_mean_absolute_error_latitude = 63.47
+    maximum_cell_mean_absolute_error_longitude = 257.5
+    mean_cell_absolute_error = 1.7148908714376645e-11
 
     [[variable.prespin."mimics_soil.c_litter_structural".top_outlier]]
     absolute_error = 5.0828230513388917e-11
@@ -2433,6 +2699,20 @@ units = "kg C m^-2"
         p99 = 2.0485257484415516e-8
         p999 = 1.9312115079817353e-7
 
+    [variable.prespin."mimics_soil.c_microbe_k".signed_error]
+    maximum = 4.998579328230335e-11
+    mean_bias = -3.15562062641149e-15
+    median = 0.0
+    minimum = -4.998934599598215e-11
+
+    [variable.prespin."mimics_soil.c_microbe_k".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.998934599598215e-11
+    maximum_cell_mean_absolute_error_cell_id = 10915
+    maximum_cell_mean_absolute_error_latitude = 35.05
+    maximum_cell_mean_absolute_error_longitude = 282.5
+    mean_cell_absolute_error = 1.7634638101370997e-11
+
     [[variable.prespin."mimics_soil.c_microbe_k".top_outlier]]
     absolute_error = 4.998934599598215e-11
     cell_id = 10915
@@ -2549,6 +2829,20 @@ units = "kg C m^-2"
         p95 = 9.599692410171166e-9
         p99 = 2.663058695043398e-8
         p999 = 5.558596469330234e-8
+
+    [variable.prespin."mimics_soil.c_microbe_r".signed_error]
+    maximum = 4.9989519468329746e-11
+    mean_bias = 6.435235856301031e-13
+    median = 0.0
+    minimum = -4.996697500203595e-11
+
+    [variable.prespin."mimics_soil.c_microbe_r".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.9989519468329746e-11
+    maximum_cell_mean_absolute_error_cell_id = 3138
+    maximum_cell_mean_absolute_error_latitude = 33.16
+    maximum_cell_mean_absolute_error_longitude = 80.0
+    mean_cell_absolute_error = 1.7844309151027818e-11
 
     [[variable.prespin."mimics_soil.c_microbe_r".top_outlier]]
     absolute_error = 4.9989519468329746e-11
@@ -2672,6 +2966,20 @@ units = "kg C m^-2"
         p99 = 9.609386738826177e-11
         p999 = 1.3327790722055214e-10
 
+    [variable.prespin."mimics_soil.c_soil_available".signed_error]
+    maximum = 5.0389026284847205e-11
+    mean_bias = 5.116977423269964e-13
+    median = 0.0
+    minimum = -5.026778993055814e-11
+
+    [variable.prespin."mimics_soil.c_soil_available".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.0389026284847205e-11
+    maximum_cell_mean_absolute_error_cell_id = 1225
+    maximum_cell_mean_absolute_error_latitude = 46.42
+    maximum_cell_mean_absolute_error_longitude = 30.0
+    mean_cell_absolute_error = 1.7319819946835193e-11
+
     [[variable.prespin."mimics_soil.c_soil_available".top_outlier]]
     absolute_error = 5.0389026284847205e-11
     cell_id = 1225
@@ -2793,6 +3101,20 @@ units = "kg C m^-2"
         p95 = 3.6923053163010065e-11
         p99 = 6.110962226471254e-11
         p999 = 7.598911970429421e-11
+
+    [variable.prespin."mimics_soil.c_soil_chemical".signed_error]
+    maximum = 5.5060844772469864e-11
+    mean_bias = -2.5873457206840844e-14
+    median = 0.0
+    minimum = -5.394973356942501e-11
+
+    [variable.prespin."mimics_soil.c_soil_chemical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.5060844772469864e-11
+    maximum_cell_mean_absolute_error_cell_id = 1131
+    maximum_cell_mean_absolute_error_latitude = 50.21
+    maximum_cell_mean_absolute_error_longitude = 27.5
+    mean_cell_absolute_error = 1.734489219699908e-11
 
     [[variable.prespin."mimics_soil.c_soil_chemical".top_outlier]]
     absolute_error = 5.5060844772469864e-11
@@ -2916,6 +3238,20 @@ units = "kg C m^-2"
         p99 = 8.76056058456777e-11
         p999 = 1.0316608805411101e-10
 
+    [variable.prespin."mimics_soil.c_soil_physical".signed_error]
+    maximum = 5.1375792509134044e-11
+    mean_bias = -1.7762932939116253e-13
+    median = 0.0
+    minimum = -5.1409321244477724e-11
+
+    [variable.prespin."mimics_soil.c_soil_physical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.1409321244477724e-11
+    maximum_cell_mean_absolute_error_cell_id = 1610
+    maximum_cell_mean_absolute_error_latitude = 48.32
+    maximum_cell_mean_absolute_error_longitude = 40.0
+    mean_cell_absolute_error = 1.7714237328015595e-11
+
     [[variable.prespin."mimics_soil.c_soil_physical".top_outlier]]
     absolute_error = 5.1409321244477724e-11
     cell_id = 1610
@@ -3037,6 +3373,20 @@ units = "kg C m^-2"
         p95 = 7.965755550901726e-8
         p99 = 2.431761219217015e-5
         p999 = 0.023308605840015807
+
+    [variable.spin."casa_plant.c_fine_root".signed_error]
+    maximum = 2.803420384722699e-9
+    mean_bias = -5.618653153034906e-12
+    median = 0.0
+    minimum = -3.384193036914951e-8
+
+    [variable.spin."casa_plant.c_fine_root".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 3.384193036914951e-8
+    maximum_cell_mean_absolute_error_cell_id = 1099
+    maximum_cell_mean_absolute_error_latitude = -10.42
+    maximum_cell_mean_absolute_error_longitude = 27.5
+    mean_cell_absolute_error = 1.883511001582235e-10
 
     [[variable.spin."casa_plant.c_fine_root".top_outlier]]
     absolute_error = 3.384193036914951e-8
@@ -3172,6 +3522,20 @@ units = "kg C m^-2"
 
         [variable.spin."casa_plant.c_labile".relative_error.distribution]
 
+    [variable.spin."casa_plant.c_labile".signed_error]
+    maximum = 0.0
+    mean_bias = 0.0
+    median = 0.0
+    minimum = 0.0
+
+    [variable.spin."casa_plant.c_labile".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.0
+    maximum_cell_mean_absolute_error_cell_id = 11012
+    maximum_cell_mean_absolute_error_latitude = 36.95
+    maximum_cell_mean_absolute_error_longitude = 285.0
+    mean_cell_absolute_error = 0.0
+
     [[variable.spin."casa_plant.c_labile".top_outlier]]
     absolute_error = 0.0
     cell_id = 10
@@ -3288,6 +3652,20 @@ units = "kg C m^-2"
         p95 = 1.8912456043732953e-7
         p99 = 0.0008202407618879924
         p999 = 0.0025167652539574634
+
+    [variable.spin."casa_plant.c_leaf".signed_error]
+    maximum = 5.682160683817723e-6
+    mean_bias = 5.633772000147051e-9
+    median = 0.0
+    minimum = -5.610456543231682e-6
+
+    [variable.spin."casa_plant.c_leaf".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 5.682160683817723e-6
+    maximum_cell_mean_absolute_error_cell_id = 63
+    maximum_cell_mean_absolute_error_latitude = 27.47
+    maximum_cell_mean_absolute_error_longitude = 0.0
+    mean_cell_absolute_error = 3.339439874599604e-8
 
     [[variable.spin."casa_plant.c_leaf".top_outlier]]
     absolute_error = 5.682160683817723e-6
@@ -3406,6 +3784,20 @@ units = "kg C m^-2"
         p99 = 0.0003211647643842217
         p999 = 0.03849896782515847
 
+    [variable.spin."casa_plant.c_wood".signed_error]
+    maximum = 3.021507510858612e-7
+    mean_bias = -2.8307642840285008e-11
+    median = 0.0
+    minimum = -6.003007690935647e-8
+
+    [variable.spin."casa_plant.c_wood".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 3.021507510858612e-7
+    maximum_cell_mean_absolute_error_cell_id = 1099
+    maximum_cell_mean_absolute_error_latitude = -10.42
+    maximum_cell_mean_absolute_error_longitude = 27.5
+    mean_cell_absolute_error = 3.6042947272361183e-10
+
     [[variable.spin."casa_plant.c_wood".top_outlier]]
     absolute_error = 3.021507510858612e-7
     cell_id = 1099
@@ -3522,6 +3914,20 @@ units = "kg C m^-2"
         p95 = 3.043998272094448e-6
         p99 = 0.0006634745059091688
         p999 = 0.032063749720820565
+
+    [variable.spin."mimics_soil.c_litter_cwd".signed_error]
+    maximum = 3.260891415224343e-8
+    mean_bias = -1.1350181767598296e-11
+    median = 0.0
+    minimum = -1.5849364043418745e-8
+
+    [variable.spin."mimics_soil.c_litter_cwd".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 3.260891415224343e-8
+    maximum_cell_mean_absolute_error_cell_id = 1099
+    maximum_cell_mean_absolute_error_latitude = -10.42
+    maximum_cell_mean_absolute_error_longitude = 27.5
+    mean_cell_absolute_error = 1.4518816517105838e-10
 
     [[variable.spin."mimics_soil.c_litter_cwd".top_outlier]]
     absolute_error = 3.260891415224343e-8
@@ -3640,6 +4046,20 @@ units = "kg C m^-2"
         p99 = 3.514433476488097e-5
         p999 = 0.0050892248007482
 
+    [variable.spin."mimics_soil.c_litter_metabolic".signed_error]
+    maximum = 1.846648248150784e-5
+    mean_bias = 1.246049637085588e-9
+    median = 0.0
+    minimum = -4.5154262983404525e-6
+
+    [variable.spin."mimics_soil.c_litter_metabolic".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 1.846648248150784e-5
+    maximum_cell_mean_absolute_error_cell_id = 1402
+    maximum_cell_mean_absolute_error_latitude = 18.0
+    maximum_cell_mean_absolute_error_longitude = 35.0
+    mean_cell_absolute_error = 2.993534866515631e-8
+
     [[variable.spin."mimics_soil.c_litter_metabolic".top_outlier]]
     absolute_error = 1.846648248150784e-5
     cell_id = 1402
@@ -3756,6 +4176,20 @@ units = "kg C m^-2"
         p95 = 1.0265771224385722e-7
         p99 = 1.3240181525912271e-5
         p999 = 0.00012828539730687892
+
+    [variable.spin."mimics_soil.c_litter_structural".signed_error]
+    maximum = 0.00011998120955747371
+    mean_bias = 2.6884898285643746e-8
+    median = 0.0
+    minimum = -1.3733472769783539e-5
+
+    [variable.spin."mimics_soil.c_litter_structural".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 0.00011998120955747371
+    maximum_cell_mean_absolute_error_cell_id = 1402
+    maximum_cell_mean_absolute_error_latitude = 18.0
+    maximum_cell_mean_absolute_error_longitude = 35.0
+    mean_cell_absolute_error = 5.8352908810463534e-8
 
     [[variable.spin."mimics_soil.c_litter_structural".top_outlier]]
     absolute_error = 0.00011998120955747371
@@ -3874,6 +4308,20 @@ units = "kg C m^-2"
         p99 = 2.4342828553804578e-5
         p999 = 0.030859456536838255
 
+    [variable.spin."mimics_soil.c_microbe_k".signed_error]
+    maximum = 2.1658483044528776e-7
+    mean_bias = -3.3713890976123224e-10
+    median = 0.0
+    minimum = -1.0530682611870588e-6
+
+    [variable.spin."mimics_soil.c_microbe_k".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 1.0530682611870588e-6
+    maximum_cell_mean_absolute_error_cell_id = 1694
+    maximum_cell_mean_absolute_error_latitude = 25.58
+    maximum_cell_mean_absolute_error_longitude = 42.5
+    mean_cell_absolute_error = 6.999020973405377e-10
+
     [[variable.spin."mimics_soil.c_microbe_k".top_outlier]]
     absolute_error = 1.0530682611870588e-6
     cell_id = 1694
@@ -3990,6 +4438,20 @@ units = "kg C m^-2"
         p95 = 9.350841510745864e-8
         p99 = 7.366636789120677e-5
         p999 = 0.0017700991343847993
+
+    [variable.spin."mimics_soil.c_microbe_r".signed_error]
+    maximum = 8.940471739533103e-8
+    mean_bias = -1.3814514167872763e-10
+    median = 0.0
+    minimum = -2.3327147380945192e-7
+
+    [variable.spin."mimics_soil.c_microbe_r".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 2.3327147380945192e-7
+    maximum_cell_mean_absolute_error_cell_id = 442
+    maximum_cell_mean_absolute_error_latitude = 18.0
+    maximum_cell_mean_absolute_error_longitude = 10.0
+    mean_cell_absolute_error = 3.3121537548538187e-10
 
     [[variable.spin."mimics_soil.c_microbe_r".top_outlier]]
     absolute_error = 2.3327147380945192e-7
@@ -4108,6 +4570,20 @@ units = "kg C m^-2"
         p99 = 9.574455330787364e-7
         p999 = 1.1094988365600823e-5
 
+    [variable.spin."mimics_soil.c_soil_available".signed_error]
+    maximum = 2.5633691104198775e-6
+    mean_bias = -1.2974521485713994e-8
+    median = 0.0
+    minimum = -4.7696902001459485e-5
+
+    [variable.spin."mimics_soil.c_soil_available".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.7696902001459485e-5
+    maximum_cell_mean_absolute_error_cell_id = 1402
+    maximum_cell_mean_absolute_error_latitude = 18.0
+    maximum_cell_mean_absolute_error_longitude = 35.0
+    mean_cell_absolute_error = 2.2248097925146686e-8
+
     [[variable.spin."mimics_soil.c_soil_available".top_outlier]]
     absolute_error = 4.7696902001459485e-5
     cell_id = 1402
@@ -4224,6 +4700,20 @@ units = "kg C m^-2"
         p95 = 3.9384263805236985e-8
         p99 = 8.376021177519848e-7
         p999 = 2.841528222718341e-6
+
+    [variable.spin."mimics_soil.c_soil_chemical".signed_error]
+    maximum = 4.834965159938864e-5
+    mean_bias = 9.575231205198857e-9
+    median = 0.0
+    minimum = -1.1904535881068767e-5
+
+    [variable.spin."mimics_soil.c_soil_chemical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 4.834965159938864e-5
+    maximum_cell_mean_absolute_error_cell_id = 1402
+    maximum_cell_mean_absolute_error_latitude = 18.0
+    maximum_cell_mean_absolute_error_longitude = 35.0
+    mean_cell_absolute_error = 3.268132473046111e-8
 
     [[variable.spin."mimics_soil.c_soil_chemical".top_outlier]]
     absolute_error = 4.834965159938864e-5
@@ -4346,6 +4836,20 @@ units = "kg C m^-2"
         p95 = 5.610401273911509e-7
         p99 = 0.0012283354087224273
         p999 = 0.1436907387759135
+
+    [variable.spin."mimics_soil.c_soil_physical".signed_error]
+    maximum = 3.2268033933746665e-7
+    mean_bias = -9.479748992103304e-9
+    median = 0.0
+    minimum = -1.1669944832704005e-5
+
+    [variable.spin."mimics_soil.c_soil_physical".spatial_summary]
+    cell_count = 4263
+    maximum_cell_mean_absolute_error = 1.1669944832704005e-5
+    maximum_cell_mean_absolute_error_cell_id = 1099
+    maximum_cell_mean_absolute_error_latitude = -10.42
+    maximum_cell_mean_absolute_error_longitude = 27.5
+    mean_cell_absolute_error = 1.2268854814897907e-8
 
     [[variable.spin."mimics_soil.c_soil_physical".top_outlier]]
     absolute_error = 1.1669944832704005e-5

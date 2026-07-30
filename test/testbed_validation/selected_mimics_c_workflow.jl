@@ -175,6 +175,14 @@ function validate_provenance(provenance)
         length(digest) == 64 && all(isxdigit, digest) ||
             error("MIMICS-C oracle $name is invalid")
     end
+    for name in ("fortran_grid", "fixture_grid", "fortran_workflow")
+        source = get(provenance, name, Dict{String, Any}())
+        !isempty(String(get(source, "id", ""))) ||
+            error("MIMICS-C oracle $name has no logical ID")
+        digest = get(source, "sha256", "")
+        length(digest) == 64 && all(isxdigit, digest) ||
+            error("MIMICS-C oracle $name SHA-256 is invalid")
+    end
     return nothing
 end
 
@@ -191,8 +199,7 @@ function validate_cells(reference, collection)
                     get(record, "latitude", nothing),
                     get(record, "longitude", nothing),
                 ),
-            ) ||
-            error("Pinned MIMICS-C oracle has invalid cell metadata")
+            ) || error("Pinned MIMICS-C oracle has invalid cell metadata")
     end
     return nothing
 end
@@ -221,8 +228,11 @@ function scope_contract(
         gap in get(scope, "eligibility_gaps", Dict{String, Any}[]) if
         get(gap, "model", nothing) == "MIMICS-C"
     ]
-    isnothing(runtime_gaps) || runtime_gaps == gaps ||
-        error("Runtime MIMICS-C Eligibility Gaps differ from the Scope Manifest")
+    isnothing(runtime_gaps) ||
+        runtime_gaps == gaps ||
+        error(
+            "Runtime MIMICS-C Eligibility Gaps differ from the Scope Manifest",
+        )
     return gaps
 end
 
@@ -255,8 +265,9 @@ function workflow_reference(
         error("Pinned MIMICS-C oracle scope does not match the collection")
     cell_ids = Int.(get(reference, "cell_ids", Int[]))
     supplied_ids = Int.(getproperty.(collection.cells, :id))
-    cell_ids == supplied_ids ||
-        error("Pinned MIMICS-C oracle cell IDs do not exactly match the supplied collection")
+    cell_ids == supplied_ids || error(
+        "Pinned MIMICS-C oracle cell IDs do not exactly match the supplied collection",
+    )
     validate_cells(reference, collection)
     eligibility_gaps = scope_contract(
         collection,
@@ -267,6 +278,7 @@ function workflow_reference(
     gap_ids = validate_gaps(eligibility_gaps, cell_ids)
     eligible_ids = filter(id -> id ∉ gap_ids, cell_ids)
     positions = findall(id -> id ∉ gap_ids, cell_ids)
+    isempty(positions) && error("MIMICS-C Scope Manifest has no eligible cells")
     validate_provenance(get(reference, "provenance", Dict{String, Any}()))
     validate_policy(comparison_policy)
 
@@ -328,25 +340,20 @@ function workflow_reference(
     )
     budget = oracle["budget"]
     get(budget, "units", nothing) == "kg C" &&
-        get(budget, "reducer", nothing) ==
-        "maximum_absolute_residual" || error(
-        "Pinned MIMICS-C oracle has an incompatible budget reducer",
-    )
+        get(budget, "reducer", nothing) == "maximum_absolute_residual" ||
+        error("Pinned MIMICS-C oracle has an incompatible budget reducer")
     residual = get(budget, "maximum_absolute_residual_kg_c", nothing)
     residual isa Real && isfinite(residual) && residual >= 0 ||
         error("Pinned MIMICS-C oracle has an invalid budget residual")
     validate_values(
-        Dict(
-            "historical_residual_kg_c" =>
-                budget["historical_residual_kg_c"],
-        ),
+        Dict("historical_residual_kg_c" => budget["historical_residual_kg_c"]),
         ("historical_residual_kg_c",),
         1,
         cell_ids,
         positions,
         "budget",
     )
-    residual == maximum(abs, budget["historical_residual_kg_c"]) ||
+    residual == maximum(abs, budget["historical_residual_kg_c"][positions]) ||
         error("Pinned MIMICS-C oracle budget reducer is inconsistent")
     by_id = Dict(id => index for (index, id) in enumerate(cell_ids))
     return (;
@@ -371,7 +378,9 @@ function compare_payload(
     concurrency_budget = getfield(
         parentmodule(@__MODULE__),
         :TestbedReferenceCellComparisons,
-    ).ConcurrencyBudget(1),
+    ).ConcurrencyBudget(
+        1,
+    ),
 )
     indices =
         reference_indices isa AbstractDict ? (; by_id = reference_indices) :
@@ -482,11 +491,8 @@ function update_forcing!(forcing::PackedMIMICSForcing, stage, index, time)
     day == 1 || return nothing
     tracker = forcing.annual_npp_tracker
     annual_npp = vec(parent(forcing.buffers.annual_npp))
-    forced = view(
-        forcing.forced_annual_npp,
-        :,
-        year - first(HISTORICAL_YEARS) + 1,
-    )
+    forced =
+        view(forcing.forced_annual_npp, :, year - first(HISTORICAL_YEARS) + 1)
     if tracker.active_stage != stage.name
         tracker.active_stage = stage.name
         annual_npp .= forced
@@ -499,15 +505,11 @@ function update_forcing!(forcing::PackedMIMICSForcing, stage, index, time)
 end
 
 function load_setup(; collection)
-    cells = getfield(
-        parentmodule(@__MODULE__),
-        :TestbedReferenceCellComparisons,
-    )
+    cells =
+        getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
     return cells.with_fixture(collection) do fixture
-        grid = selected_casa.selected_grid(
-            fixture.files["grid"],
-            fixture.cell_ids,
-        )
+        grid =
+            selected_casa.selected_grid(fixture.files["grid"], fixture.cell_ids)
         soils = native_mimics.casa().read_soils(fixture.files["soil"])
         domain = native_mimics.casa().gridded_domain(length(grid))
         buffers = native_mimics.MIMICSBuffers(domain)
@@ -581,10 +583,7 @@ function compare_historical_reference(
         Dict(
             name => vec(
                 Array(
-                    output[replace(name, "." => "__")][
-                        :,
-                        daily["sample_days"],
-                    ],
+                    output[replace(name, "." => "__")][:, daily["sample_days"]],
                 ),
             ) for name in DAILY_NAMES
         )
@@ -626,11 +625,9 @@ function compare_historical_reference(
         concurrency_budget,
     )
     return Dict(
-        "output" => Dict(
-            "records" => NCDatasets.NCDataset(path) do output
-                size(output["time"], 1)
-            end,
-        ),
+        "output" => Dict("records" => NCDatasets.NCDataset(path) do output
+            size(output["time"], 1)
+        end),
         "reference" => reference.path,
         "provenance" => reference.provenance,
         "fixed_daily_samples" => daily_report,
@@ -653,14 +650,10 @@ function historical_budget_values(boundaries, path, grid)
     end
     npp, respiration = NCDatasets.NCDataset(path) do output
         (
+            vec(sum(output["diagnostic__cnpp"][:, :]; dims = 2)) .*
+            native_mimics.DAY_SECONDS,
             vec(
-                sum(output["diagnostic__cnpp"][:, :]; dims = 2),
-            ) .* native_mimics.DAY_SECONDS,
-            vec(
-                sum(
-                    output["diagnostic__mimics_respiration"][:, :];
-                    dims = 2,
-                ),
+                sum(output["diagnostic__mimics_respiration"][:, :]; dims = 2),
             ) .* native_mimics.DAY_SECONDS,
         )
     end
@@ -684,10 +677,8 @@ function compare_budget_reference(
 )
     expected = reference.oracle["budget"]
     comparison = compare_payload(
-        Dict(
-            "historical_residual_kg_c" =>
-                actual["historical_residual_kg_c"],
-        ),
+        Dict("historical_residual_kg_c" =>
+                actual["historical_residual_kg_c"]),
         Dict(
             "historical_residual_kg_c" =>
                 expected["historical_residual_kg_c"],
@@ -748,9 +739,8 @@ function annotate_report!(
     stage_budgets = collect(values(budget["stage"]))
     budget["units"] = "kg C"
     budget["reducer"] = "maximum_absolute_residual"
-    budget["maximum_absolute_residual_kg_c"] = maximum(
-        abs(values["residual_kg_c"]) for values in stage_budgets
-    )
+    budget["maximum_absolute_residual_kg_c"] =
+        maximum(abs(values["residual_kg_c"]) for values in stage_budgets)
     report["coverage"] = Dict(
         "scope_cell_ids" => getproperty.(scope_collection.cells, :id),
         "eligible_cell_ids" => getproperty.(active_collection.cells, :id),
@@ -772,7 +762,9 @@ function run_selected_case(
     concurrency_budget = getfield(
         parentmodule(@__MODULE__),
         :TestbedReferenceCellComparisons,
-    ).ConcurrencyBudget(1),
+    ).ConcurrencyBudget(
+        1,
+    ),
     stages = (
         native_mimics.native_workflow().NativeStage(
             :prespin,
@@ -786,11 +778,7 @@ function run_selected_case(
             499;
             write_output = false,
         ),
-        native_mimics.native_workflow().NativeStage(
-            :historical,
-            114 * 365,
-            1,
-        ),
+        native_mimics.native_workflow().NativeStage(:historical, 114 * 365, 1),
     ),
     budget_rtol = 5e-12,
     compare_references = true,
@@ -819,10 +807,8 @@ function run_selected_case(
     else
         nothing
     end
-    cells = getfield(
-        parentmodule(@__MODULE__),
-        :TestbedReferenceCellComparisons,
-    )
+    cells =
+        getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
     active_collection =
         isnothing(reference) ? collection :
         cells.subset(collection, reference.eligible_ids)
@@ -895,14 +881,13 @@ function run_selected_case(
             historical_budget_values(boundary_snapshots, path, setup.grid)
         return isnothing(reference) ?
                Dict(
-            "output" => Dict(
-                "records" => NCDatasets.NCDataset(path) do output
-                    size(output["time"], 1)
-                end,
-            ),
+            "output" => Dict("records" => NCDatasets.NCDataset(path) do output
+                size(output["time"], 1)
+            end),
             "budget" => model_budget,
             "skipped" => "reference comparison disabled",
-        ) : compare_historical_reference(
+        ) :
+               compare_historical_reference(
             reference,
             path,
             model_budget,
@@ -930,8 +915,7 @@ function run_selected_case(
         result.report,
         collection,
         active_collection,
-        isnothing(reference) ? Dict{String, Any}[] :
-        reference.eligibility_gaps,
+        isnothing(reference) ? Dict{String, Any}[] : reference.eligibility_gaps,
     )
     return result
 end

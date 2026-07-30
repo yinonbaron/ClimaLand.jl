@@ -46,7 +46,7 @@ function scope_contract(reference, scope_manifest_path)
     Int.(get(scope, "cell_ids", Int[])) == Int.(reference["cell_ids"]) ||
         error("MIMICS-C historical population differs from its Scope Manifest")
     sha256sum(scope_manifest_path) ==
-        reference["provenance"]["scope_manifest_sha256"] ||
+    reference["provenance"]["scope_manifest_sha256"] ||
         error("MIMICS-C historical Scope Manifest hash differs from the oracle")
     gaps = [
         gap for
@@ -54,8 +54,7 @@ function scope_contract(reference, scope_manifest_path)
         get(gap, "model", nothing) == "MIMICS-C"
     ]
     excluded = Workflow.validate_gaps(gaps, Int.(reference["cell_ids"]))
-    eligible_ids =
-        filter(id -> id ∉ excluded, Int.(reference["cell_ids"]))
+    eligible_ids = filter(id -> id ∉ excluded, Int.(reference["cell_ids"]))
     return (; gaps, eligible_ids)
 end
 
@@ -71,10 +70,7 @@ function historical_values(
         year in Workflow.HISTORICAL_YEARS for cell_id in eligible_ids
     ]
     annual_actual = NCDatasets.NCDataset(output_path) do output
-        Workflow.selected_casa.reduced_annual_values(
-            output,
-            oracle["annual"],
-        )
+        Workflow.selected_casa.reduced_annual_values(output, oracle["annual"])
     end
     annual = Dict(
         reducer => Dict(
@@ -84,8 +80,7 @@ function historical_values(
                 units = units(reducer, name),
                 observations = annual_observations,
             ) for (name, expected) in variables
-        ) for (reducer, variables) in
-        (
+        ) for (reducer, variables) in (
             reducer => oracle["annual"][reducer] for
             reducer in ("annual_mean", "end_of_year", "annual_total")
         )
@@ -95,8 +90,7 @@ function historical_values(
         (;
             cell_id,
             sample_day,
-            year = first(Workflow.HISTORICAL_YEARS) +
-                   (sample_day - 1) ÷ 365,
+            year = first(Workflow.HISTORICAL_YEARS) + (sample_day - 1) ÷ 365,
             day_of_year = mod1(sample_day, 365),
             get(coordinates, cell_id, (;))...,
         ) for sample_day in sample_days for cell_id in eligible_ids
@@ -104,9 +98,7 @@ function historical_values(
     daily_actual = NCDatasets.NCDataset(output_path) do output
         Dict(
             name => vec(
-                Array(
-                    output[replace(name, "." => "__")][:, sample_days],
-                ),
+                Array(output[replace(name, "." => "__")][:, sample_days]),
             ) for name in Workflow.DAILY_NAMES
         )
     end
@@ -142,10 +134,9 @@ function write_calibration(
     oracle = reference["oracle"]
     contract = scope_contract(reference, scope_manifest_path)
     coordinates = Dict(
-        Int(cell["cell_id"]) => (;
-            latitude = cell["latitude"],
-            longitude = cell["longitude"],
-        ) for cell in get(reference, "cell", Dict{String, Any}[])
+        Int(cell["cell_id"]) =>
+            (; latitude = cell["latitude"], longitude = cell["longitude"])
+        for cell in get(reference, "cell", Dict{String, Any}[])
     )
     length(coordinates) == length(cell_ids) ||
         error("MIMICS-C historical oracle lacks cell coordinates")
@@ -160,8 +151,7 @@ function write_calibration(
     get(report["coverage"], "scope_cell_ids", Int[]) == cell_ids &&
         get(report["coverage"], "eligible_cell_ids", Int[]) ==
         contract.eligible_ids &&
-        get(report["coverage"], "eligibility_gaps", Any[]) ==
-        contract.gaps ||
+        get(report["coverage"], "eligibility_gaps", Any[]) == contract.gaps ||
         error("MIMICS-C Julia report differs from the immutable Scope Manifest")
     julia_budget =
         report["historical_comparison"]["budget"]["historical_residual_kg_c"]
@@ -194,8 +184,7 @@ function write_calibration(
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
     document = Dict(
         "schema_version" => 1,
-        "calibration_id" =>
-            "mimics-c-current-julia-fresh-fortran-representative-history-v1",
+        "calibration_id" => "mimics-c-current-julia-fresh-fortran-representative-history-v1",
         "model" => "MIMICS-C",
         "scope" => reference["scope"],
         "cell_ids" => cell_ids,
@@ -203,17 +192,8 @@ function write_calibration(
         "eligible_cell_ids" => contract.eligible_ids,
         "eligible_cell_count" => eligible_count,
         "reviewed_exclusion" => contract.gaps,
-        "method" => Dict(
-            "error" => "e_i = abs(Julia_i - Fortran_i)",
-            "reference_magnitude" => "x_i = abs(Fortran_i)",
-            "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
-            "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for the zero-centered budget residual",
-            "safety_margin" =>
-                "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
-            "nonfinite" =>
-                "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
-        ),
+        "method" =>
+            Calibration.calibration_method(; budget_absolute_only = true),
         "source_provenance" => Dict(
             "git_revision_basis" =>
                 readchomp(`git -C $repo_root rev-parse HEAD`),
@@ -250,9 +230,8 @@ function write_calibration(
                     reference["provenance"]["fortran_source_revision"],
                 "scope_manifest_sha256" =>
                     reference["provenance"]["scope_manifest_sha256"],
-                "fresh_historical_source_sha256" => reference["provenance"][
-                    "fresh_historical_source_sha256"
-                ],
+                "fresh_historical_source_sha256" =>
+                    reference["provenance"]["fresh_historical_source_sha256"],
             ),
         ),
         "annual" => annual,
