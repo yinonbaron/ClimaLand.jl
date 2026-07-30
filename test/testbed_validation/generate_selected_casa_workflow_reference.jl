@@ -225,6 +225,41 @@ function fortran_annual(fortran_root, cell_ids)
     end
 end
 
+function fortran_daily(fortran_root, cell_ids)
+    quarter_days =
+        [collect(1:7); collect(91:97); collect(182:188); collect(274:280)]
+    sample_days = [
+        (year - 1901) * 365 + day for year in (1901, 2014) for
+        day in quarter_days
+    ]
+    values = Dict{String, Any}("sample_days" => sample_days)
+    stock_names = Set(first.(NativeCASACN.STOCK_VARIABLES))
+    for (reference_name, variable) in NativeCASACN.historical_variables()
+        reference_name == "nLitInptStruc" && continue
+        years = Matrix{Float64}[]
+        for year in (1901, 2014)
+            path = joinpath(
+                fortran_root,
+                "stages",
+                "04-historical",
+                "casaclm_pool_flux_$(year)_daily.nc",
+            )
+            NCDatasets.NCDataset(path) do output
+                ids = vec(Int.(Array(output["cellid"])))
+                by_id = Dict(id => index for (index, id) in enumerate(ids))
+                indices = [by_id[id] for id in cell_ids]
+                raw = reshape(Array(output[reference_name]), length(ids), 365)
+                selected = Float64.(raw[indices, quarter_days]) ./ 1000
+                reference_name in stock_names ||
+                    (selected ./= NativeCASA.DAY_SECONDS)
+                push!(years, selected)
+            end
+        end
+        values[replace(variable.native_name, "__" => ".")] = vec(hcat(years...))
+    end
+    return values
+end
+
 function calibrated_fortran_tolerance(path = CASA_C_CALIBRATION_PATH)
     calibration = TOML.parsefile(path)
     calibration["source"] == "fresh_fortran_full_grid" &&
@@ -261,6 +296,20 @@ function calibrated_fortran_annual_tolerance(path = CASA_CN_CALIBRATION_PATH)
     return tolerance
 end
 
+function calibrated_fortran_daily_tolerance(path = CASA_CN_CALIBRATION_PATH)
+    calibration = TOML.parsefile(path)
+    calibration["source"] == "fresh_fortran_full_grid" &&
+        calibration["cell_count"] == 4263 ||
+        error("CASA-CN calibration must use the full fresh-Fortran grid")
+    return Dict(
+        name => Dict(
+            "atol" => values["derived_policy"]["atol"],
+            "rtol" => values["derived_policy"]["rtol"],
+            "method" => calibration["calibration_id"],
+        ) for (name, values) in calibration["daily_variable"]
+    )
+end
+
 function generate_reference(
     configuration,
     collection,
@@ -283,6 +332,9 @@ function generate_reference(
     fortran_annual_reference =
         configuration == :carbon_nitrogen ?
         fortran_annual(fortran_root, metadata.ids) : Dict{String, Any}()
+    fortran_daily_reference =
+        configuration == :carbon_nitrogen ?
+        fortran_daily(fortran_root, metadata.ids) : Dict{String, Any}()
     reference = isfile(path) ? TOML.parsefile(path) : Dict{String, Any}()
     reference["schema_version"] = 1
     reference["tier"] = collection.name
@@ -321,6 +373,16 @@ function generate_reference(
                     "ann_casaclm_pool_flux_1901_2014.nc",
                 ),
             )
+        provenance["fresh_fortran_daily_sha256"] = Dict(
+            string(year) => TestbedNativeWorkflow.sha256sum(
+                joinpath(
+                    fortran_root,
+                    "stages",
+                    "04-historical",
+                    "casaclm_pool_flux_$(year)_daily.nc",
+                ),
+            ) for year in (1901, 2014)
+        )
         provenance["fresh_fortran_calibration_sha256"] =
             TestbedNativeWorkflow.sha256sum(CASA_CN_CALIBRATION_PATH)
     end
@@ -333,6 +395,7 @@ function generate_reference(
         "fresh_fortran" => Dict(
             "boundary" => fortran,
             "annual" => fortran_annual_reference,
+            "historical" => fortran_daily_reference,
         ),
         "native_julia" => Dict(
             "initialization" =>
@@ -364,6 +427,10 @@ function generate_reference(
             "fresh_fortran_annual" =>
                 configuration == :carbon_nitrogen ?
                 calibrated_fortran_annual_tolerance() :
+                Dict{String, Any}(),
+            "fresh_fortran_historical" =>
+                configuration == :carbon_nitrogen ?
+                calibrated_fortran_daily_tolerance() :
                 Dict{String, Any}(),
             "native_julia_annual" => Dict(
                 "atol" => 256eps(Float64),

@@ -26,12 +26,13 @@ For each finite eligible pair, let
 ```text
 x_i = abs(Fortran_i)
 e_i = abs(Julia_i - Fortran_i)
-a(r) = max(5e-10 kg C m^-2 + 64eps(Float64), max_i(e_i - r*x_i))
+a(r) = max(0, max_i(e_i - r*x_i))
 ```
 
 The calibration chooses the smallest nonnegative `r` minimizing
-`a(r) + r*mean(x)`. It then multiplies both envelope coefficients by 1.05 and
-adds `64eps(Float64)` to the absolute coefficient. Every pair is rechecked
+`a(r) + r*mean(x)`. It then multiplies both observation-fitted coefficients by
+1.05 and adds separately recorded, data-scale Float64 numerical padding to
+the absolute coefficient. Every pair is rechecked
 against `e_i <= atol + rtol*x_i`.
 
 The committed calibration manifest records distributions, maxima, six

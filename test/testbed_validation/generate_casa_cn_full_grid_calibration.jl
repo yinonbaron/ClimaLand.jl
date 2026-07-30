@@ -94,6 +94,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             units = "kg C or N m^-2, as declared by variable",
             model_source = "native_casa_cn_reconstruction.jl",
             annual_variables = CASA_CN_ANNUAL_VARIABLES,
+            daily_variables = CASA_CN_ANNUAL_VARIABLES,
             additional_sources = (
                 "generate_casa_cn_full_grid_calibration.jl",
                 "selected_casa_workflow.jl",

@@ -3,6 +3,7 @@ module TestbedValidationRunner
 import Pkg
 import SHA
 import TOML
+import NCDatasets
 
 include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
 include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
@@ -73,6 +74,8 @@ const CASA_CN_DAILY_VARIABLES = union(
     CASA_CN_ANNUAL_TOTAL_VARIABLES,
     Set(("diagnostic.n_litter_structural_input",)),
 )
+const CASA_CN_FRESH_DAILY_VARIABLES =
+    union(CASA_CN_ANNUAL_MEAN_VARIABLES, CASA_CN_ANNUAL_TOTAL_VARIABLES)
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = Dict(
     "CASA-C" => "CLIMALAND_VALIDATION_CASA_C_REFERENCE",
@@ -378,6 +381,14 @@ function comparison_policy(model_name = "CASA-C")
             "$model_name Calibration at $calibration_path is incompatible",
         ),
     )
+    raw_absolute =
+        get(get(calibration, "method", Dict{String, Any}()), "raw_absolute", "")
+    occursin("a(r) = max(0", raw_absolute) &&
+        !occursin("5e-10", raw_absolute) || throw(
+        RunnerError(
+            "$model_name Calibration at $calibration_path declares an obsolete absolute floor",
+        ),
+    )
     calibrated_variables = get(calibration, "variable", Dict{String, Any}())
     boundary_variables =
         model_name == "CASA-C" ? CASA_C_BOUNDARY_VARIABLES :
@@ -410,6 +421,12 @@ function comparison_policy(model_name = "CASA-C")
                             "$model_name Calibration at $calibration_path has no derived policy",
                         ),
                     )
+                    get(values[name], "units", nothing) isa String && !haskey(derived, "absolute_floor") ||
+                        throw(
+                            RunnerError(
+                                "$model_name Calibration at $calibration_path has incomplete boundary diagnostics",
+                            ),
+                        )
                     atol = get(derived, "atol", nothing)
                     rtol = get(derived, "rtol", nothing)
                     atol isa Real &&
@@ -432,9 +449,11 @@ function comparison_policy(model_name = "CASA-C")
         for rule in (
             "native_julia_annual",
             "fresh_fortran_annual",
+            "fresh_fortran_daily",
             "annual_reducers",
             "fixed_daily_samples",
             "invalid_oracle_variables",
+            "invalid_oracle_windows",
         )
             haskey(model, rule) || throw(
                 RunnerError(
@@ -446,6 +465,12 @@ function comparison_policy(model_name = "CASA-C")
         calibration_name || throw(
             RunnerError(
                 "Comparison Policy at $path has incompatible $model_name annual calibration",
+            ),
+        )
+        get(model["fresh_fortran_daily"], "calibration_manifest", nothing) ==
+        calibration_name || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name daily calibration",
             ),
         )
         tolerance["native_julia_annual"] = Dict(
@@ -476,6 +501,12 @@ function comparison_policy(model_name = "CASA-C")
                 ),
             )
             derived = get(values, "derived_policy", Dict{String, Any}())
+            get(values, "units", nothing) isa String &&
+                !haskey(derived, "absolute_floor") || throw(
+                RunnerError(
+                    "$model_name Calibration at $calibration_path has incomplete annual diagnostics",
+                ),
+            )
             atol = get(derived, "atol", nothing)
             rtol = get(derived, "rtol", nothing)
             atol isa Real &&
@@ -532,7 +563,64 @@ function comparison_policy(model_name = "CASA-C")
                 "Comparison Policy at $path has incompatible $model_name invalid-oracle variables",
             ),
         )
+        window_gap = get(
+            model["invalid_oracle_windows"],
+            "fresh_fortran_fixed_daily",
+            Dict{String, Any}(),
+        )
+        get(window_gap, "scope", nothing) == "fresh_fortran" &&
+            get(window_gap, "kind", nothing) == "time_window" &&
+            get(window_gap, "required_years", []) == [1901, 1957, 2014] &&
+            get(window_gap, "available_years", []) == [1901, 2014] &&
+            get(window_gap, "missing_years", []) == [1957] &&
+            get(window_gap, "comparison", nothing) ==
+            "missing_window_native_julia_only" &&
+            get(window_gap, "reviewed", false) === true || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name invalid-oracle windows",
+            ),
+        )
         tolerance["fresh_fortran_annual"] = annual_tolerance
+        daily_variables =
+            get(calibration, "daily_variable", Dict{String, Any}())
+        Set(keys(daily_variables)) ==
+        union(CASA_CN_ANNUAL_MEAN_VARIABLES, CASA_CN_ANNUAL_TOTAL_VARIABLES) ||
+            throw(
+                RunnerError(
+                    "$model_name Calibration at $calibration_path has incompatible daily variables",
+                ),
+            )
+        tolerance["fresh_fortran_historical"] = Dict(
+            String(name) => begin
+                get(values, "finite_pair_count", nothing) == 4263 * 56 || throw(
+                    RunnerError(
+                        "$model_name Calibration at $calibration_path is not full-grid daily",
+                    ),
+                )
+                derived =
+                    get(values, "derived_policy", Dict{String, Any}())
+                get(values, "units", nothing) isa String &&
+                    !haskey(derived, "absolute_floor") || throw(
+                    RunnerError(
+                        "$model_name Calibration at $calibration_path has incomplete daily diagnostics",
+                    ),
+                )
+                atol = get(derived, "atol", nothing)
+                rtol = get(derived, "rtol", nothing)
+                atol isa Real &&
+                    rtol isa Real &&
+                    isfinite(atol) &&
+                    isfinite(rtol) &&
+                    atol >= 0 &&
+                    rtol >= 0 &&
+                    get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                    RunnerError(
+                        "$model_name Calibration at $calibration_path has an invalid daily tolerance",
+                    ),
+                )
+                Dict("atol" => Float64(atol), "rtol" => Float64(rtol))
+            end for (name, values) in daily_variables
+        )
     end
     for rule in required_rules[1:3]
         rule_values = tolerance[rule]
@@ -594,6 +682,11 @@ function initial_report(configuration, output_root, scope, policy)
                 "fresh_fortran_annual",
                 Dict{String, Any}(),
             ),
+            "fresh_fortran_historical" => get(
+                policy.tolerance,
+                "fresh_fortran_historical",
+                Dict{String, Any}(),
+            ),
             "calibration" => Dict(
                 "id" => String(policy.calibration["calibration_id"]),
                 "source" => String(policy.calibration["source"]),
@@ -613,6 +706,11 @@ function initial_report(configuration, output_root, scope, policy)
             "invalid_oracle_variables" => get(
                 policy.model,
                 "invalid_oracle_variables",
+                Dict{String, Any}(),
+            ),
+            "invalid_oracle_windows" => get(
+                policy.model,
+                "invalid_oracle_windows",
                 Dict{String, Any}(),
             ),
         ),
@@ -834,6 +932,14 @@ function validate_eligible_reference_values(reference, scope, model = "CASA-C")
                 "Pinned $model reference has incompatible fixed daily variables",
             ),
         )
+        fresh_historical = get(fresh, "historical", Dict{String, Any}())
+        Set(keys(fresh_historical)) ==
+        union(CASA_CN_FRESH_DAILY_VARIABLES, Set(("sample_days",))) &&
+            length(get(fresh_historical, "sample_days", [])) == 56 || throw(
+            RunnerError(
+                "Pinned $model reference has incompatible fresh-Fortran daily variables",
+            ),
+        )
     end
     validate_finite_reference_values(
         native,
@@ -923,6 +1029,41 @@ function summarize_budget(budget, units)
     return summary
 end
 
+function compare_fresh_fortran_daily(
+    pinned_reference,
+    historical_output,
+    collection,
+    tolerance,
+    workers,
+)
+    reference = TOML.parsefile(pinned_reference)
+    expected =
+        reference["configuration"]["carbon_nitrogen"]["fresh_fortran"]["historical"]
+    sample_days = Int.(expected["sample_days"])
+    variables = Dict(
+        name => values for (name, values) in expected if name != "sample_days"
+    )
+    actual = NCDatasets.NCDataset(historical_output) do output
+        Dict(
+            name => vec(
+                Array(output[replace(name, "." => "__")][:, sample_days]),
+            ) for name in keys(variables)
+        )
+    end
+    cell_ids = Int.(reference["cell_ids"])
+    report = TestbedSelectedCASAWorkflow.compare_snapshot(
+        actual,
+        variables,
+        tolerance,
+        collection,
+        (; by_id = Dict(id => index for (index, id) in enumerate(cell_ids))),
+        TestbedReferenceCellComparisons.ConcurrencyBudget(workers),
+    )
+    report["sample_days"] = sample_days
+    report["source"] = "fresh_fortran"
+    return report
+end
+
 function run_casa!(
     report,
     output_root,
@@ -952,6 +1093,26 @@ function run_casa!(
     seconds = (time_ns() - started) / 1e9
     scientific_report = TOML.parsefile(result.report)
     outcome = scientific_outcome(scientific_report, result, model)
+    fresh_daily = Dict{String, Any}()
+    if model == "CASA-CN"
+        fresh_daily = compare_fresh_fortran_daily(
+            pinned_reference,
+            joinpath(
+                output_root,
+                model,
+                "stages",
+                "historical",
+                "historical.nc",
+            ),
+            collection,
+            policy.tolerance["fresh_fortran_historical"],
+            configuration.workers,
+        )
+        checks = copy(outcome.checks)
+        checks["fresh_fortran_daily"] = fresh_daily["all_match"]
+        outcome =
+            (; passed = outcome.passed && fresh_daily["all_match"], checks)
+    end
     model_report = only(report["model"])
     model_report["coverage"]["compared_cells"] =
         model_report["coverage"]["eligible_cells"]
@@ -976,6 +1137,7 @@ function run_casa!(
             "annual" => get(historical, "annual", Dict{String, Any}()),
             "fixed_daily_samples" =>
                 get(historical, "selected_dates", Dict{String, Any}()),
+            "fresh_fortran_daily" => fresh_daily,
         )
     end
     model_report["reference"] = Dict(
@@ -1040,6 +1202,18 @@ function main(args = ARGS)
             throw(
                 RunnerError(
                     "Pinned $model inputs are incompatible: $(sprint(showerror, error))",
+                ),
+            )
+            daily_hashes = get(
+                get(configuration, "provenance", Dict{String, Any}()),
+                "fresh_fortran_daily_sha256",
+                Dict{String, Any}(),
+            )
+            Set(keys(daily_hashes)) == Set(("1901", "2014")) && all(
+                hash isa String && length(hash) == 64 && all(isxdigit, hash) for hash in values(daily_hashes)
+            ) || throw(
+                RunnerError(
+                    "Pinned $model reference has invalid fresh-Fortran daily provenance",
                 ),
             )
         end

@@ -515,6 +515,8 @@ end
         report = TOML.parsefile(joinpath(output, "validation_report.toml"))
         model = only(report["model"])
         @test model["name"] == "CASA-CN"
+        @test report["comparison_policy"]["id"] ==
+              "casa-representative-validation-v3"
         @test model["coverage"]["scope_cells"] == 80
         @test model["coverage"]["compared_cells"] == 80
         @test model["outcome"] == "passed"
@@ -527,12 +529,30 @@ end
               "maximum_absolute_residual"
         @test model["historical"]["annual"]["all_match"]
         @test model["historical"]["fixed_daily_samples"]["all_match"]
+        @test model["historical"]["fresh_fortran_daily"]["all_match"]
+        @test length(
+            model["historical"]["fresh_fortran_daily"]["sample_days"],
+        ) == 56
         @test report["comparison_policy"]["fixed_daily_samples"]["sample_count_per_variable_cell"] ==
               84
         @test report["comparison_policy"]["annual_reducers"]["state_pool"]["reducers"] ==
               ["annual_mean", "end_of_year"]
         @test report["comparison_policy"]["invalid_oracle_variables"]["nLitInptStruc"]["kind"] ==
               "variable_level"
+        daily_gap =
+            report["comparison_policy"]["invalid_oracle_windows"]["fresh_fortran_fixed_daily"]
+        @test daily_gap["kind"] == "time_window"
+        @test daily_gap["missing_years"] == [1957]
+        @test daily_gap["comparison"] == "missing_window_native_julia_only"
+        policy_document = TOML.parsefile(VALIDATION_COMPARISON_POLICY)
+        for rule in (
+            "fresh_fortran_boundary",
+            "fresh_fortran_annual",
+            "fresh_fortran_daily",
+        )
+            @test !haskey(policy_document["model"]["CASA-CN"][rule], "atol")
+            @test !haskey(policy_document["model"]["CASA-CN"][rule], "rtol")
+        end
         scientific = TOML.parsefile(model["comparison_report"])
         applied =
             scientific["historical_comparison"]["annual"]["source"]["fresh_fortran"]["reducers"]["annual_mean"]["variable"]["casa_plant.c_leaf"]
@@ -540,6 +560,12 @@ end
             report["comparison_policy"]["fresh_fortran_annual"]["annual_mean"]["casa_plant.c_leaf"]
         @test applied["atol"] == policy["atol"]
         @test applied["rtol"] == policy["rtol"]
+        daily_applied =
+            model["historical"]["fresh_fortran_daily"]["variable"]["casa_plant.c_leaf"]
+        daily_policy =
+            report["comparison_policy"]["fresh_fortran_historical"]["casa_plant.c_leaf"]
+        @test daily_applied["atol"] == daily_policy["atol"]
+        @test daily_applied["rtol"] == daily_policy["rtol"]
     end
 end
 

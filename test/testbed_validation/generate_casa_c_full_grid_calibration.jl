@@ -40,6 +40,8 @@ function grid_metadata(path)
         (
             cell_id = parse(Int, row[columns["ijcam"]]),
             pft = parse(Int, row[columns["ivt_igbp"]]),
+            latitude = parse(Float64, row[columns["lat"]]),
+            longitude = parse(Float64, row[columns["lon"]]),
         ) for row in rows
     ]
 end
@@ -67,8 +69,8 @@ function fortran_values(path, reference_name)
     return [parse(Float64, row[index]) / 1000 for row in rows]
 end
 
-function right_derivative(r, errors, references, absolute_floor, mean_reference)
-    maximum_value = absolute_floor
+function right_derivative(r, errors, references, mean_reference)
+    maximum_value = 0.0
     maximum_slope = mean_reference
     for index in eachindex(errors, references)
         residual = errors[index] - r * references[index]
@@ -83,25 +85,13 @@ function right_derivative(r, errors, references, absolute_floor, mean_reference)
     return maximum_slope
 end
 
-function calibrated_envelope(errors, references)
-    absolute_floor = 5.0e-10 + 64eps(Float64)
+function calibrated_envelope(errors, references; numerical_scale)
+    numerical_padding = 64eps(Float64) * max(numerical_scale, floatmin(Float64))
     mean_reference = Statistics.mean(references)
     relative = 0.0
-    if right_derivative(
-        relative,
-        errors,
-        references,
-        absolute_floor,
-        mean_reference,
-    ) < 0
+    if right_derivative(relative, errors, references, mean_reference) < 0
         upper = eps(Float64)
-        while right_derivative(
-            upper,
-            errors,
-            references,
-            absolute_floor,
-            mean_reference,
-        ) < 0
+        while right_derivative(upper, errors, references, mean_reference) < 0
             upper *= 2
             isfinite(upper) ||
                 error("unable to bracket calibrated relative tolerance")
@@ -109,13 +99,7 @@ function calibrated_envelope(errors, references)
         lower = 0.0
         for _ in 1:80
             middle = (lower + upper) / 2
-            if right_derivative(
-                middle,
-                errors,
-                references,
-                absolute_floor,
-                mean_reference,
-            ) < 0
+            if right_derivative(middle, errors, references, mean_reference) < 0
                 lower = middle
             else
                 upper = middle
@@ -123,8 +107,8 @@ function calibrated_envelope(errors, references)
         end
         relative = upper
     end
-    absolute = max(absolute_floor, maximum(errors .- relative .* references))
-    atol = 1.05absolute + 64eps(Float64)
+    absolute = max(0.0, maximum(errors .- relative .* references))
+    atol = 1.05absolute + numerical_padding
     rtol = 1.05relative
     all(errors .<= atol .+ rtol .* references) ||
         error("calibrated tolerance does not enclose every full-grid pair")
@@ -133,7 +117,7 @@ function calibrated_envelope(errors, references)
         rtol,
         raw_atol = absolute,
         raw_rtol = relative,
-        absolute_floor,
+        numerical_padding,
     )
 end
 
@@ -150,8 +134,8 @@ function distribution(values)
     )
 end
 
-function calibration_record(actual, expected, grid; quantity = "c")
-    length(actual) == length(expected) == length(grid) ||
+function calibration_record(actual, expected, contexts; units)
+    length(actual) == length(expected) == length(contexts) ||
         error("full-grid calibration requires aligned cell pairs")
     all(isfinite, actual) ||
         error("eligible Julia full-grid boundary contains a nonfinite value")
@@ -169,12 +153,16 @@ function calibration_record(actual, expected, grid; quantity = "c")
     )
     isempty(relative_errors) ||
         merge!(relative_distribution, distribution(relative_errors))
-    envelope = calibrated_envelope(errors, references)
+    envelope = calibrated_envelope(
+        errors,
+        references;
+        numerical_scale = max(maximum(abs, actual), maximum(abs, expected)),
+    )
     residuals = errors .- envelope.raw_rtol .* references
     maximum_residual = maximum(residuals)
     active_tolerance = 256eps(Float64) * max(1.0, abs(maximum_residual))
     active =
-        maximum_residual + active_tolerance >= envelope.absolute_floor ?
+        maximum_residual + active_tolerance >= 0 ?
         findall(
             residual -> isapprox(
                 residual,
@@ -188,11 +176,18 @@ function calibration_record(actual, expected, grid; quantity = "c")
     outliers = [
         Dict(
             "rank" => rank,
-            "cell_id" => grid[index].cell_id,
-            "pft" => grid[index].pft,
-            "julia_kg_$(quantity)_m2" => actual[index],
-            "fortran_kg_$(quantity)_m2" => expected[index],
-            "absolute_error_kg_$(quantity)_m2" => errors[index],
+            "cell_id" => contexts[index].cell_id,
+            "pft" => contexts[index].pft,
+            "latitude" => contexts[index].latitude,
+            "longitude" => contexts[index].longitude,
+            (
+                string(name) => value for
+                (name, value) in pairs(contexts[index]) if
+                name ∉ (:cell_id, :pft, :latitude, :longitude)
+            )...,
+            "julia_value" => actual[index],
+            "fortran_value" => expected[index],
+            "absolute_error" => errors[index],
             "relative_error" =>
                 iszero(references[index]) ? "undefined_zero_reference" :
                 errors[index] / references[index],
@@ -200,28 +195,30 @@ function calibration_record(actual, expected, grid; quantity = "c")
     ]
     return Dict(
         "finite_pair_count" => length(errors),
-        "absolute_error_kg_$(quantity)_m2" => distribution(errors),
+        "units" => units,
+        "absolute_error" => distribution(errors),
         "relative_error" => relative_distribution,
-        "absolute_reference_kg_$(quantity)_m2" => distribution(references),
+        "absolute_reference" => distribution(references),
         "active_constraint_cell_ids" =>
-            [grid[index].cell_id for index in active],
+            [contexts[index].cell_id for index in active],
         "active_constraint_objective_slopes" => [
             Statistics.mean(references) - references[index] for index in active
         ],
-        "floor_constraint_active" => isapprox(
-            envelope.absolute_floor,
-            max(envelope.absolute_floor, maximum_residual);
+        "nonnegative_absolute_constraint_active" => isapprox(
+            0.0,
+            max(0.0, maximum_residual);
             atol = active_tolerance,
             rtol = 0,
         ),
-        "active_constraint" => isempty(active) ? "absolute_floor" : "cell_pair",
+        "active_constraint" =>
+            isempty(active) ? "nonnegative_absolute_bound" : "cell_pair",
         "top_outlier" => outliers,
         "derived_policy" => Dict(
             "atol" => envelope.atol,
             "rtol" => envelope.rtol,
             "raw_atol" => envelope.raw_atol,
             "raw_rtol" => envelope.raw_rtol,
-            "absolute_floor" => envelope.absolute_floor,
+            "numerical_padding" => envelope.numerical_padding,
             "raw_objective" =>
                 envelope.raw_atol +
                 envelope.raw_rtol * Statistics.mean(references),
@@ -246,6 +243,7 @@ function generate(
     units = "kg C m^-2",
     model_source = "native_casa_c_reconstruction.jl",
     annual_variables = (),
+    daily_variables = (),
     additional_sources = (),
 )
     stage_root = joinpath(fortran_root, "stages")
@@ -288,13 +286,19 @@ function generate(
             quantity = length(specification) == 3 ? specification[3] : "c"
             actual = checkpoint_values(checkpoint, component, variable)
             expected = fortran_values(fortran_boundary, reference_name)
-            stage_records["$component.$variable"] =
-                calibration_record(actual, expected, grid; quantity)
+            stage_records["$component.$variable"] = calibration_record(
+                actual,
+                expected,
+                grid;
+                units = "kg $(uppercase(quantity)) m^-2",
+            )
         end
         variables[stage] = stage_records
     end
     annual = Dict{String, Any}()
+    daily = Dict{String, Any}()
     annual_sources = Dict{String, Any}()
+    daily_sources = Dict{String, Any}()
     if !isempty(annual_variables)
         reduced_path = joinpath(output_root, "reduced_historical.nc")
         fortran_path = joinpath(
@@ -318,7 +322,9 @@ function generate(
                 positions =
                     Dict(id => index for (index, id) in enumerate(cell_ids))
                 indices = [positions[cell.cell_id] for cell in grid]
-                repeated_grid = repeat(grid, 114)
+                annual_contexts = [
+                    merge(cell, (; year)) for year in 1901:2014 for cell in grid
+                ]
                 for (reference_name, native_name, reducer, quantity) in
                     annual_variables
                     actual = vec(Array(julia["$(reducer)__$(reference_name)"]))
@@ -337,10 +343,95 @@ function generate(
                     annual["$reducer.$native_name"] = calibration_record(
                         actual,
                         expected,
-                        repeated_grid;
-                        quantity,
+                        annual_contexts;
+                        units = reducer == "annual_total" ?
+                                "kg $(uppercase(quantity)) m^-2 year^-1" :
+                                "kg $(uppercase(quantity)) m^-2",
                     )
                 end
+            end
+        end
+    end
+    if !isempty(daily_variables)
+        reduced_path = joinpath(output_root, "reduced_historical.nc")
+        sample_columns = [collect(1:28); collect(57:84)]
+        daily_samples = [
+            (
+                year = year,
+                day_of_year = day,
+                sample_day = (year - 1901) * 365 + day,
+            ) for year in (1901, 2014) for day in [
+                collect(1:7)
+                collect(91:97)
+                collect(182:188)
+                collect(274:280)
+            ]
+        ]
+        daily_contexts =
+            [merge(cell, sample) for sample in daily_samples for cell in grid]
+        daily_paths = Dict(
+            year => joinpath(
+                fortran_root,
+                "stages",
+                "04-historical",
+                "casaclm_pool_flux_$(year)_daily.nc",
+            ) for year in (1901, 2014)
+        )
+        daily_sources = Dict(
+            "julia_reduced_historical" => source_file_record(
+                reduced_path,
+                "julia/reduced_historical.nc",
+            ),
+            "fresh_fortran_daily" => Dict(
+                string(year) => source_file_record(
+                    path,
+                    "fortran/stages/04-historical/$(basename(path))",
+                ) for (year, path) in daily_paths
+            ),
+        )
+        NCDatasets.NCDataset(reduced_path) do julia
+            for (reference_name, native_name, _, quantity) in daily_variables
+                actual = vec(
+                    Array(
+                        julia["fixed_daily_sample__$(reference_name)"][
+                            :,
+                            sample_columns,
+                        ],
+                    ),
+                )
+                expected_years = Matrix{Float64}[]
+                for year in (1901, 2014)
+                    NCDatasets.NCDataset(daily_paths[year]) do fortran
+                        ids = vec(Int.(Array(fortran["cellid"])))
+                        positions =
+                            Dict(id => index for (index, id) in enumerate(ids))
+                        indices = [positions[cell.cell_id] for cell in grid]
+                        raw = reshape(
+                            Array(fortran[reference_name]),
+                            length(ids),
+                            365,
+                        )
+                        days = [
+                            collect(1:7)
+                            collect(91:97)
+                            collect(182:188)
+                            collect(274:280)
+                        ]
+                        values = Float64.(raw[indices, days])
+                        startswith(native_name, "diagnostic.") &&
+                            (values ./= 86400)
+                        push!(expected_years, values ./ 1000)
+                    end
+                end
+                expected = vec(hcat(expected_years...))
+                daily[native_name] = calibration_record(
+                    actual,
+                    expected,
+                    daily_contexts;
+                    units = startswith(native_name, "diagnostic.") ?
+                            "kg $(uppercase(quantity)) m^-2 s^-1" :
+                            "kg $(uppercase(quantity)) m^-2",
+                )
             end
         end
     end
@@ -380,9 +471,9 @@ function generate(
         "method" => Dict(
             "error" => "e_i = abs(Julia_i - Fortran_i)",
             "reference_magnitude" => "x_i = abs(Fortran_i)",
-            "raw_absolute" => "a(r) = max(5e-10 in the declared variable units + 64eps(Float64), max_i(e_i - r*x_i))",
+            "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
             "selection" => "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
-            "safety_margin" => "multiply both raw envelope coefficients by 1.05, then add 64eps(Float64) to atol",
+            "safety_margin" => "multiply both observation-fitted raw coefficients by 1.05, then add 64*eps(Float64)*max(maximum(abs, Julia), maximum(abs, Fortran), floatmin(Float64)) to atol",
             "acceptance" => "e_i <= atol + rtol*x_i for every eligible pair",
             "nonfinite" => "fail calibration; exclusions require a reviewed scope-manifest gap",
         ),
@@ -404,10 +495,12 @@ function generate(
             "julia" => julia_sources,
             "fortran" => fortran_sources,
             "annual" => annual_sources,
+            "daily" => daily_sources,
             "model_source" => model_sources,
         ),
         "variable" => variables,
         "annual_variable" => annual,
+        "daily_variable" => daily,
     )
     mkpath(dirname(output_path))
     open(output_path, "w") do io

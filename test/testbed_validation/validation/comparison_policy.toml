@@ -1,5 +1,5 @@
 schema_version = 2
-policy_id = "casa-representative-validation-v2"
+policy_id = "casa-representative-validation-v3"
 
 [acceptance]
 eligible_nonfinite = "fail"
@@ -58,6 +58,10 @@ method = "mixed absolute-relative envelope calibrated from all 4,263 current-Jul
 calibration_manifest = "casa_cn_full_grid_calibration.toml"
 method = "variable-aware annual reducers with mixed envelopes calibrated from all 485,982 current-Julia/fresh-Fortran year-cell pairs"
 
+[model."CASA-CN".fresh_fortran_daily]
+calibration_manifest = "casa_cn_full_grid_calibration.toml"
+method = "variable-aware mixed envelopes calibrated from all 238,728 current-Julia/fresh-Fortran retained requested day-cell pairs"
+
 [model."CASA-CN".annual_reducers.state_pool]
 reducers = ["annual_mean", "end_of_year"]
 units = "kg C or N m^-2"
@@ -81,3 +85,13 @@ scope = "fresh_fortran"
 kind = "variable_level"
 reviewed = true
 reason = "Fortran casa_delsoil adds an uninitialized local nwd2str work array; Julia's initialized diagnostic remains pinned as a native regression value"
+
+[model."CASA-CN".invalid_oracle_windows.fresh_fortran_fixed_daily]
+scope = "fresh_fortran"
+kind = "time_window"
+required_years = [1901, 1957, 2014]
+available_years = [1901, 2014]
+missing_years = [1957]
+comparison = "missing_window_native_julia_only"
+reviewed = true
+reason = "The fresh-Fortran archive retained daily trajectories only for 1901-1905 and 2010-2014; reconstructing 1957 requires a new stateful historical run"

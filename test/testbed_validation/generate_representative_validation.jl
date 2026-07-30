@@ -215,27 +215,33 @@ function build_casa_cn(args)
         cell_ids;
         manifest_path = fixture_manifest,
     )
-    native_output = joinpath(work_root, "representative_casa_cn_native")
-    result = Workflow.run_selected_case(
-        native_output;
-        configuration = :carbon_nitrogen,
-        collection,
-        concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
-        compare_references = false,
-        diagnostics = setup -> NativeCASACN.casa_cn_diagnostics(
-            setup.normal.model.casa_soil.parameters,
-        ),
-    )
     reference_payload = joinpath(work_root, "representative_casa_cn_reference")
     mkpath(reference_payload)
     reference_path = joinpath(reference_payload, "complete_casa_workflow.toml")
-    generate_reference(
-        :carbon_nitrogen,
-        collection,
-        native_output,
-        fortran_root,
-        reference_path,
-    )
+    mkpath(work_root)
+    native_report_sha256 = mktempdir(
+        work_root;
+        prefix = "representative_casa_cn_native.",
+    ) do native_output
+        result = Workflow.run_selected_case(
+            native_output;
+            configuration = :carbon_nitrogen,
+            collection,
+            concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+            compare_references = false,
+            diagnostics = setup -> NativeCASACN.casa_cn_diagnostics(
+                setup.normal.model.casa_soil.parameters,
+            ),
+        )
+        generate_reference(
+            :carbon_nitrogen,
+            collection,
+            native_output,
+            fortran_root,
+            reference_path,
+        )
+        Selection.sha256sum(result.report)
+    end
     reference_hash = bind_local_artifact!(
         artifacts_toml,
         "representative_casa_cn_reference",
@@ -248,7 +254,7 @@ function build_casa_cn(args)
             "forcing_artifact" => string(forcing_hash),
             "reference_artifact" => string(reference_hash),
             "reference_path" => Pkg.Artifacts.artifact_path(reference_hash),
-            "native_report" => result.report,
+            "native_report_sha256" => native_report_sha256,
         );
         sorted = true,
     )
