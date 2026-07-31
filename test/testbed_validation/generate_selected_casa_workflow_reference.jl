@@ -276,6 +276,18 @@ function calibrated_fortran_tolerance(path = CASA_C_CALIBRATION_PATH)
     )
 end
 
+function measured_boundary_tolerance(path, julia, fortran)
+    tolerance = calibrated_fortran_tolerance(path)
+    for (stage, variables) in tolerance
+        for (name, values) in variables
+            values["measured_maximum_absolute_error"] = maximum(
+                abs.(julia[stage][name] .- fortran[stage][name]),
+            )
+        end
+    end
+    return tolerance
+end
+
 function calibrated_fortran_annual_tolerance(path = CASA_CN_CALIBRATION_PATH)
     calibration = TOML.parsefile(path)
     calibration["source"] == "fresh_fortran_full_grid" &&
@@ -411,9 +423,11 @@ function generate_reference(
             "annual" => annual,
         ),
         "tolerance" => Dict(
-            "fresh_fortran_boundary" => calibrated_fortran_tolerance(
+            "fresh_fortran_boundary" => measured_boundary_tolerance(
                 configuration == :carbon_only ?
                 CASA_C_CALIBRATION_PATH : CASA_CN_CALIBRATION_PATH,
+                julia,
+                fortran,
             ),
             "native_julia_boundary" => Dict(
                 "atol" => 256eps(Float64),

@@ -24,6 +24,8 @@ const SoilCASA = ClimaLand.Soil.Biogeochemistry.CASA
 native_workflow() = getfield(parentmodule(@__MODULE__), :TestbedNativeWorkflow)
 native_casa() =
     getfield(parentmodule(@__MODULE__), :TestbedNativeCASACReconstruction)
+native_casa_cn() =
+    getfield(parentmodule(@__MODULE__), :TestbedNativeCASACNReconstruction)
 reference_cells() =
     getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
 
@@ -1212,6 +1214,13 @@ function (callback::SelectedAfterStep)(stage, _, Y, p, _)
     return nothing
 end
 
+function default_diagnostics(configuration, setup)
+    parameters = setup.normal.model.casa_soil.parameters
+    return configuration == :carbon_nitrogen ?
+           native_casa_cn().casa_cn_diagnostics(parameters) :
+           native_casa().casa_diagnostics(parameters)
+end
+
 function run_selected_case(
     output_root;
     configuration = :carbon_only,
@@ -1226,7 +1235,7 @@ function run_selected_case(
 )
     setup = load_setup(configuration; collection)
     active_diagnostics = if isnothing(diagnostics)
-        native_casa().casa_diagnostics(setup.normal.model.casa_soil.parameters)
+        default_diagnostics(configuration, setup)
     elseif diagnostics isa Function
         diagnostics(setup)
     else

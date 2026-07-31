@@ -1,4 +1,5 @@
 using Test
+import Dates
 import TOML
 
 import NCDatasets
@@ -68,8 +69,14 @@ end
         ),
     )
     @test Int.(reference["cell_ids"]) == getproperty.(collection.cells, :id)
-    @test reference["historical_coverage"]["dates"] ==
-          ["1901-01-01", "1957-07-02", "2014-12-31"]
+    expected_dates = string.([
+        Dates.Date(year, month, 1) + Dates.Day(offset) for
+        year in (1901, 1957, 2014) for month in (1, 4, 7, 10) for
+        offset in 0:6
+    ])
+    @test reference["historical_coverage"]["dates"] == expected_dates
+    @test reference["historical_coverage"]["final_boundary"] ==
+          "2014-12-31"
     for configuration in TestbedSelectedCASAWorkflow.supported_configurations()
         pinned = reference["configuration"][String(configuration)]
         measured = pinned["tolerance"]["fresh_fortran_boundary"]
@@ -256,6 +263,15 @@ end
           10 .* values(getindex.(normal_rates, 3))
     @test first(values(setup.initial_state.casa_soil.n_mineral)) == 0
     @test values(setup.initial_state.casa_soil.n_mineral)[2:end] == ones(10)
+    diagnostic_names = getproperty.(
+        TestbedSelectedCASAWorkflow.default_diagnostics(
+            :carbon_nitrogen,
+            setup,
+        ),
+        :name,
+    )
+    @test "diagnostic__n_deposition" in diagnostic_names
+    @test "diagnostic__n_net_mineralization" in diagnostic_names
 end
 
 @testset "selected-cell CASA-CN preserves the legacy first-step P:N" begin

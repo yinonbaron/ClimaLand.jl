@@ -48,8 +48,12 @@ import TOML
                   expected_pfts
             @test report["historical_comparison"]["selected_dates"]["forcing_regimes"] ==
                   expected_regimes
+            sample_count = length(
+                report["historical_comparison"]["selected_dates"]["sample_days"],
+            )
+            @test sample_count == 84
             @test all(
-                metric["compared_values"] == 3length(expected_ids) for
+                metric["compared_values"] == sample_count * length(expected_ids) for
                 metric in values(
                     report["historical_comparison"]["selected_dates"]["variable"],
                 )
