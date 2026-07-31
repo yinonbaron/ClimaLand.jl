@@ -66,3 +66,38 @@ include("generate_casa_c_full_grid_calibration.jl")
         ) for outlier in record["top_outlier"]
     )
 end
+
+@testset "CASA calibration source records distinguish sharded outputs" begin
+    mktempdir() do root
+        shard_roots = [joinpath(root, "shard-001"), joinpath(root, "shard-002")]
+        for (index, shard_root) in enumerate(shard_roots)
+            mkpath(shard_root)
+            write(joinpath(shard_root, "reduced_historical.nc"), "shard $index")
+        end
+        outputs = [
+            (
+                index = index,
+                first_grid_index = index,
+                last_grid_index = index,
+                output_root = shard_root,
+            ) for (index, shard_root) in enumerate(shard_roots)
+        ]
+        records = output_source_records(
+            outputs,
+            "reduced_historical.nc",
+            "julia/reduced_historical.nc",
+        )
+        @test getindex.(records["shard"], "index") == [1, 2]
+        @test getindex.(getindex.(records["shard"], "file"), "id") == [
+            joinpath("julia", "shard-001", "reduced_historical.nc"),
+            joinpath("julia", "shard-002", "reduced_historical.nc"),
+        ]
+
+        monolithic = output_source_records(
+            [first(outputs)],
+            "reduced_historical.nc",
+            "julia/reduced_historical.nc",
+        )
+        @test monolithic["id"] == "julia/reduced_historical.nc"
+    end
+end

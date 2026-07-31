@@ -222,8 +222,21 @@ function accumulate_bookkeeping!(bookkeeping, step, p)
     return bookkeeping
 end
 
-function compare_boundary_csv(Y, path; atol = 0.0, rtol = 0.0)
+"""
+    compare_boundary_csv(Y, path; atol = 0, rtol = 0, reference_indices = nothing)
+
+Compare a Julia boundary state with all or an ordered subset of Fortran rows.
+Called from [`run_gridded_case`](@ref).
+"""
+function compare_boundary_csv(
+    Y,
+    path;
+    atol = 0.0,
+    rtol = 0.0,
+    reference_indices = nothing,
+)
     columns, data = native_casa().read_boundary_csv(path)
+    isnothing(reference_indices) || (data = data[reference_indices])
     metrics = Dict{String, Any}()
     for (reference_name, (component, variable)) in BOUNDARY_VARIABLES
         haskey(columns, reference_name) ||
@@ -244,8 +257,21 @@ function compare_boundary_csv(Y, path; atol = 0.0, rtol = 0.0)
     )
 end
 
-function compare_bookkeeping_csv(bookkeeping, path; atol = 0.0, rtol = 0.0)
+"""
+    compare_bookkeeping_csv(bookkeeping, path; atol = 0, rtol = 0, reference_indices = nothing)
+
+Compare accumulated bookkeeping with all or a matching subset of Fortran rows.
+Called from [`run_gridded_case`](@ref).
+"""
+function compare_bookkeeping_csv(
+    bookkeeping,
+    path;
+    atol = 0.0,
+    rtol = 0.0,
+    reference_indices = nothing,
+)
     columns, data = native_casa().read_boundary_csv(path)
+    isnothing(reference_indices) || (data = data[reference_indices])
     metrics = Dict{String, Any}()
     for reference_name in BOOKKEEPING_VARIABLES
         haskey(columns, reference_name) ||
@@ -646,7 +672,13 @@ function (tracker::ReducedCNHistorical)(stage, step, Y, p, _)
     return nothing
 end
 
-function write_reduced_historical(path, tracker)
+"""
+    write_reduced_historical(path, tracker; cell_ids = nothing)
+
+Write reduced CASA-CN histories, optionally embedding ordered global cell IDs.
+Called from [`run_gridded_case`](@ref).
+"""
+function write_reduced_historical(path, tracker; cell_ids = nothing)
     mkpath(dirname(path))
     NCDatasets.NCDataset(path, "c") do output
         NCDatasets.defDim(
@@ -659,6 +691,14 @@ function write_reduced_historical(path, tracker)
         NCDatasets.defVar(output, "year", Int, ("year",))[:] = 1901:2014
         NCDatasets.defVar(output, "sample_day", Int, ("sample",))[:] =
             REDUCED_SAMPLE_DAYS
+        isnothing(cell_ids) || (
+            length(cell_ids) == size(first(values(tracker.annual_mean)), 1) ||
+            error("reduced CASA-CN cell IDs have the wrong length")
+        )
+        isnothing(cell_ids) || (
+            NCDatasets.defVar(output, "cell_id", Int, ("point",))[:] =
+                cell_ids
+        )
         for (reducer, values) in (
             "annual_mean" => tracker.annual_mean,
             "end_of_year" => tracker.end_of_year,
@@ -686,11 +726,13 @@ end
     run_gridded_case(source_root, forcing_root, reference_root, output_root; ...)
 
 Run the pinned CASA-CN prespin, accelerated spin, normal spin, and historical
-workflow on all 4,263 cells. `reference_root` is the completed issue-24 case
-root. In addition to its `stages`, `candidates`, and `reference` directories,
-it must contain `fresh_reference` with separately reduced annual and retained
-daily fresh-Fortran products. `resume_historical_checkpoint` is restricted to
-boundary-only calibration recovery and reruns only the historical stage.
+workflow. `grid_indices` selects sorted, unique rows from the 4,263-cell global
+grid and defaults to the complete grid. `reference_root` is the completed
+issue-24 case root. In addition to its `stages`, `candidates`, and `reference`
+directories, it must contain `fresh_reference` with separately reduced annual
+and retained daily fresh-Fortran products. `resume_historical_checkpoint` is
+restricted to boundary-only calibration recovery and reruns only the historical
+stage.
 """
 function run_gridded_case(
     source_root,
@@ -706,6 +748,7 @@ function run_gridded_case(
     budget_rtol = 5e-12,
     boundary_only = false,
     resume_historical_checkpoint = nothing,
+    grid_indices = 1:4263,
 )
     isnothing(resume_historical_checkpoint) ||
         boundary_only ||
@@ -734,8 +777,16 @@ function run_gridded_case(
         joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4_exud0.csv")
     accelerated_path =
         joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4_exud0AD.csv")
-    grid = native_casa().read_grid(grid_path)
-    length(grid) == 4263 || error("Pinned CASA-CN grid must have 4,263 rows")
+    full_grid = native_casa().read_grid(grid_path)
+    length(full_grid) == 4263 ||
+        error("Pinned CASA-CN grid must have 4,263 rows")
+    grid_indices = collect(Int, grid_indices)
+    isempty(grid_indices) && error("CASA-CN grid selection must not be empty")
+    issorted(grid_indices) && allunique(grid_indices) ||
+        error("CASA-CN grid selection must be sorted and unique")
+    all(index -> 1 <= index <= length(full_grid), grid_indices) ||
+        error("CASA-CN grid selection lies outside the pinned grid")
+    grid = full_grid[grid_indices]
     soils = native_casa().read_soils(soil_path)
     domain = native_casa().gridded_domain(length(grid))
     buffers = native_casa().GriddedBuffers(domain)
@@ -897,6 +948,7 @@ function run_gridded_case(
             joinpath(directory, "casa_final.csv");
             atol = boundary_atol,
             rtol = boundary_rtol,
+            reference_indices = grid_indices,
         )
         balance =
             boundary_only ? Dict("skipped" => "boundary calibration only") :
@@ -905,6 +957,7 @@ function run_gridded_case(
                 joinpath(directory, "casa_flux_final.csv");
                 atol = boundary_atol,
                 rtol = boundary_rtol,
+                reference_indices = grid_indices,
             )
         return Dict(
             "state" => state,
@@ -984,6 +1037,7 @@ function run_gridded_case(
             write_reduced_historical(
                 joinpath(output_root, "reduced_historical.nc"),
                 reduced,
+                cell_ids = getproperty.(grid, :cell_id),
             )
         end
         return result

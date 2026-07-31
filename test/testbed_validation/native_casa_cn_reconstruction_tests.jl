@@ -163,9 +163,11 @@ end
         path = reconstruction.write_reduced_historical(
             joinpath(output_root, "reduced_historical.nc"),
             reduced,
+            cell_ids = getproperty.(setup.grid, :cell_id),
         )
         NCDatasets.NCDataset(path) do output
             @test output["sample_day"][:] == reconstruction.REDUCED_SAMPLE_DAYS
+            @test output["cell_id"][:] == getproperty.(setup.grid, :cell_id)
             @test any(!iszero, output["annual_mean__cleaf"][:, 1])
             @test any(!iszero, output["annual_total__cgpp"][:, 1])
             @test any(!iszero, output["fixed_daily_sample__cleaf"][:, 1])

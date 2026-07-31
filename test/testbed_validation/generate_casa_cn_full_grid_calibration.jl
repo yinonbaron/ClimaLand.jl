@@ -1,3 +1,6 @@
+if !isdefined(@__MODULE__, :TestbedCASACNShardedCalibration)
+    include(joinpath(@__DIR__, "casa_cn_sharded_calibration.jl"))
+end
 include(joinpath(@__DIR__, "generate_casa_c_full_grid_calibration.jl"))
 
 const CASA_CN_BOUNDARY_VARIABLES = (
@@ -85,6 +88,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     length(ARGS) in (3, 4) || error(
         "usage: generate_casa_cn_full_grid_calibration.jl JULIA_OUTPUT FORTRAN_REFERENCE OUTPUT_TOML [EXECUTION_REVISION]",
     )
+    shard_manifest =
+        joinpath(ARGS[1], TestbedCASACNShardedCalibration.MANIFEST_NAME)
+    output_shards =
+        isfile(shard_manifest) ?
+        TestbedCASACNShardedCalibration.load_shards(ARGS[1]) : nothing
     println(
         generate(
             ARGS[1:3]...;
@@ -98,7 +106,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
             additional_sources = (
                 "generate_casa_cn_full_grid_calibration.jl",
                 "selected_casa_workflow.jl",
+                "casa_cn_sharded_calibration.jl",
             ),
+            output_shards,
+            shard_manifest = isnothing(output_shards) ? nothing :
+                             shard_manifest,
         ),
     )
 end

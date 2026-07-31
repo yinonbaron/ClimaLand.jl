@@ -26,6 +26,74 @@ const BOUNDARY_VARIABLES = (
 
 sha256sum(path) = bytes2hex(SHA.sha256(read(path)))
 
+"""
+    calibration_outputs(output_root, output_shards)
+
+Return a uniform output list for monolithic or sharded calibration data.
+Called from [`generate`](@ref).
+"""
+function calibration_outputs(output_root, output_shards)
+    isnothing(output_shards) && return [(
+        index = 1,
+        first_grid_index = 1,
+        last_grid_index = 4263,
+        output = ".",
+        output_root = output_root,
+    )]
+    return output_shards
+end
+
+"""
+    combined_output_values(load, outputs, cell_count)
+
+Load one monolithic array or combine shard arrays in global grid order.
+Called from [`generate`](@ref).
+"""
+function combined_output_values(load::Function, outputs, cell_count)
+    length(outputs) == 1 &&
+        first(outputs).first_grid_index == 1 &&
+        first(outputs).last_grid_index == cell_count &&
+        return load(first(outputs))
+    isdefined(@__MODULE__, :TestbedCASACNShardedCalibration) ||
+        error("sharded calibration support is not loaded")
+    return TestbedCASACNShardedCalibration.combine_shards(
+        load,
+        outputs,
+        cell_count,
+    )
+end
+
+"""
+    output_source_records(outputs, relative_path, id)
+
+Record one monolithic source or the ordered sources for every output shard.
+Called from [`generate`](@ref).
+"""
+function output_source_records(outputs, relative_path, id)
+    if length(outputs) == 1
+        return source_file_record(
+            joinpath(first(outputs).output_root, relative_path),
+            id,
+        )
+    end
+    records = [
+        Dict(
+            "index" => output.index,
+            "first_grid_index" => output.first_grid_index,
+            "last_grid_index" => output.last_grid_index,
+            "file" => source_file_record(
+                joinpath(output.output_root, relative_path),
+                joinpath(
+                    "julia",
+                    "shard-$(lpad(output.index, 3, '0'))",
+                    relative_path,
+                ),
+            ),
+        ) for output in outputs
+    ]
+    return Dict("shard" => records)
+end
+
 function csv_table(path)
     lines = readlines(path)
     header = strip.(split(first(lines), ','))
@@ -257,28 +325,71 @@ function generate(
     annual_variables = (),
     daily_variables = (),
     additional_sources = (),
+    output_shards = nothing,
+    shard_manifest = nothing,
 )
     stage_root = joinpath(fortran_root, "stages")
     grid_path = joinpath(stage_root, "01-prespin", "grid.csv")
     grid = grid_metadata(grid_path)
     length(grid) == 4263 ||
         error("Fortran grid must contain exactly 4,263 cells")
+    outputs = calibration_outputs(output_root, output_shards)
+    if !isnothing(output_shards)
+        for output in outputs
+            reduced_path = joinpath(output.output_root, "reduced_historical.nc")
+            NCDatasets.NCDataset(reduced_path) do reduced
+                haskey(reduced, "cell_id") ||
+                    error("sharded reduced history is missing cell IDs")
+                expected =
+                    getproperty.(
+                        grid[(output.first_grid_index):(output.last_grid_index)],
+                        :cell_id,
+                    )
+                vec(Int.(Array(reduced["cell_id"]))) == expected ||
+                    error("sharded reduced history is not in global grid order")
+            end
+        end
+    end
 
     variables = Dict{String, Any}()
     julia_sources = Dict{String, Any}()
     fortran_sources = Dict{String, Any}()
     for (stage, fortran_stage) in STAGES
-        checkpoint, workflow = checkpoint_path(output_root, stage)
+        stage_files = map(outputs) do output
+            checkpoint, workflow = checkpoint_path(output.output_root, stage)
+            (; output, checkpoint, workflow)
+        end
         fortran_stage_root = joinpath(stage_root, fortran_stage)
         fortran_boundary = joinpath(fortran_stage_root, "casa_final.csv")
-        julia_sources[stage] = Dict(
-            "checkpoint" => source_file_record(
-                checkpoint,
-                "julia/$stage/final_checkpoint.hdf5",
-            ),
-            "workflow" =>
-                source_file_record(workflow, "julia/$stage/workflow.toml"),
-        )
+        julia_sources[stage] =
+            length(stage_files) == 1 ?
+            Dict(
+                "checkpoint" => source_file_record(
+                    only(stage_files).checkpoint,
+                    "julia/$stage/final_checkpoint.hdf5",
+                ),
+                "workflow" => source_file_record(
+                    only(stage_files).workflow,
+                    "julia/$stage/workflow.toml",
+                ),
+            ) :
+            Dict(
+                "shard" => [
+                    Dict(
+                        "index" => item.output.index,
+                        "first_grid_index" => item.output.first_grid_index,
+                        "last_grid_index" => item.output.last_grid_index,
+                        "checkpoint" => source_file_record(
+                            item.checkpoint,
+                            "julia/shard-$(lpad(item.output.index, 3, '0'))/$stage/final_checkpoint.hdf5",
+                        ),
+                        "workflow" => source_file_record(
+                            item.workflow,
+                            "julia/shard-$(lpad(item.output.index, 3, '0'))/$stage/workflow.toml",
+                        ),
+                    ) for item in stage_files
+                ],
+            )
         fortran_sources[stage] = Dict(
             name => source_file_record(
                 joinpath(fortran_stage_root, filename),
@@ -296,7 +407,10 @@ function generate(
         for (reference_name, specification) in boundary_variables
             component, variable = specification[1:2]
             quantity = length(specification) == 3 ? specification[3] : "c"
-            actual = checkpoint_values(checkpoint, component, variable)
+            actual = combined_output_values(outputs, length(grid)) do output
+                checkpoint, _ = checkpoint_path(output.output_root, stage)
+                checkpoint_values(checkpoint, component, variable)
+            end
             expected = fortran_values(fortran_boundary, reference_name)
             stage_records["$component.$variable"] = calibration_record(
                 actual,
@@ -312,15 +426,15 @@ function generate(
     annual_sources = Dict{String, Any}()
     daily_sources = Dict{String, Any}()
     if !isempty(annual_variables)
-        reduced_path = joinpath(output_root, "reduced_historical.nc")
         fortran_path = joinpath(
             fortran_root,
             "fresh_reference",
             "ann_casaclm_pool_flux_1901_2014.nc",
         )
         annual_sources = Dict(
-            "julia_reduced_historical" => source_file_record(
-                reduced_path,
+            "julia_reduced_historical" => output_source_records(
+                outputs,
+                "reduced_historical.nc",
                 "julia/reduced_historical.nc",
             ),
             "fresh_fortran_annual" => source_file_record(
@@ -328,44 +442,49 @@ function generate(
                 "fortran/fresh_reference/ann_casaclm_pool_flux_1901_2014.nc",
             ),
         )
-        NCDatasets.NCDataset(reduced_path) do julia
-            NCDatasets.NCDataset(fortran_path) do fortran
-                cell_ids = vec(Int.(Array(fortran["cellid"])))
-                positions =
-                    Dict(id => index for (index, id) in enumerate(cell_ids))
-                indices = [positions[cell.cell_id] for cell in grid]
-                annual_contexts = [
-                    merge(cell, (; year)) for year in 1901:2014 for cell in grid
-                ]
-                for (reference_name, native_name, reducer, quantity) in
-                    annual_variables
-                    actual = vec(Array(julia["$(reducer)__$(reference_name)"]))
-                    raw = reshape(
-                        Array(fortran[reference_name]),
-                        length(cell_ids),
-                        114,
-                    )
-                    expected = vec(raw[indices, :])
-                    any(ismissing, expected) &&
-                        error("eligible fresh-Fortran annual value is missing")
-                    expected =
-                        reducer == "annual_total" ?
-                        Float64.(expected) .* 365 ./ 1000 :
-                        Float64.(expected) ./ 1000
-                    annual["$reducer.$native_name"] = calibration_record(
-                        actual,
-                        expected,
-                        annual_contexts;
-                        units = reducer == "annual_total" ?
-                                "kg $(uppercase(quantity)) m^-2 year^-1" :
-                                "kg $(uppercase(quantity)) m^-2",
-                    )
-                end
+        NCDatasets.NCDataset(fortran_path) do fortran
+            cell_ids = vec(Int.(Array(fortran["cellid"])))
+            positions = Dict(id => index for (index, id) in enumerate(cell_ids))
+            indices = [positions[cell.cell_id] for cell in grid]
+            annual_contexts =
+                [merge(cell, (; year)) for year in 1901:2014 for cell in grid]
+            for (reference_name, native_name, reducer, quantity) in
+                annual_variables
+                actual = vec(
+                    combined_output_values(outputs, length(grid)) do output
+                        path = joinpath(
+                            output.output_root,
+                            "reduced_historical.nc",
+                        )
+                        NCDatasets.NCDataset(path) do julia
+                            Array(julia["$(reducer)__$(reference_name)"])
+                        end
+                    end,
+                )
+                raw = reshape(
+                    Array(fortran[reference_name]),
+                    length(cell_ids),
+                    114,
+                )
+                expected = vec(raw[indices, :])
+                any(ismissing, expected) &&
+                    error("eligible fresh-Fortran annual value is missing")
+                expected =
+                    reducer == "annual_total" ?
+                    Float64.(expected) .* 365 ./ 1000 :
+                    Float64.(expected) ./ 1000
+                annual["$reducer.$native_name"] = calibration_record(
+                    actual,
+                    expected,
+                    annual_contexts;
+                    units = reducer == "annual_total" ?
+                            "kg $(uppercase(quantity)) m^-2 year^-1" :
+                            "kg $(uppercase(quantity)) m^-2",
+                )
             end
         end
     end
     if !isempty(daily_variables)
-        reduced_path = joinpath(output_root, "reduced_historical.nc")
         sample_columns = [collect(1:28); collect(57:84)]
         daily_samples = [
             (
@@ -390,8 +509,9 @@ function generate(
             ) for year in (1901, 2014)
         )
         daily_sources = Dict(
-            "julia_reduced_historical" => source_file_record(
-                reduced_path,
+            "julia_reduced_historical" => output_source_records(
+                outputs,
+                "reduced_historical.nc",
                 "julia/reduced_historical.nc",
             ),
             "fresh_fortran_daily" => Dict(
@@ -401,50 +521,52 @@ function generate(
                 ) for (year, path) in daily_paths
             ),
         )
-        NCDatasets.NCDataset(reduced_path) do julia
-            for (reference_name, native_name, _, quantity) in daily_variables
-                actual = vec(
-                    Array(
-                        julia["fixed_daily_sample__$(reference_name)"][
-                            :,
-                            sample_columns,
-                        ],
-                    ),
-                )
-                expected_years = Matrix{Float64}[]
-                for year in (1901, 2014)
-                    NCDatasets.NCDataset(daily_paths[year]) do fortran
-                        ids = vec(Int.(Array(fortran["cellid"])))
-                        positions =
-                            Dict(id => index for (index, id) in enumerate(ids))
-                        indices = [positions[cell.cell_id] for cell in grid]
-                        raw = reshape(
-                            Array(fortran[reference_name]),
-                            length(ids),
-                            365,
+        for (reference_name, native_name, _, quantity) in daily_variables
+            actual = vec(
+                combined_output_values(outputs, length(grid)) do output
+                    path = joinpath(output.output_root, "reduced_historical.nc")
+                    NCDatasets.NCDataset(path) do julia
+                        Array(
+                            julia["fixed_daily_sample__$(reference_name)"][
+                                :,
+                                sample_columns,
+                            ],
                         )
-                        days = [
-                            collect(1:7)
-                            collect(91:97)
-                            collect(182:188)
-                            collect(274:280)
-                        ]
-                        values = Float64.(raw[indices, days])
-                        startswith(native_name, "diagnostic.") &&
-                            (values ./= 86400)
-                        push!(expected_years, values ./ 1000)
                     end
+                end,
+            )
+            expected_years = Matrix{Float64}[]
+            for year in (1901, 2014)
+                NCDatasets.NCDataset(daily_paths[year]) do fortran
+                    ids = vec(Int.(Array(fortran["cellid"])))
+                    positions =
+                        Dict(id => index for (index, id) in enumerate(ids))
+                    indices = [positions[cell.cell_id] for cell in grid]
+                    raw = reshape(
+                        Array(fortran[reference_name]),
+                        length(ids),
+                        365,
+                    )
+                    days = [
+                        collect(1:7)
+                        collect(91:97)
+                        collect(182:188)
+                        collect(274:280)
+                    ]
+                    values = Float64.(raw[indices, days])
+                    startswith(native_name, "diagnostic.") && (values ./= 86400)
+                    push!(expected_years, values ./ 1000)
                 end
-                expected = vec(hcat(expected_years...))
-                daily[native_name] = calibration_record(
-                    actual,
-                    expected,
-                    daily_contexts;
-                    units = startswith(native_name, "diagnostic.") ?
-                            "kg $(uppercase(quantity)) m^-2 s^-1" :
-                            "kg $(uppercase(quantity)) m^-2",
-                )
             end
+            expected = vec(hcat(expected_years...))
+            daily[native_name] = calibration_record(
+                actual,
+                expected,
+                daily_contexts;
+                units = startswith(native_name, "diagnostic.") ?
+                        "kg $(uppercase(quantity)) m^-2 s^-1" :
+                        "kg $(uppercase(quantity)) m^-2",
+            )
         end
     end
 
@@ -475,7 +597,7 @@ function generate(
         readchomp(`git -C $repo_root rev-parse $execution_revision`)
     manifest_revision = readchomp(`git -C $repo_root rev-parse HEAD`)
     recovery_path = joinpath(output_root, "historical_recovery.toml")
-    historical_recovery = if isfile(recovery_path)
+    historical_recovery = if isnothing(output_shards) && isfile(recovery_path)
         detail = TOML.parsefile(recovery_path)
         get(detail, "schema_version", nothing) == 1 &&
             get(detail, "mode", nothing) == "historical_only" ||
@@ -490,6 +612,15 @@ function generate(
     else
         Dict{String, Any}()
     end
+    shard_provenance =
+        isnothing(shard_manifest) ? Dict{String, Any}() :
+        Dict(
+            "manifest" => source_file_record(
+                shard_manifest,
+                "julia/calibration_shards.toml",
+            ),
+            "count" => length(outputs),
+        )
     document = Dict(
         "schema_version" => 1,
         "calibration_id" => calibration_id,
@@ -525,6 +656,7 @@ function generate(
             "annual" => annual_sources,
             "daily" => daily_sources,
             "historical_recovery" => historical_recovery,
+            "calibration_shards" => shard_provenance,
             "model_source" => model_sources,
         ),
         "variable" => variables,
