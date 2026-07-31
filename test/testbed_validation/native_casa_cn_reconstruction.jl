@@ -783,6 +783,10 @@ function run_gridded_case(
     parameter_for_stage(stage) =
         stage.name == :prespin ? prespin_path :
         stage.name == :accelerated_spin ? accelerated_path : normal_path
+    parameters_for_stage(stage) =
+        stage.name == :prespin ? prespin.parameters :
+        stage.name == :accelerated_spin ? accelerated.parameters :
+        normal.parameters
     boundary_directories = Dict(
         :prespin => "01-prespin",
         :accelerated_spin => "02-accelerated_spin",
@@ -795,6 +799,29 @@ function run_gridded_case(
         boundary_only ?
         ReducedCNHistorical(length(grid), normal.model.casa_soil.parameters) :
         nothing
+    selected_after_step =
+        boundary_only ? reduced : GriddedCNAfterStep(budget, bookkeeping)
+    fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
+    function prepare_stage!(stage, initial_state, model)
+        fixed_plant_stoichiometry[stage.name] =
+            selected_casa().use_initial_plant_stoichiometry!(
+                model,
+                grid,
+                parameters_for_stage(stage),
+                initial_state,
+            )
+        return nothing
+    end
+    function after_step!(stage, step, Y, p, time)
+        selected_after_step(stage, step, Y, p, time)
+        if step == 1
+            selected_casa().restore_plant_stoichiometry!(
+                model_for_stage(stage),
+                fixed_plant_stoichiometry[stage.name],
+            )
+        end
+        return nothing
+    end
     function carbon_budget(stage, result, _, _, initial_state, model)
         boundary_only && return Dict("skipped" => "boundary calibration only")
         name = stage.name
@@ -916,8 +943,7 @@ function run_gridded_case(
             output_root;
             model_for_stage,
             update_forcing! = GriddedCNForcingUpdate(forcing),
-            after_step! = boundary_only ? reduced :
-                          GriddedCNAfterStep(budget, bookkeeping),
+            after_step!,
             diagnostics = boundary_only ? () :
                           casa_cn_diagnostics(
                 normal.model.casa_soil.parameters,
@@ -946,6 +972,7 @@ function run_gridded_case(
             carbon_budget,
             nitrogen_budget,
             workflow_budget,
+            prepare_stage!,
             restore_passive! = selected_casa().restore_passive_carbon_nitrogen!,
             output_eltype = Float32,
             deflatelevel = 1,
