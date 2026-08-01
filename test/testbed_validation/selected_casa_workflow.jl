@@ -13,6 +13,7 @@ end
 
 module TestbedSelectedCASAWorkflow
 
+import Dates
 import TOML
 
 import NCDatasets
@@ -1243,6 +1244,164 @@ struct SelectedAfterStep{B, S}
     stoichiometry::S
 end
 
+struct ObservedStateVariable
+    component::Symbol
+    variable::Symbol
+    name::String
+end
+
+mutable struct NonfiniteObserver{D}
+    cell_ids::Vector{Int}
+    state_variables::Vector{ObservedStateVariable}
+    diagnostics::D
+    seen::BitVector
+    records::Vector{Dict{String, Any}}
+    path::Union{Nothing, String}
+    model::String
+    scope::String
+end
+
+function NonfiniteObserver(
+    cell_ids,
+    initial_state,
+    diagnostics;
+    path = nothing,
+    model,
+    scope,
+)
+    variables = ObservedStateVariable[
+        ObservedStateVariable(
+            component,
+            variable,
+            "$component.$variable",
+        ) for component in propertynames(initial_state) for
+        variable in propertynames(getproperty(initial_state, component))
+    ]
+    sort!(variables; by = descriptor -> descriptor.name)
+    ordered_diagnostics = sort!(collect(diagnostics); by = item -> item.name)
+    return NonfiniteObserver(
+        Int.(collect(cell_ids)),
+        variables,
+        ordered_diagnostics,
+        falses(length(cell_ids)),
+        Dict{String, Any}[],
+        isnothing(path) ? nothing : abspath(path),
+        String(model),
+        String(scope),
+    )
+end
+
+function write_nonfinite_evidence(observer::NonfiniteObserver)
+    isnothing(observer.path) && return nothing
+    mkpath(dirname(observer.path))
+    temporary = observer.path * ".tmp"
+    open(temporary, "w") do io
+        TOML.print(
+            io,
+            Dict(
+                "schema_version" => 1,
+                "model" => observer.model,
+                "scope" => observer.scope,
+                "nonfinite" => observer.records,
+            );
+            sorted = true,
+        )
+    end
+    mv(temporary, observer.path; force = true)
+    return observer.path
+end
+
+function read_nonfinite_evidence(path; model, scope)
+    isfile(path) || return Dict{String, Any}[]
+    document = TOML.parsefile(path)
+    get(document, "schema_version", nothing) == 1 &&
+        get(document, "model", nothing) == model &&
+        get(document, "scope", nothing) == scope ||
+        error("Julia CASA nonfinite evidence has incompatible provenance")
+    records = Dict{String, Any}.(get(document, "nonfinite", Any[]))
+    required = Set((
+        "cell_id",
+        "evidence_side",
+        "first_nonfinite_stage",
+        "first_nonfinite_date",
+        "first_nonfinite_step",
+        "first_nonfinite_variable",
+        "reason",
+    ))
+    all(
+        Set(keys(record)) == required &&
+        record["evidence_side"] == "julia" &&
+        record["cell_id"] isa Integer &&
+        record["first_nonfinite_step"] isa Integer &&
+        record["first_nonfinite_step"] > 0 &&
+        !isempty(record["first_nonfinite_variable"]) &&
+        tryparse(Dates.Date, record["first_nonfinite_date"]) !== nothing for
+        record in records
+    ) || error("Julia CASA nonfinite evidence is malformed")
+    allunique(getindex.(records, "cell_id")) ||
+        error("Julia CASA nonfinite evidence repeats a cell")
+    issorted(getindex.(records, "cell_id")) ||
+        error("Julia CASA nonfinite evidence is unordered")
+    return records
+end
+
+function observe_values!(observer, stage, step, variable, values)
+    data = vec(parent(values))
+    length(data) == length(observer.cell_ids) || error(
+        "Julia nonfinite observer has incompatible $variable values",
+    )
+    added = false
+    date = nothing
+    for position in eachindex(observer.cell_ids)
+        observer.seen[position] && continue
+        value = data[position]
+        ismissing(value) &&
+            error("Julia nonfinite observer found missing $variable")
+        value isa Real && !isfinite(value) || continue
+        if isnothing(date)
+            index = native_workflow().forcing_index(stage, step)
+            date = string(Dates.Date(1901, 1, 1) + Dates.Day(index - 1))
+        end
+        push!(
+            observer.records,
+            Dict(
+                "cell_id" => observer.cell_ids[position],
+                "evidence_side" => "julia",
+                "first_nonfinite_stage" => String(stage.name),
+                "first_nonfinite_date" => date,
+                "first_nonfinite_step" => step,
+                "first_nonfinite_variable" => variable,
+                "reason" =>
+                    "native Julia CASA trajectory became nonfinite",
+            ),
+        )
+        observer.seen[position] = true
+        added = true
+    end
+    if added
+        sort!(observer.records; by = record -> record["cell_id"])
+        write_nonfinite_evidence(observer)
+    end
+    return added
+end
+
+function (observer::NonfiniteObserver)(stage, step, Y, p, _)
+    all(observer.seen) && return nothing
+    for descriptor in observer.state_variables
+        values = getproperty(
+            getproperty(Y, descriptor.component),
+            descriptor.variable,
+        )
+        observe_values!(observer, stage, step, descriptor.name, values)
+    end
+    for diagnostic in observer.diagnostics
+        values = diagnostic.compute(Y, p)
+        name = replace(diagnostic.name, "__" => ".")
+        observe_values!(observer, stage, step, name, values)
+    end
+    return nothing
+end
+
 function (callback::SelectedAfterStep)(stage, _, Y, p, _)
     accumulate_budget!(callback.budget, callback.configuration, stage, p)
     isnothing(callback.stoichiometry) ||
@@ -1268,6 +1427,7 @@ function run_selected_case(
     reference_path = REFERENCE_PATH,
     comparison_policy = nothing,
     diagnostics = nothing,
+    nonfinite_path = nothing,
 )
     setup = load_setup(configuration; collection)
     active_diagnostics = if isnothing(diagnostics)
@@ -1306,6 +1466,14 @@ function run_selected_case(
         SelectedForcingUpdater(setup.forcing, stoichiometry, model_for_stage)
     selected_after_step =
         SelectedAfterStep(budget, configuration, stoichiometry)
+    nonfinite_observer = NonfiniteObserver(
+        setup.cell_ids,
+        setup.initial_state,
+        active_diagnostics;
+        path = nonfinite_path,
+        model = configuration == :carbon_only ? "CASA-C" : "CASA-CN",
+        scope = collection.name,
+    )
     fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
     restart_serialization_adjustment = Dict("carbon" => 0.0, "nitrogen" => 0.0)
     function prepare_selected_stage!(stage, initial_state, model)
@@ -1340,6 +1508,7 @@ function run_selected_case(
         return nothing
     end
     function after_step!(stage, step, Y, p, time)
+        nonfinite_observer(stage, step, Y, p, time)
         selected_after_step(stage, step, Y, p, time)
         if configuration == :carbon_nitrogen && step == 1
             restore_plant_stoichiometry!(
@@ -1402,7 +1571,7 @@ function run_selected_case(
         end
         return reports
     end
-    return native_casa().run_case(
+    result = native_casa().run_case(
         setup.initial_state,
         stages,
         output_root;
@@ -1443,6 +1612,7 @@ function run_selected_case(
                            restore_passive_carbon_nitrogen! :
                            native_casa().restore_passive_carbon!,
     )
+    return merge(result, (; nonfinite_records = nonfinite_observer.records))
 end
 
 end

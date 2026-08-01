@@ -797,14 +797,51 @@ function finish_representative_worker(
     end
     built.oracle_path == oracle_path ||
         error("Fresh CASA reference builder returned the wrong oracle")
-    julia = julia_runner(
-        julia_root;
-        configuration,
-        collection,
-        reference_path = oracle_path,
-        compare_references = true,
-        concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+    julia_nonfinite_path = joinpath(julia_root, "nonfinite_results.toml")
+    model = configuration == :carbon_only ? "CASA-C" : "CASA-CN"
+    julia = try
+        julia_runner(
+            julia_root;
+            configuration,
+            collection,
+            reference_path = oracle_path,
+            compare_references = true,
+            concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+            nonfinite_path = julia_nonfinite_path,
+        )
+    catch
+        records = Workflow.read_nonfinite_evidence(
+            julia_nonfinite_path;
+            model,
+            scope = "representative",
+        )
+        isempty(records) && rethrow()
+        return (
+            oracle_path,
+            julia = nothing,
+            report_path = nothing,
+            nonfinite_records = records,
+        )
+    end
+    persisted_records = Workflow.read_nonfinite_evidence(
+        julia_nonfinite_path;
+        model,
+        scope = "representative",
     )
+    if hasproperty(julia, :nonfinite_records)
+        julia.nonfinite_records == persisted_records || error(
+            "Fresh CASA Julia nonfinite result differs from persisted evidence",
+        )
+    end
+    records = persisted_records
+    if !isempty(records)
+        return (
+            oracle_path,
+            julia,
+            report_path = nothing,
+            nonfinite_records = records,
+        )
+    end
     report_path = getproperty(julia, :report)
     isfile(report_path) || error("Fresh CASA Julia report is missing")
     return (

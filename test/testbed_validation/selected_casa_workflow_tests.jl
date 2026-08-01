@@ -601,6 +601,64 @@ end
         @test isnothing(blocked.julia)
         @test isnothing(blocked.report_path)
 
+        julia_nonfinite = [
+            Dict(
+                "cell_id" => 2,
+                "evidence_side" => "julia",
+                "first_nonfinite_stage" => "historical",
+                "first_nonfinite_date" => "1901-01-02",
+                "first_nonfinite_step" => 2,
+                "first_nonfinite_variable" => "casa_plant.c_leaf",
+                "reason" =>
+                    "native Julia CASA trajectory became nonfinite",
+            ),
+        ]
+        throwing_runner = function (output_root; nonfinite_path, kwargs...)
+            mkpath(output_root)
+            open(nonfinite_path, "w") do io
+                TOML.print(
+                    io,
+                    Dict(
+                        "schema_version" => 1,
+                        "model" => "CASA-C",
+                        "scope" => "representative",
+                        "nonfinite" => julia_nonfinite,
+                    );
+                    sorted = true,
+                )
+            end
+            error("synthetic integration failure after nonfinite state")
+        end
+        observed = finish_representative_worker(
+            :carbon_only,
+            fixture_path,
+            scope_path,
+            fortran_root,
+            joinpath(directory, "julia-nonfinite"),
+            reference_template;
+            build_metadata_path,
+            oracle_path = joinpath(directory, "oracle-nonfinite.toml"),
+            reference_builder,
+            julia_runner = throwing_runner,
+        )
+        @test observed.nonfinite_records == julia_nonfinite
+        @test isfile(observed.oracle_path)
+        @test isnothing(observed.julia)
+        @test isnothing(observed.report_path)
+
+        @test_throws ErrorException finish_representative_worker(
+            :carbon_only,
+            fixture_path,
+            scope_path,
+            fortran_root,
+            joinpath(directory, "julia-unexplained-error"),
+            reference_template;
+            build_metadata_path,
+            oracle_path = joinpath(directory, "oracle-unexplained-error.toml"),
+            reference_builder,
+            julia_runner = (args...; kwargs...) -> error("unexplained"),
+        )
+
         stale = deepcopy(fixture)
         stale["selection"]["scope_manifest_sha256"] = repeat("0", 64)
         open(fixture_path, "w") do io
@@ -619,5 +677,59 @@ end
             reference_template;
             build_metadata_path = joinpath(directory, "missing-build.toml"),
         )
+    end
+end
+
+@testset "selected CASA observes exact Julia trajectory nonfinites" begin
+    mktempdir() do directory
+        state = (
+            casa_plant = (c_leaf = [1.0, 2.0, 3.0],),
+            casa_soil = (c_soil_slow = [4.0, 5.0, 6.0],),
+        )
+        diagnostics = (
+            (
+                name = "diagnostic__cgpp",
+                compute = (_, p) -> p.gpp,
+            ),
+        )
+        path = joinpath(directory, "nonfinite_results.toml")
+        observer = TestbedSelectedCASAWorkflow.NonfiniteObserver(
+            [101, 202, 303],
+            state,
+            diagnostics;
+            path,
+            model = "CASA-C",
+            scope = "representative",
+        )
+        stage = TestbedNativeWorkflow.NativeStage(:historical, 3, 1)
+        state.casa_plant.c_leaf[2] = Inf
+        observer(stage, 2, state, (; gpp = [1.0, 2.0, NaN]), 0.0)
+        state.casa_soil.c_soil_slow[1] = -Inf
+        state.casa_plant.c_leaf[2] = 2.0
+        observer(stage, 3, state, (; gpp = [1.0, 2.0, 3.0]), 0.0)
+
+        records = observer.records
+        @test getindex.(records, "cell_id") == [101, 202, 303]
+        @test getindex.(records, "evidence_side") == fill("julia", 3)
+        @test getindex.(records, "first_nonfinite_stage") ==
+              fill("historical", 3)
+        @test getindex.(records, "first_nonfinite_date") ==
+              ["1901-01-03", "1901-01-02", "1901-01-02"]
+        @test getindex.(records, "first_nonfinite_step") == [3, 2, 2]
+        @test getindex.(records, "first_nonfinite_variable") == [
+            "casa_soil.c_soil_slow",
+            "casa_plant.c_leaf",
+            "diagnostic.cgpp",
+        ]
+        @test isfile(path)
+        document = TOML.parsefile(path)
+        @test document["schema_version"] == 1
+        @test document["model"] == "CASA-C"
+        @test document["scope"] == "representative"
+        @test document["nonfinite"] == records
+
+        state.casa_plant.c_leaf[2] = NaN
+        observer(stage, 3, state, (; gpp = [1.0, 2.0, 3.0]), 0.0)
+        @test observer.records == records
     end
 end
