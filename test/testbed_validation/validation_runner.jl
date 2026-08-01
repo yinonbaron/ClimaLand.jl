@@ -10,6 +10,8 @@ include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
 include(joinpath(@__DIR__, "selected_mimics_c_workflow.jl"))
 include(joinpath(@__DIR__, "selected_mimics_cn_workflow.jl"))
 include(joinpath(@__DIR__, "model_process_orchestration.jl"))
+include(joinpath(@__DIR__, "fresh_reference_orchestration.jl"))
+include(joinpath(@__DIR__, "fresh_reference_adapter.jl"))
 include(joinpath(@__DIR__, "pinned_corpse_executor.jl"))
 include(joinpath(@__DIR__, "pinned_corpse_adapter.jl"))
 
@@ -97,6 +99,7 @@ const REFERENCE_BINDING = Dict(
     "CASA-CN" => "representative_casa_cn_reference",
 )
 const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
+const FRESH_SOURCE_OVERRIDE = "CLIMALAND_VALIDATION_FORTRAN_SOURCE"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
 const DEFAULT_REFERENCE = joinpath(
@@ -806,6 +809,12 @@ function validate_available(configuration)
             "$(titlecase(configuration.scope)) Scope is not available yet; use --scope core",
         ),
     )
+    configuration.reference_mode == "fresh" &&
+        configuration.scope != "representative" && throw(
+        RunnerError(
+            "fresh references are available only for the Representative Scope",
+        ),
+    )
     configuration.scope == "representative" ||
         length(configuration.models) == 1 &&
             only(configuration.models) in ("CASA-C", "CASA-CN") || throw(
@@ -1485,6 +1494,117 @@ function aggregate_model_reports!(report, model_reports, outcomes, seconds)
     return report
 end
 
+function configured_fresh_commands(models)
+    source_root = get(ENV, FRESH_SOURCE_OVERRIDE, nothing)
+    source_root isa AbstractString && !isempty(strip(source_root)) || throw(
+        RunnerError(
+            "$FRESH_SOURCE_OVERRIDE must point to the pinned biogeochem_testbed checkout in fresh mode",
+        ),
+    )
+    source_root = strip(source_root)
+    fixture_manifest, _ = fixture_manifest_path("representative")
+    forcing_root = dirname(fixture_manifest)
+    selected = Set(models)
+    reference(model) = first(reference_path("representative", model))
+    return TestbedFreshReferenceAdapter.commands(
+        source_root;
+        casa_forcing_root =
+            isempty(intersect(selected, Set(("CASA-C", "CASA-CN")))) ?
+            nothing : forcing_root,
+        casa_c_reference_template =
+            "CASA-C" in selected ? reference("CASA-C") : nothing,
+        casa_cn_reference_template =
+            "CASA-CN" in selected ? reference("CASA-CN") : nothing,
+        corpse_forcing_root = "CORPSE" in selected ? forcing_root : nothing,
+        mimics_c_forcing_root =
+            "MIMICS-C" in selected ? forcing_root : nothing,
+        mimics_cn_forcing_root =
+            "MIMICS-CN" in selected ? forcing_root : nothing,
+        mimics_cn_reference_template =
+            "MIMICS-CN" in selected ? reference("MIMICS-CN") : nothing,
+    )
+end
+
+function fresh_outcome_record(outcome)
+    record = Dict{String, Any}(
+        "outcome" => outcome.outcome,
+        "seconds" => outcome.seconds,
+    )
+    isnothing(outcome.exitcode) || (record["exitcode"] = outcome.exitcode)
+    isnothing(outcome.signal) || (record["signal"] = outcome.signal)
+    isnothing(outcome.error) || (record["error"] = outcome.error)
+    return record
+end
+
+function run_fresh!(
+    report,
+    output_root,
+    configuration;
+    commands = nothing,
+    runner = TestbedFreshReferenceOrchestration.run_fresh_reference,
+)
+    configuration.scope == "representative" || throw(
+        RunnerError(
+            "fresh references are available only for the Representative Scope",
+        ),
+    )
+    selected_commands =
+        isnothing(commands) ? configured_fresh_commands(configuration.models) :
+        commands
+    mkpath(output_root)
+    started = time_ns()
+    result = runner(
+        "fresh",
+        selected_commands.build,
+        selected_commands.worker;
+        models = configuration.models,
+        workers = configuration.workers,
+        temporary_parent = output_root,
+        preflight = get(selected_commands, :preflight, _ -> nothing),
+    )
+    seconds = (time_ns() - started) / 1e9
+    by_model = Dict(outcome.model => outcome for outcome in result.outcomes)
+    for model_report in report["model"]
+        model = model_report["name"]
+        if haskey(by_model, model)
+            outcome = by_model[model]
+            model_report["outcome"] = outcome.outcome
+            model_report["seconds"] = outcome.seconds
+            isnothing(outcome.error) || (model_report["error"] = outcome.error)
+            outcome.outcome == "passed" &&
+                (model_report["coverage"]["compared_cells"] =
+                    model_report["coverage"]["eligible_cells"])
+        else
+            model_report["outcome"] = "not_run"
+            model_report["seconds"] = 0.0
+        end
+        if haskey(result.proposal_paths, model)
+            model_report["outcome"] = "nonfinite"
+            model_report["eligibility_gap_proposal"] =
+                abspath(result.proposal_paths[model])
+        end
+        haskey(result.comparisons, model) &&
+            (model_report["comparison"] = result.comparisons[model])
+    end
+    build = fresh_outcome_record(result.build)
+    report["fresh_reference"] = Dict(
+        "shared_build" => build,
+        "ephemeral" => true,
+        "cleaned_up" => !result.preserved,
+        "preserved_on_failure" => result.preserved,
+        "model_process" => Dict(
+            outcome.model => fresh_outcome_record(outcome) for
+            outcome in result.outcomes
+        ),
+        "eligibility_gap_proposals" => Dict(result.proposal_paths),
+    )
+    result.preserved &&
+        (report["fresh_reference"]["evidence_root"] = abspath(result.run_root))
+    report["seconds"] = seconds
+    report["outcome"] = result.outcome
+    return result.exitcode == 0
+end
+
 function run_multiple!(report, output_root, configuration, scope)
     configuration.reference_mode == "pinned" || throw(
         RunnerError(
@@ -1555,6 +1675,22 @@ function main(args = ARGS)
         println(stderr, "Validation Runner: ", error.message)
         return 2
     end
+    if configuration.reference_mode == "fresh"
+        report = empty_aggregate_report(configuration, output_root, scope)
+        try
+            passed = run_fresh!(report, output_root, configuration)
+            report_path = write_report(output_root, report)
+            print_summary(stdout, report, report_path)
+            return passed ? 0 : 1
+        catch error
+            report["error"] = sprint(showerror, error)
+            report_path = write_report(output_root, report)
+            println(stderr, "Validation Runner: ", report["error"])
+            println(stderr, "Validation Report: $report_path")
+            return error isa RunnerError ||
+                   error isa TestbedFreshReferenceAdapter.AdapterError ? 2 : 1
+        end
+    end
     if length(configuration.models) > 1
         report = empty_aggregate_report(configuration, output_root, scope)
         started = time_ns()
@@ -1573,15 +1709,6 @@ function main(args = ARGS)
         end
     end
     model = only(configuration.models)
-    if configuration.reference_mode == "fresh"
-        report = empty_aggregate_report(configuration, output_root, scope)
-        report["error"] =
-            "fresh-reference model commands are not yet connected to the public runner"
-        report_path = write_report(output_root, report)
-        println(stderr, "Validation Runner: ", report["error"])
-        println(stderr, "Validation Report: $report_path")
-        return 2
-    end
     if model == "CORPSE"
         report = empty_aggregate_report(configuration, output_root, scope)
         try

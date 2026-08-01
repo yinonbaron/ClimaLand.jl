@@ -64,6 +64,7 @@ end
         @test result.build.outcome == "failed"
         @test occursin("verification", result.build.error)
         @test isempty(result.outcomes)
+        @test isempty(result.comparisons)
         @test readdir(audit) == ["build.toml"]
     end
 end
@@ -199,6 +200,12 @@ end
         @test result.exitcode == 0
         @test result.outcome == "passed"
         @test result.build.outcome == "passed"
+        @test Set(keys(result.comparisons)) ==
+              Set(("CORPSE", "MIMICS-CN", "CASA-CN"))
+        @test all(
+            result.comparisons[model]["model"] == model for
+            model in keys(result.comparisons)
+        )
         canonical_root =
             joinpath(realpath(temporary), basename(result.run_root))
         build_record = TOML.parsefile(joinpath(audit, "build.toml"))

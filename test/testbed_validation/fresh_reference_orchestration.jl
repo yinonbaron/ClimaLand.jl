@@ -144,6 +144,7 @@ function run_fresh_reference(
             exitcode = 1,
             build,
             outcomes = Any[],
+            comparisons = Dict{String, Any}(),
             run_root,
             preserved = true,
             proposal_paths = Dict{String, String}(),
@@ -167,7 +168,11 @@ function run_fresh_reference(
         worker_stderr,
     )
     proposal_paths = Dict{String, String}()
+    comparisons = Dict{String, Any}()
     for model in selected
+        comparison_path = joinpath(model_directories[model], "comparison.toml")
+        isfile(comparison_path) &&
+            (comparisons[model] = TOML.parsefile(comparison_path))
         path = write_proposals(model, model_directories[model])
         isnothing(path) || (proposal_paths[model] = path)
     end
@@ -189,6 +194,7 @@ function run_fresh_reference(
         exitcode = passed ? 0 : 1,
         build,
         outcomes,
+        comparisons,
         run_root,
         preserved,
         proposal_paths,

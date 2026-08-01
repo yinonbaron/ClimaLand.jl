@@ -28,6 +28,16 @@ function run_validation(args...; environment = Dict{String, String}())
     )
 end
 
+function fake_validation_fresh_commands(audit_directory)
+    project = dirname(Base.active_project())
+    script = joinpath(@__DIR__, "fake_fresh_reference_process.jl")
+    build = build_directory ->
+        `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory pass`
+    worker = (model, run_directory, build_directory) ->
+        `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory pass`
+    return (; build, worker, preflight = _ -> nothing)
+end
+
 function write_smoke_scope_manifests(directory, eligibility_gaps)
     manifests = joinpath(directory, "scopes")
     mkpath(manifests)
@@ -402,7 +412,73 @@ end
     end
 end
 
-@testset "Validation Runner exposes explicit remaining integration blockers" begin
+@testset "Validation Runner dispatches fresh mode through process orchestration" begin
+    unsupported = VALIDATION_RUNNER_MODULE.parse_args([
+        "--scope",
+        "core",
+        "--models",
+        "CASA-C",
+        "--reference",
+        "fresh",
+    ])
+    @test_throws VALIDATION_RUNNER_MODULE.RunnerError begin
+        VALIDATION_RUNNER_MODULE.validate_available(unsupported)
+    end
+    withenv(VALIDATION_RUNNER_MODULE.FRESH_SOURCE_OVERRIDE => nothing) do
+        @test_throws VALIDATION_RUNNER_MODULE.RunnerError begin
+            VALIDATION_RUNNER_MODULE.configured_fresh_commands(["MIMICS-C"])
+        end
+    end
+    mktempdir() do directory
+        audit = joinpath(directory, "audit")
+        output = joinpath(directory, "output")
+        mkpath(audit)
+        configuration = VALIDATION_RUNNER_MODULE.parse_args([
+            "--scope",
+            "representative",
+            "--models",
+            "all",
+            "--reference",
+            "fresh",
+            "--workers",
+            "3",
+            "--output",
+            output,
+        ])
+        scope =
+            VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+        report = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
+            configuration,
+            output,
+            scope,
+        )
+        @test VALIDATION_RUNNER_MODULE.run_fresh!(
+            report,
+            output,
+            configuration;
+            commands = fake_validation_fresh_commands(audit),
+        )
+        @test TOML.parsefile(joinpath(audit, "build.toml"))["invocations"] == 1
+        @test all(
+            isfile(joinpath(audit, "$model.toml")) for
+            model in VALIDATION_RUNNER_MODULE.MODELS
+        )
+        @test report["outcome"] == "passed"
+        @test getindex.(report["model"], "name") == configuration.models
+        @test all(model["outcome"] == "passed" for model in report["model"])
+        @test all(
+            model["coverage"]["compared_cells"] ==
+            model["coverage"]["eligible_cells"] for model in report["model"]
+        )
+        @test all(haskey(model, "comparison") for model in report["model"])
+        @test report["fresh_reference"]["cleaned_up"] === true
+        @test report["fresh_reference"]["preserved_on_failure"] === false
+        @test isempty(report["fresh_reference"]["eligibility_gap_proposals"])
+        @test !haskey(report["fresh_reference"], "evidence_root")
+        report_path = VALIDATION_RUNNER_MODULE.write_report(output, report)
+        @test TOML.parsefile(report_path)["outcome"] == "passed"
+    end
+
     mktempdir() do output
         result = run_validation(
             "--scope",
@@ -415,7 +491,10 @@ end
             output,
         )
         @test result.exitcode == 2
-        @test occursin("fresh-reference model commands", result.stderr)
+        @test occursin(
+            VALIDATION_RUNNER_MODULE.FRESH_SOURCE_OVERRIDE,
+            result.stderr,
+        )
         report = TOML.parsefile(joinpath(output, "validation_report.toml"))
         @test only(report["model"])["name"] == "MIMICS-C"
     end

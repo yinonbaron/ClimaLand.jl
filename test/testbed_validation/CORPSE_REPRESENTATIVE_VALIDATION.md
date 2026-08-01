@@ -67,5 +67,21 @@ Such a result writes `nonfinite_results.toml` as an unreviewed Eligibility Gap
 proposal; it never edits the scope, calibration, fixture, or artifact binding.
 Successful scientific output is normalized to `comparison.toml`.
 
+The public runner dispatches this path together with the other four models:
+
+```sh
+CLIMALAND_VALIDATION_FORTRAN_SOURCE=/path/to/pinned/biogeochem_testbed \
+  julia --startup-file=no --project=test \
+  test/testbed_validation/validation_runner.jl \
+  --scope representative --models all --reference fresh --workers 5 \
+  --output validation-output
+```
+
+Fresh mode performs one shared build, preflights every selected model before
+that build, and keeps each model in its own process and directory. Passing
+outputs are removed after their comparison is aggregated; failures and
+Eligibility Gap proposals retain their evidence directory. The outer runner's
+hard deadline remains 7,200 seconds.
+
 The runner has a two-hour process deadline. It stores checkpoints, the compact
 candidate reduced history, and TOML reports; it does not retain daily history.
