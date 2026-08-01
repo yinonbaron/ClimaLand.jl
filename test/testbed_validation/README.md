@@ -806,6 +806,9 @@ The regular 80-cell CI contracts are documented in
 [`CASA_C_REPRESENTATIVE_VALIDATION.md`](CASA_C_REPRESENTATIVE_VALIDATION.md)
 and
 [`CASA_CN_REPRESENTATIVE_VALIDATION.md`](CASA_CN_REPRESENTATIVE_VALIDATION.md).
+The equivalent reduced-oracle and Eligibility Gap contract for MIMICS-CN is
+documented in
+[`MIMICS_CN_REPRESENTATIVE_VALIDATION.md`](MIMICS_CN_REPRESENTATIVE_VALIDATION.md).
 The current all-model integration status, measured checks, and remaining
 blocking contracts are recorded in
 [`STABLE_REPRESENTATIVE_V1_READINESS.md`](STABLE_REPRESENTATIVE_V1_READINESS.md).

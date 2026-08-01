@@ -647,6 +647,36 @@ end
     end
 end
 
+@testset "Validation Runner accepts explicit MIMICS-CN and fails closed" begin
+    mktempdir() do output
+        missing = joinpath(output, "missing-reference.toml")
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "MIMICS-CN",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_MIMICS_CN_REFERENCE" => missing,
+            ),
+        )
+
+        @test result.exitcode == 2
+        @test occursin("Pinned MIMICS-CN reference is missing", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        model = only(report["model"])
+        @test model["name"] == "MIMICS-CN"
+        @test model["coverage"]["scope_cells"] == 80
+        @test model["coverage"]["compared_cells"] == 0
+        @test report["comparison_policy"]["boundary_calibration_sha256"] ==
+              bytes2hex(SHA.sha256(read(
+            report["comparison_policy"]["boundary_calibration"],
+        )))
+        @test !isdir(joinpath(output, "MIMICS-CN", "stages"))
+    end
+end
+
 @testset "Validation Runner completes pinned Core and Smoke comparisons" begin
     for (scope, cell_count) in (("core", 11), ("smoke", 37))
         mktempdir() do output
@@ -687,6 +717,42 @@ end
                 report["comparison_policy"]["fresh_fortran_boundary"]["prespin"]["casa_plant.c_leaf"]
             @test applied["atol"] == policy["atol"]
             @test applied["rtol"] == policy["rtol"]
+            @test report["outcome"] == "passed"
+        end
+    end
+end
+
+if get(
+    ENV,
+    "CLIMALAND_RUN_MIMICS_CN_REPRESENTATIVE_VALIDATION",
+    "false",
+) == "true"
+    @testset "Validation Runner completes pinned Representative MIMICS-CN" begin
+        mktempdir() do output
+            result = run_validation(
+                "--scope",
+                "representative",
+                "--models",
+                "MIMICS-CN",
+                "--reference",
+                "pinned",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            )
+
+            @test result.exitcode == 0
+            @test occursin("Validation: passed", result.stdout)
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            model = only(report["model"])
+            @test model["name"] == "MIMICS-CN"
+            @test model["coverage"]["scope_cells"] == 80
+            @test model["coverage"]["eligible_cells"] == 80
+            @test model["coverage"]["compared_cells"] == 80
+            @test isempty(model["coverage"]["eligibility_gaps"])
+            @test model["outcome"] == "passed"
+            @test all(values(model["comparison"]))
             @test report["outcome"] == "passed"
         end
     end
