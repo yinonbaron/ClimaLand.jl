@@ -26,9 +26,15 @@ open(joinpath(directory, "$model.finished.toml"), "w") do io
             "julia_num_threads_environment" =>
                 get(ENV, "JULIA_NUM_THREADS", ""),
             "model" => model,
+            "mkl_num_threads_environment" =>
+                get(ENV, "MKL_NUM_THREADS", ""),
+            "omp_num_threads_environment" =>
+                get(ENV, "OMP_NUM_THREADS", ""),
             "openblas_num_threads_environment" =>
                 get(ENV, "OPENBLAS_NUM_THREADS", ""),
             "started_ns" => started_ns,
+            "veclib_maximum_threads_environment" =>
+                get(ENV, "VECLIB_MAXIMUM_THREADS", ""),
         );
         sorted = true,
     )

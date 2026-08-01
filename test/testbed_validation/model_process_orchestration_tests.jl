@@ -101,7 +101,10 @@ end
                 record["julia_num_threads"] == 1 &&
                     record["blas_threads"] == 1 &&
                     record["julia_num_threads_environment"] == "1" &&
-                    record["openblas_num_threads_environment"] == "1",
+                    record["openblas_num_threads_environment"] == "1" &&
+                    record["omp_num_threads_environment"] == "1" &&
+                    record["mkl_num_threads_environment"] == "1" &&
+                    record["veclib_maximum_threads_environment"] == "1",
             values(records),
         )
         events = [
