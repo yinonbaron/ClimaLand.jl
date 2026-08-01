@@ -4,9 +4,16 @@ import Pkg
 import SHA
 import TOML
 
+if !isdefined(@__MODULE__, :TestbedFreshReferenceOrchestration)
+    include(joinpath(@__DIR__, "fresh_reference_orchestration.jl"))
+end
+const FreshReferenceOrchestration = TestbedFreshReferenceOrchestration
+
 const MODELS = ("CORPSE", "MIMICS-C", "MIMICS-CN", "CASA-C", "CASA-CN")
 const CANONICAL_TOOLCHAIN_IDENTITY = "climaland-biogeochem-reference-linux-gfortran-v1"
 const CANONICAL_BUILD_PLATFORM = "x86_64-linux-gnu"
+const PINNED_FORTRAN_SOURCE_COMMIT =
+    "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 const DEFAULT_ARTIFACTS_TOML =
     joinpath(@__DIR__, "validation", "Artifacts.toml")
 const REPRESENTATIVE_SCOPE_MANIFEST =
@@ -119,6 +126,240 @@ function representative_scope()
     return (; cell_ids, sha256 = sha256sum(REPRESENTATIVE_SCOPE_MANIFEST))
 end
 
+function write_toml(path, document)
+    temporary = "$path.tmp"
+    open(temporary, "w") do io
+        TOML.print(io, document; sorted = true)
+    end
+    mv(temporary, path; force = true)
+    return path
+end
+
+function canonical_build_receipt(fresh_root, candidate_root)
+    build_root = joinpath(fresh_root, "build")
+    metadata_path = joinpath(build_root, "build_metadata.toml")
+    metadata = parse_toml(metadata_path, "verified shared-build metadata")
+    get(metadata, "schema_version", nothing) == 1 &&
+        get(metadata, "verified", nothing) === true ||
+        fail("shared Fortran build metadata is not verified")
+    get(metadata, "build_platform", nothing) == CANONICAL_BUILD_PLATFORM &&
+        get(metadata, "toolchain_identity", nothing) ==
+        CANONICAL_TOOLCHAIN_IDENTITY ||
+        fail("shared Fortran build metadata is not canonical")
+    compiler = get(metadata, "compiler_identity", nothing)
+    compiler isa AbstractString &&
+        occursin(r"^GNU Fortran(?: |$)", compiler) &&
+        occursin(r"[0-9]", compiler) ||
+        fail("shared Fortran build metadata is not GNU Fortran")
+    verification = get(metadata, "verification", Dict{String, Any}())
+    executable_name = get(verification, "executable", nothing)
+    executable_name isa AbstractString &&
+        basename(executable_name) == executable_name ||
+        fail("shared Fortran build metadata has an unsafe executable")
+    executable = joinpath(build_root, executable_name)
+    isfile(executable) || fail("verified shared Fortran executable is missing")
+    executable_sha256 = sha256sum(executable)
+    executable_sha256 == get(verification, "executable_sha256", nothing) ||
+        fail("verified shared Fortran executable differs from build metadata")
+    get(verification, "source_code_clean", nothing) === true &&
+        get(verification, "source_commit", nothing) ==
+        PINNED_FORTRAN_SOURCE_COMMIT ||
+        fail("shared Fortran build lacks clean pinned-source evidence")
+
+    copied_metadata = joinpath(candidate_root, "build_metadata.toml")
+    cp(metadata_path, copied_metadata; force = true)
+    receipt = Dict(
+        "schema_version" => 1,
+        "kind" => "canonical_fortran_build_receipt",
+        "verified" => true,
+        "canonical" => true,
+        "compiler_identity" => String(compiler),
+        "build_platform" => CANONICAL_BUILD_PLATFORM,
+        "toolchain_identity" => CANONICAL_TOOLCHAIN_IDENTITY,
+        "source_build_metadata_sha256" => sha256sum(copied_metadata),
+        "verification" => Dict(
+            "source_commit" => String(verification["source_commit"]),
+            "source_code_clean" => true,
+            "executable_sha256" => executable_sha256,
+        ),
+    )
+    path = write_toml(
+        joinpath(candidate_root, "canonical_build_receipt.toml"),
+        receipt,
+    )
+    return (; path, receipt, sha256 = sha256sum(path))
+end
+
+all_match(records) =
+    records isa AbstractDict && !isempty(records) &&
+    all(get(record, "all_match", false) === true for record in values(records))
+
+is_true(record, key) =
+    record isa AbstractDict && get(record, key, false) === true
+
+function scientific_checks(model, report)
+    if model == "CORPSE"
+        stages = get(report, "stage", nothing)
+        boundaries = stages isa AbstractDict && !isempty(stages) && all(
+            all_match(get(stage, "comparison", nothing)) for stage in
+            values(stages)
+        )
+        historical = get(report, "reduced_historical", nothing)
+        annual = historical isa AbstractDict && all(
+            haskey(historical, name) && all_match(historical[name]) for name in
+            ("annual_summaries", "end_of_year", "annual_budgets")
+        )
+        daily = historical isa AbstractDict &&
+                haskey(historical, "fixed_daily_samples") &&
+                all_match(historical["fixed_daily_samples"])
+        budget = get(get(report, "budget", Dict{String, Any}()), "verified", false)
+        checks = (boundaries, annual, budget, daily)
+    else
+        boundaries = all_match(get(report, "boundary_comparison", nothing))
+        historical = get(report, "historical_comparison", nothing)
+        annual = historical isa AbstractDict &&
+                 is_true(get(historical, "annual", nothing), "all_match")
+        daily_record = historical isa AbstractDict ? get(
+            historical,
+            "fixed_daily_samples",
+            get(historical, "selected_dates", get(historical, "daily", nothing)),
+        ) : nothing
+        daily = is_true(daily_record, "all_match")
+        carbon = get(get(report, "carbon_budget", Dict{String, Any}()), "all_close", false)
+        nitrogen = model in ("MIMICS-CN", "CASA-CN") ? get(
+            get(report, "nitrogen_budget", Dict{String, Any}()),
+            "all_close",
+            false,
+        ) : true
+        checks = (boundaries, annual, carbon && nitrogen, daily)
+    end
+    names = (
+        "boundaries",
+        "annual_summaries",
+        "budget_diagnostics",
+        "fixed_daily_samples",
+    )
+    result = Dict(name => value for (name, value) in zip(names, checks))
+    all(values(result)) ||
+        fail("$model fresh comparison lacks successful scientific checks")
+    return result
+end
+
+function comparison_receipt(fresh_root, candidate_root, model, build, scope)
+    fresh_model = joinpath(fresh_root, "model-$model")
+    source_path = joinpath(fresh_model, "comparison.toml")
+    report = try
+        FreshReferenceOrchestration.validated_comparison(model, source_path)
+    catch error
+        fail(sprint(showerror, error))
+    end
+    reference = get(report, "reference", Dict{String, Any}())
+    get(reference, "kind", nothing) == "fresh_reduced_oracle" ||
+        fail("$model fresh comparison lacks its reduced oracle identity")
+    source_reference = get(reference, "path", nothing)
+    source_reference isa AbstractString ||
+        fail("$model fresh comparison lacks its reduced oracle path")
+    relative_reference = relpath(abspath(source_reference), abspath(fresh_model))
+    startswith(relative_reference, "..") &&
+        fail("$model fresh comparison references an oracle outside its run")
+    isfile(source_reference) || fail("$model fresh reduced oracle is missing")
+    sha256sum(source_reference) == get(reference, "sha256", nothing) ||
+        fail("$model fresh reduced oracle differs from its comparison")
+
+    payload_root = joinpath(candidate_root, "model-$model", "reference")
+    bundle = validate_payload(
+        payload_root,
+        "reference",
+        TOML.parsefile(joinpath(candidate_root, "publication_candidate.toml"))[
+            "generation"
+        ];
+        model,
+    )
+    role = model == "CORPSE" ? "reduced_history" : "oracle"
+    published_reference =
+        joinpath(payload_root, bundle.manifest["payload"][role])
+    sha256sum(published_reference) == sha256sum(source_reference) ||
+        fail("$model publication payload differs from its fresh reduced oracle")
+    if model == "CORPSE"
+        fresh_payload = joinpath(fresh_model, "payload")
+        for relative in values(bundle.manifest["payload"])
+            source = joinpath(fresh_payload, relative)
+            isfile(source) &&
+                sha256sum(source) ==
+                sha256sum(joinpath(payload_root, relative)) ||
+                fail("CORPSE publication payload differs from its fresh run")
+        end
+    end
+
+    checks = scientific_checks(model, report)
+    destination = joinpath(candidate_root, "model-$model")
+    source_copy = joinpath(destination, "source_comparison.toml")
+    cp(source_path, source_copy; force = true)
+    receipt = Dict(
+        "schema_version" => 1,
+        "kind" => "reference_comparison_receipt",
+        "model" => model,
+        "scope" => "representative",
+        "scope_manifest_sha256" => scope.sha256,
+        "build_receipt_sha256" => build.sha256,
+        "source_comparison_sha256" => sha256sum(source_copy),
+        "outcome" => "passed",
+        "coverage" => report["coverage"],
+        "check" => checks,
+        "reference_files" => bundle.manifest["files"],
+    )
+    path = write_toml(joinpath(destination, "comparison.toml"), receipt)
+    return (; path, sha256 = sha256sum(path))
+end
+
+function bind_canonical_evidence!(fresh_root, candidate_root)
+    fresh_root = abspath(fresh_root)
+    candidate_root = abspath(candidate_root)
+    candidate = parse_toml(
+        joinpath(candidate_root, "publication_candidate.toml"),
+        "publication candidate",
+    )
+    raw_models = get(candidate, "models", nothing)
+    raw_models isa AbstractVector || fail("publication candidate lacks models")
+    models = String.(raw_models)
+    length(models) == length(unique(models)) &&
+        all(model -> model in MODELS, models) ||
+        fail("publication candidate has invalid models")
+    build = canonical_build_receipt(fresh_root, candidate_root)
+    scope = representative_scope()
+    receipts = Dict(
+        model => comparison_receipt(
+            fresh_root,
+            candidate_root,
+            model,
+            build,
+            scope,
+        ) for model in models
+    )
+    bundle_paths = [
+        joinpath(candidate_root, "model-$model", "reference", "manifest.toml") for
+        model in models
+    ]
+    get(candidate, "change_kind", nothing) == "shared" &&
+        push!(bundle_paths, joinpath(candidate_root, "forcing", "manifest.toml"))
+    for path in bundle_paths
+        manifest = parse_toml(path, "publication bundle manifest")
+        provenance = manifest["provenance"]
+        provenance["build_receipt_sha256"] = build.sha256
+        provenance["source_revision"] =
+            build.receipt["verification"]["source_commit"]
+        provenance["compiler_identity"] = build.receipt["compiler_identity"]
+        provenance["build_platform"] = build.receipt["build_platform"]
+        provenance["toolchain_identity"] = build.receipt["toolchain_identity"]
+        if get(manifest, "kind", nothing) == "reference"
+            provenance["comparison_report_sha256"] =
+                receipts[manifest["model"]].sha256
+        end
+        write_toml(path, manifest)
+    end
+    return candidate_root
+end
+
 function validate_build_receipt(candidate_root)
     path = joinpath(candidate_root, "canonical_build_receipt.toml")
     receipt = parse_toml(path, "canonical build receipt")
@@ -145,6 +386,23 @@ function validate_build_receipt(candidate_root)
         occursin(r"[0-9]", compiler_identity) || fail(
         "canonical build receipt was not generated by canonical Linux/GNU Fortran",
     )
+    metadata_path = joinpath(candidate_root, "build_metadata.toml")
+    metadata = parse_toml(metadata_path, "source shared-build metadata")
+    get(receipt, "source_build_metadata_sha256", nothing) ==
+    sha256sum(metadata_path) ||
+        fail("canonical build receipt differs from its source build metadata")
+    metadata_verification =
+        get(metadata, "verification", Dict{String, Any}())
+    get(metadata, "build_platform", nothing) == receipt["build_platform"] &&
+        get(metadata, "toolchain_identity", nothing) ==
+        receipt["toolchain_identity"] &&
+        get(metadata, "compiler_identity", nothing) == compiler_identity &&
+        get(metadata_verification, "source_commit", nothing) ==
+        verification["source_commit"] &&
+        get(metadata_verification, "source_code_clean", nothing) === true &&
+        get(metadata_verification, "executable_sha256", nothing) ==
+        verification["executable_sha256"] ||
+        fail("canonical build receipt does not derive from its source metadata")
     return (; path, receipt, sha256 = sha256sum(path))
 end
 
@@ -247,6 +505,20 @@ function validate_comparison_receipt(candidate_root, bundle, build, scope)
     get(report, "reference_files", nothing) == bundle.manifest["files"] || fail(
         "$(bundle.model) comparison receipt does not identify the published payload",
     )
+    source_path = joinpath(
+        candidate_root,
+        "model-$(bundle.model)",
+        "source_comparison.toml",
+    )
+    source = try
+        FreshReferenceOrchestration.validated_comparison(bundle.model, source_path)
+    catch error
+        fail(sprint(showerror, error))
+    end
+    get(report, "source_comparison_sha256", nothing) == sha256sum(source_path) ||
+        fail("$(bundle.model) receipt differs from its source comparison")
+    scientific_checks(bundle.model, source) == checks ||
+        fail("$(bundle.model) receipt differs from its scientific comparison")
     provenance = bundle.manifest["provenance"]
     get(provenance, "build_receipt_sha256", nothing) == build.sha256 &&
         get(provenance, "comparison_report_sha256", nothing) ==
@@ -387,7 +659,8 @@ end
 
 Verify a publication candidate and return its compatible forcing/reference bundles.
 
-Called from `stage_publication` before any archives are created.
+Called from `_stage_prepared_publication` after fresh evidence is bound and before
+any archives are created.
 """
 function validate_candidate(candidate_root)
     isdir(candidate_root) ||
@@ -678,15 +951,16 @@ function write_expected_manifest(path, bundle, archive, release_base_url)
 end
 
 """
-    stage_publication(candidate_root, output, artifacts_toml, release_base_url;
-                      expected_manifest_directory = nothing)
+    _stage_prepared_publication(candidate_root, output, artifacts_toml,
+                                release_base_url;
+                                expected_manifest_directory = nothing)
 
 Stage immutable archives, expected manifests, and artifact bindings atomically.
 
 Return the output path, generation, and published model names. Existing output is
 never overwritten.
 """
-function stage_publication(
+function _stage_prepared_publication(
     candidate_root,
     output,
     artifacts_toml,
@@ -734,6 +1008,12 @@ function stage_publication(
             "canonical_build_receipt.toml" =>
                 sha256sum(staged_build_receipt),
         )
+        metadata_source = joinpath(candidate_root, "build_metadata.toml")
+        metadata_destination = joinpath(evidence, "build_metadata.toml")
+        cp(metadata_source, metadata_destination)
+        chmod(metadata_destination, 0o444)
+        evidence_records["build_metadata.toml"] =
+            sha256sum(metadata_destination)
         for model in candidate.models
             source = joinpath(candidate_root, "model-$model", "comparison.toml")
             name = "$model-comparison.toml"
@@ -741,6 +1021,13 @@ function stage_publication(
             cp(source, destination)
             chmod(destination, 0o444)
             evidence_records[name] = sha256sum(destination)
+            source_comparison =
+                joinpath(candidate_root, "model-$model", "source_comparison.toml")
+            source_name = "$model-source-comparison.toml"
+            source_destination = joinpath(evidence, source_name)
+            cp(source_comparison, source_destination)
+            chmod(source_destination, 0o444)
+            evidence_records[source_name] = sha256sum(source_destination)
         end
         staged_artifacts = joinpath(staging, "Artifacts.toml")
         cp(artifacts_toml, staged_artifacts; force = true)
@@ -806,6 +1093,27 @@ function stage_publication(
     )
 end
 
+function stage_fresh_publication(
+    fresh_root,
+    candidate_root,
+    output,
+    artifacts_toml,
+    release_base_url;
+    expected_manifest_directory = nothing,
+)
+    bind_canonical_evidence!(fresh_root, candidate_root)
+    return _stage_prepared_publication(
+        candidate_root,
+        output,
+        artifacts_toml,
+        release_base_url;
+        expected_manifest_directory,
+    )
+end
+
+stage_publication(args...; kwargs...) =
+    stage_fresh_publication(args...; kwargs...)
+
 """
     main(args = ARGS)
 
@@ -814,15 +1122,17 @@ Run the explicit `stage` publication command and return a successful exit code.
 Called from the script entry point after command-line arguments are collected.
 """
 function main(args = ARGS)
-    4 <= length(args) <= 6 || fail(
-        "usage: reference_publication.jl stage CANDIDATE OUTPUT RELEASE_BASE_URL [ARTIFACTS_TOML [EXPECTED_MANIFEST_DIRECTORY]]",
+    5 <= length(args) <= 7 || fail(
+        "usage: reference_publication.jl stage FRESH_RUN CANDIDATE OUTPUT " *
+        "RELEASE_BASE_URL [ARTIFACTS_TOML [EXPECTED_MANIFEST_DIRECTORY]]",
     )
     first(args) == "stage" ||
         fail("only the explicit stage operation is supported")
-    candidate, output, release_base_url = args[2:4]
-    artifacts_toml = length(args) >= 5 ? args[5] : DEFAULT_ARTIFACTS_TOML
-    expected_manifest_directory = length(args) == 6 ? args[6] : nothing
+    fresh_root, candidate, output, release_base_url = args[2:5]
+    artifacts_toml = length(args) >= 6 ? args[6] : DEFAULT_ARTIFACTS_TOML
+    expected_manifest_directory = length(args) == 7 ? args[7] : nothing
     stage_publication(
+        fresh_root,
         candidate,
         output,
         artifacts_toml,

@@ -707,10 +707,13 @@ The candidate must declare the canonical `x86_64-linux-gnu` platform, a
 versioned GNU Fortran compiler, and the pinned
 `climaland-biogeochem-reference-linux-gfortran-v1` toolchain identity. Local
 macOS fresh runs are useful evidence, but are intentionally not publishable.
-The declaration alone is not sufficient: the candidate root must contain a
-hashed `canonical_build_receipt.toml` from the verified clean-source build and
-each `model-MODEL` directory must contain a hashed successful
-`comparison.toml`. Every comparison receipt must cover the exact current
+The declaration alone is not sufficient. The staging command consumes the
+exact canonical Fresh Fortran Reference run directory, verifies its shared
+executable against `build/build_metadata.toml`, and generates the candidate's
+hashed `canonical_build_receipt.toml`. It validates each strict
+`model-MODEL/comparison.toml` and derives the corresponding publication
+receipt; maintainers do not author these evidence files. Every comparison
+receipt must cover the exact current
 Representative Scope Manifest and all eligible cells, pass boundary, annual,
 budget, and fixed-daily checks, and identify the exact files being published.
 The forcing and model payloads are independently checked against their
@@ -719,7 +722,7 @@ model-specific schemas before staging.
 ```sh
 julia --startup-file=no --project=. \
   test/testbed_validation/reference_publication.jl stage \
-  CANDIDATE STAGED_OUTPUT \
+  CANONICAL_FRESH_RUN CANDIDATE STAGED_OUTPUT \
   https://github.com/OWNER/REPOSITORY/releases/download/IMMUTABLE_TAG \
   test/testbed_validation/validation/Artifacts.toml
 ```
@@ -733,10 +736,11 @@ artifact tree, archive checksum, immutable URL, and binding.
 
 The staged directory contains read-only archives, expected manifests, a copied
 `Artifacts.toml`, `publication.toml`, and an `evidence` directory containing
-the exact canonical build and model-comparison receipts. Maintainers review
-this complete directory, upload every listed archive to the named immutable
-release, verify the uploaded checksums, and only then commit the staged
-bindings and manifests.
+the source build metadata, exact strict fresh-comparison reports, and their
+derived canonical build and model-comparison receipts. Maintainers review this
+complete directory, upload every listed archive to the named immutable release,
+verify the uploaded checksums, and only then commit the staged bindings and
+manifests.
 Incomplete provenance, noncanonical toolchains, stale bindings, mixed shared
 identities, partial model sets, and an existing output directory all fail
 before the atomic staging move.

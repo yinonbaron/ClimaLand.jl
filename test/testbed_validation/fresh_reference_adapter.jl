@@ -20,6 +20,8 @@ const NetCDFCompare =
     getfield(parentmodule(@__MODULE__), :TestbedNetCDFCompare)
 const SCRIPT_PATH = @__FILE__
 const PINNED_SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+const CANONICAL_TOOLCHAIN_IDENTITY =
+    "climaland-biogeochem-reference-linux-gfortran-v1"
 const CASA_C_TRACER_MODEL = "CASA-C"
 const CASA_C_TRACER_SCOPE = "one-cell-boundary"
 const CASA_C_TRACER_CONTRACT = "fortran-archive-integrity-tracer"
@@ -214,6 +216,9 @@ function build_shared_fortran(source_root, build_directory)
     metadata = TOML.parsefile(metadata_path)
     metadata["schema_version"] = 1
     metadata["verified"] = true
+    metadata["build_platform"] = Sys.MACHINE
+    metadata["toolchain_identity"] = CANONICAL_TOOLCHAIN_IDENTITY
+    metadata["compiler_identity"] = metadata["build"]["compiler_version"]
     metadata["verification"] = Dict(
         "executable" => basename(executable),
         "executable_sha256" => sha256sum(executable),

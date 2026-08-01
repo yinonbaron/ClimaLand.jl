@@ -50,6 +50,24 @@ function write_build_receipt(
     canonical = true,
     compiler_identity = "GNU Fortran 14.2.0",
 )
+    metadata_path = joinpath(root, "build_metadata.toml")
+    write_publication_manifest(
+        metadata_path,
+        Dict(
+            "schema_version" => 1,
+            "verified" => true,
+            "build_platform" =>
+                canonical ? "x86_64-linux-gnu" : "aarch64-apple-darwin",
+            "toolchain_identity" => CANONICAL_TOOLCHAIN,
+            "compiler_identity" => compiler_identity,
+            "verification" => Dict(
+                "source_commit" =>
+                    "0123456789abcdef0123456789abcdef01234567",
+                "source_code_clean" => true,
+                "executable_sha256" => HEX_A,
+            ),
+        ),
+    )
     path = joinpath(root, "canonical_build_receipt.toml")
     write_publication_manifest(
         path,
@@ -62,6 +80,7 @@ function write_build_receipt(
             "build_platform" =>
                 canonical ? "x86_64-linux-gnu" : "aarch64-apple-darwin",
             "toolchain_identity" => CANONICAL_TOOLCHAIN,
+            "source_build_metadata_sha256" => sha256sum(metadata_path),
             "verification" => Dict(
                 "source_commit" => "0123456789abcdef0123456789abcdef01234567",
                 "source_code_clean" => true,
@@ -167,7 +186,51 @@ function write_payload_manifest(
     comparison_sha256 = nothing
     if kind == "reference"
         comparison_path = joinpath(dirname(directory), "comparison.toml")
+        source_comparison_path =
+            joinpath(dirname(directory), "source_comparison.toml")
         expected_eligible = model == "CORPSE" ? 78 : 80
+        source_comparison = Dict{String, Any}(
+            "schema_version" => 1,
+            "model" => model,
+            "scope" => "representative",
+            "outcome" => "passed",
+            "coverage" => Dict(
+                "scope_cells" => 80,
+                "eligible_cells" => expected_eligible,
+                "compared_cells" => expected_eligible,
+            ),
+        )
+        if model == "CORPSE"
+            source_comparison["stage"] = Dict(
+                "historical" => Dict(
+                    "comparison" => Dict(
+                        "state" => Dict("all_match" => true),
+                    ),
+                ),
+            )
+            source_comparison["reduced_historical"] = Dict(
+                name => Dict("state" => Dict("all_match" => true)) for name in
+                (
+                    "annual_summaries",
+                    "end_of_year",
+                    "annual_budgets",
+                    "fixed_daily_samples",
+                )
+            )
+            source_comparison["budget"] = Dict("verified" => true)
+        else
+            source_comparison["boundary_comparison"] =
+                Dict("historical" => Dict("all_match" => true))
+            source_comparison["historical_comparison"] = Dict(
+                "annual" => Dict("all_match" => true),
+                "fixed_daily_samples" => Dict("all_match" => true),
+            )
+            source_comparison["carbon_budget"] = Dict("all_close" => true)
+            model in ("MIMICS-CN", "CASA-CN") &&
+                (source_comparison["nitrogen_budget"] =
+                    Dict("all_close" => true))
+        end
+        write_publication_manifest(source_comparison_path, source_comparison)
         write_publication_manifest(
             comparison_path,
             Dict(
@@ -178,6 +241,8 @@ function write_payload_manifest(
                 "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
                 "build_receipt_sha256" => build_receipt_sha256,
                 "outcome" => "passed",
+                "source_comparison_sha256" =>
+                    sha256sum(source_comparison_path),
                 "coverage" => Dict(
                     "scope_cells" => 80,
                     "eligible_cells" => expected_eligible,
@@ -267,6 +332,93 @@ function make_candidate(
     return root
 end
 
+function make_canonical_fresh_run(root, candidate)
+    build = joinpath(root, "build")
+    mkpath(build)
+    executable = joinpath(build, "casaclm_mimics-cn_corpse")
+    write(executable, "canonical executable")
+    write_publication_manifest(
+        joinpath(build, "build_metadata.toml"),
+        Dict(
+            "schema_version" => 1,
+            "verified" => true,
+            "build_platform" => "x86_64-linux-gnu",
+            "toolchain_identity" => CANONICAL_TOOLCHAIN,
+            "compiler_identity" => "GNU Fortran 14.2.0",
+            "verification" => Dict(
+                "executable" => basename(executable),
+                "executable_sha256" => sha256sum(executable),
+                "source_commit" =>
+                    ReferencePublication.PINNED_FORTRAN_SOURCE_COMMIT,
+                "source_code_clean" => true,
+            ),
+        ),
+    )
+    for model in PUBLICATION_MODELS
+        model_root = joinpath(root, "model-$model")
+        mkpath(model_root)
+        payload = joinpath(candidate, "model-$model", "reference")
+        role = model == "CORPSE" ? "reduced_history" : "oracle"
+        relative = TOML.parsefile(joinpath(payload, "manifest.toml"))["payload"][role]
+        reference = joinpath(model_root, basename(relative))
+        cp(joinpath(payload, relative), reference)
+        if model == "CORPSE"
+            cp(payload, joinpath(model_root, "payload"))
+        end
+        historical = Dict(
+            "all_match" => true,
+            "annual" => Dict("all_match" => true),
+            "fixed_daily_samples" => Dict("all_match" => true),
+        )
+        report = Dict{String, Any}(
+            "schema_version" => 1,
+            "model" => model,
+            "scope" => "representative",
+            "outcome" => "passed",
+            "coverage" => Dict(
+                "scope_cells" => 80,
+                "eligible_cells" => model == "CORPSE" ? 78 : 80,
+                "compared_cells" => model == "CORPSE" ? 78 : 80,
+            ),
+            "reference" => Dict(
+                "path" => reference,
+                "sha256" => sha256sum(reference),
+                "kind" => "fresh_reduced_oracle",
+            ),
+        )
+        if model == "CORPSE"
+            report["stage"] = Dict(
+                stage => Dict(
+                    "comparison" => Dict(
+                        "state" => Dict("all_match" => true),
+                    ),
+                ) for stage in
+                ("prespin", "spin", "spin_continuation", "historical")
+            )
+            report["reduced_historical"] = Dict(
+                name => Dict("state" => Dict("all_match" => true)) for name in
+                (
+                    "annual_summaries",
+                    "end_of_year",
+                    "annual_budgets",
+                    "fixed_daily_samples",
+                )
+            )
+            report["budget"] = Dict("verified" => true)
+        else
+            report["boundary_comparison"] = Dict(
+                "historical" => Dict("all_match" => true),
+            )
+            report["historical_comparison"] = historical
+            report["carbon_budget"] = Dict("all_close" => true)
+            model in ("MIMICS-CN", "CASA-CN") &&
+                (report["nitrogen_budget"] = Dict("all_close" => true))
+        end
+        write_publication_manifest(joinpath(model_root, "comparison.toml"), report)
+    end
+    return root
+end
+
 function empty_artifacts_toml(path)
     write(
         path,
@@ -283,7 +435,7 @@ end
         destination = joinpath(directory, "publication")
 
         error = try
-            ReferencePublication.stage_publication(
+            ReferencePublication._stage_prepared_publication(
                 fresh,
                 destination,
                 empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
@@ -305,7 +457,7 @@ end
         candidate = make_candidate(joinpath(directory, "candidate"))
         rm(joinpath(candidate, "canonical_build_receipt.toml"))
         error = try
-            ReferencePublication.stage_publication(
+            ReferencePublication._stage_prepared_publication(
                 candidate,
                 joinpath(directory, "publication"),
                 empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
@@ -321,6 +473,73 @@ end
     end
 end
 
+@testset "Reference Publication bridges validated fresh evidence" begin
+    mktempdir() do directory
+        candidate = make_candidate(joinpath(directory, "candidate"))
+        fresh = make_canonical_fresh_run(joinpath(directory, "fresh"), candidate)
+        rm(joinpath(candidate, "canonical_build_receipt.toml"))
+        rm(joinpath(candidate, "build_metadata.toml"))
+        for model in PUBLICATION_MODELS
+            rm(joinpath(candidate, "model-$model", "comparison.toml"))
+            rm(joinpath(candidate, "model-$model", "source_comparison.toml"))
+        end
+        destination = joinpath(directory, "publication")
+
+        result = ReferencePublication.stage_publication(
+            fresh,
+            candidate,
+            destination,
+            empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
+            RELEASE_URL,
+        )
+
+        @test result.output == destination
+        evidence = joinpath(destination, "evidence")
+        @test isfile(joinpath(evidence, "build_metadata.toml"))
+        @test all(
+            isfile(joinpath(evidence, "$model-source-comparison.toml")) for
+            model in PUBLICATION_MODELS
+        )
+        receipt = TOML.parsefile(joinpath(evidence, "CASA-C-comparison.toml"))
+        @test receipt["source_comparison_sha256"] ==
+              sha256sum(joinpath(evidence, "CASA-C-source-comparison.toml"))
+
+        tampered = make_candidate(joinpath(directory, "tampered-candidate"))
+        tampered_fresh = make_canonical_fresh_run(
+            joinpath(directory, "tampered-fresh"),
+            tampered,
+        )
+        comparison = joinpath(tampered_fresh, "model-CASA-C", "comparison.toml")
+        report = TOML.parsefile(comparison)
+        write(report["reference"]["path"], "tampered after comparison")
+        @test_throws ReferencePublication.PublicationError ReferencePublication.stage_publication(
+            tampered_fresh,
+            tampered,
+            joinpath(directory, "tampered-publication"),
+            empty_artifacts_toml(joinpath(directory, "tampered-Artifacts.toml")),
+            RELEASE_URL,
+        )
+
+        incomplete = make_candidate(joinpath(directory, "incomplete-candidate"))
+        incomplete_fresh = make_canonical_fresh_run(
+            joinpath(directory, "incomplete-fresh"),
+            incomplete,
+        )
+        comparison =
+            joinpath(incomplete_fresh, "model-MIMICS-C", "comparison.toml")
+        report = TOML.parsefile(comparison)
+        delete!(report["historical_comparison"], "fixed_daily_samples")
+        write_publication_manifest(comparison, report)
+        @test_throws ReferencePublication.PublicationError ReferencePublication.stage_publication(
+            incomplete_fresh,
+            incomplete,
+            joinpath(directory, "incomplete-publication"),
+            empty_artifacts_toml(joinpath(directory, "incomplete-Artifacts.toml")),
+            RELEASE_URL,
+        )
+    end
+end
+
 @testset "Reference Publication stages one immutable shared compatibility set" begin
     mktempdir() do directory
         candidate = make_candidate(joinpath(directory, "candidate"))
@@ -328,7 +547,7 @@ end
         original_bindings = read(artifacts)
         destination = joinpath(directory, "publication")
 
-        result = ReferencePublication.stage_publication(
+        result = ReferencePublication._stage_prepared_publication(
             candidate,
             destination,
             artifacts,
@@ -363,7 +582,9 @@ end
         evidence = joinpath(destination, "evidence")
         @test Set(readdir(evidence)) == Set((
             "canonical_build_receipt.toml",
+            "build_metadata.toml",
             ("$model-comparison.toml" for model in PUBLICATION_MODELS)...,
+            ("$model-source-comparison.toml" for model in PUBLICATION_MODELS)...,
         ))
         build_receipt_sha256 =
             sha256sum(joinpath(evidence, "canonical_build_receipt.toml"))
@@ -429,7 +650,7 @@ end
             )
         end
 
-        @test_throws ReferencePublication.PublicationError ReferencePublication.stage_publication(
+        @test_throws ReferencePublication.PublicationError ReferencePublication._stage_prepared_publication(
             candidate,
             destination,
             artifacts,
@@ -502,7 +723,7 @@ end
             candidate = candidate_builder(joinpath(directory, "candidate"))
             destination = joinpath(directory, "publication")
             error = try
-                ReferencePublication.stage_publication(
+                ReferencePublication._stage_prepared_publication(
                     candidate,
                     destination,
                     empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
@@ -585,7 +806,7 @@ end
             candidate = make_candidate(joinpath(directory, "candidate"))
             mutate(candidate)
             error = try
-                ReferencePublication.stage_publication(
+                ReferencePublication._stage_prepared_publication(
                     candidate,
                     joinpath(directory, "publication"),
                     empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
@@ -607,7 +828,7 @@ end
         shared = make_candidate(joinpath(directory, "shared"))
         initial = joinpath(directory, "initial")
         artifacts = empty_artifacts_toml(joinpath(directory, "Artifacts.toml"))
-        ReferencePublication.stage_publication(
+        ReferencePublication._stage_prepared_publication(
             shared,
             initial,
             artifacts,
@@ -622,7 +843,7 @@ end
             payload_suffix = "-changed",
         )
         updated = joinpath(directory, "updated")
-        result = ReferencePublication.stage_publication(
+        result = ReferencePublication._stage_prepared_publication(
             model_candidate,
             updated,
             joinpath(initial, "Artifacts.toml"),
@@ -650,7 +871,7 @@ end
         )
         rejected = joinpath(directory, "rejected")
         error = try
-            ReferencePublication.stage_publication(
+            ReferencePublication._stage_prepared_publication(
                 incompatible,
                 rejected,
                 joinpath(initial, "Artifacts.toml"),
@@ -672,7 +893,7 @@ end
         write_publication_manifest(forcing_manifest_path, forcing_manifest)
         mixed = joinpath(directory, "mixed-existing-generation")
         error = try
-            ReferencePublication.stage_publication(
+            ReferencePublication._stage_prepared_publication(
                 model_candidate,
                 mixed,
                 joinpath(initial, "Artifacts.toml"),
@@ -689,7 +910,7 @@ end
 
         shared_again = make_candidate(joinpath(directory, "shared-again"))
         clean_initial = joinpath(directory, "clean-initial")
-        ReferencePublication.stage_publication(
+        ReferencePublication._stage_prepared_publication(
             shared_again,
             clean_initial,
             artifacts,
@@ -705,7 +926,7 @@ end
         )
         stale_binding = joinpath(directory, "stale-binding")
         error = try
-            ReferencePublication.stage_publication(
+            ReferencePublication._stage_prepared_publication(
                 model_candidate,
                 stale_binding,
                 joinpath(clean_initial, "Artifacts.toml"),
