@@ -50,5 +50,22 @@ Before the published artifact is bound, set
 `CLIMALAND_VALIDATION_CORPSE_REFERENCE` to the generated reference bundle
 directory to exercise the same pinned path locally.
 
+## Ephemeral fresh comparison
+
+The common fresh-reference adapter also runs CORPSE on the exact manifest-
+ordered Representative 80 cells. Configure `FreshReferenceAdapter.commands`
+with `corpse_forcing_root` pointing to the immutable Representative fixture
+directory. The shared Fortran executable is built and verified once before
+workers launch; the CORPSE worker never builds internally.
+
+The worker materializes the canonical prespin, spin, spin-continuation, and
+historical stages in its isolated run directory, creates a fresh reduced
+oracle and payload, and runs Julia with the unchanged frozen tolerance policy.
+It scans the three equilibration boundaries and every historical day on the
+Fortran side, and every Julia step, for the earliest eligible-cell nonfinite.
+Such a result writes `nonfinite_results.toml` as an unreviewed Eligibility Gap
+proposal; it never edits the scope, calibration, fixture, or artifact binding.
+Successful scientific output is normalized to `comparison.toml`.
+
 The runner has a two-hour process deadline. It stores checkpoints, the compact
 candidate reduced history, and TOML reports; it does not retain daily history.

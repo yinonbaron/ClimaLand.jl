@@ -49,6 +49,10 @@ const MIMICS_CN_STAGE_END_DATES = Dict(
     "spin_continuation" => "1920-12-31",
     "historical" => "2014-12-31",
 )
+const CORPSE_CALIBRATION =
+    joinpath(@__DIR__, "validation", "corpse_c_representative_calibration.toml")
+const REPRESENTATIVE_SCOPE =
+    joinpath(@__DIR__, "validation", "scopes", "representative.toml")
 
 const MODEL_CAPABILITIES = Dict(
     "CASA-C" => (
@@ -108,13 +112,18 @@ const MODEL_CAPABILITIES = Dict(
         blocker = "",
     ),
     "CORPSE" => (
-        runner = joinpath(@__DIR__, "corpse_c_reconstruction.jl"),
-        entrypoint = "run",
-        deepest_scope = "global-reconstruction",
-        shared_build = false,
-        completed_phases = ("fortran",),
-        representative_ready = false,
-        blocker = "the reconstruction runner builds internally; the selected generator is fixed to the legacy 37-cell fixture and publication-shaped output",
+        runner = joinpath(@__DIR__, "corpse_fresh_worker.jl"),
+        entrypoint = "run_worker",
+        deepest_scope = "representative",
+        shared_build = true,
+        completed_phases = (
+            "fortran",
+            "julia",
+            "comparison",
+            "eligibility_gap_proposal",
+        ),
+        representative_ready = true,
+        blocker = "",
     ),
 )
 const MISSING_MODEL_COMMANDS = Dict(
@@ -214,6 +223,7 @@ function commands(
     casa_forcing_root = nothing,
     casa_c_reference_template = nothing,
     casa_cn_reference_template = nothing,
+    corpse_forcing_root = nothing,
     mimics_c_forcing_root = nothing,
     mimics_cn_forcing_root = nothing,
     mimics_cn_reference_template = nothing,
@@ -239,6 +249,9 @@ function commands(
                 push!(arguments, abspath(casa_forcing_root))
             isnothing(reference_template) ||
                 push!(arguments, abspath(reference_template))
+        elseif model == "CORPSE"
+            isnothing(corpse_forcing_root) ||
+                push!(arguments, abspath(corpse_forcing_root))
         elseif model == "MIMICS-C"
             isnothing(mimics_c_forcing_root) ||
                 push!(arguments, abspath(mimics_c_forcing_root))
@@ -262,6 +275,13 @@ function commands(
                 !isnothing(reference_template) || throw(
                 AdapterError(
                     "$model Representative fresh worker requires forcing and reference-template paths",
+                ),
+            )
+        end
+        if "CORPSE" in selected
+            !isnothing(corpse_forcing_root) || throw(
+                AdapterError(
+                    "CORPSE Representative fresh worker requires a forcing-fixture path",
                 ),
             )
         end
@@ -321,6 +341,126 @@ function run_casa_80(
         reference_template,
         run_directory,
         build_directory,
+    )
+end
+
+function corpse_modules()
+    parent = parentmodule(@__MODULE__)
+    for (name, file) in (
+        :TestbedCORPSEFreshWorker => "corpse_fresh_worker.jl",
+        :TestbedRepresentativeCORPSEFortran =>
+            "representative_corpse_fortran.jl",
+        :GenerateRepresentativeCORPSEReference =>
+            "generate_representative_corpse_reference.jl",
+        :GeneratePinnedCORPSEPayload => "generate_pinned_corpse_payload.jl",
+        :TestbedCORPSEFreshJuliaExecutor =>
+            "corpse_fresh_julia_executor.jl",
+    )
+        isdefined(parent, name) || Base.include(parent, joinpath(@__DIR__, file))
+    end
+    return (;
+        worker = Base.invokelatest(
+            getproperty,
+            parent,
+            :TestbedCORPSEFreshWorker,
+        ),
+        fortran = Base.invokelatest(
+            getproperty,
+            parent,
+            :TestbedRepresentativeCORPSEFortran,
+        ),
+        reducer = Base.invokelatest(
+            getproperty,
+            parent,
+            :GenerateRepresentativeCORPSEReference,
+        ),
+        payload = Base.invokelatest(
+            getproperty,
+            parent,
+            :GeneratePinnedCORPSEPayload,
+        ),
+        julia = Base.invokelatest(
+            getproperty,
+            parent,
+            :TestbedCORPSEFreshJuliaExecutor,
+        ),
+    )
+end
+
+function build_corpse_fresh_payload(modules, boundary_root, oracle, destination)
+    boundaries = Base.invokelatest(
+        getproperty(modules.payload, :create_boundary_payload),
+        boundary_root,
+        joinpath(destination, "boundaries.tar"),
+        joinpath(destination, "boundaries.toml"),
+    )
+    reduced_history = joinpath(destination, "reduced_history.nc")
+    reduced_history_manifest = joinpath(destination, "reduced_history.toml")
+    cp(oracle, reduced_history; force = true)
+    cp(oracle * ".toml", reduced_history_manifest; force = true)
+    return (; boundaries..., reduced_history, reduced_history_manifest)
+end
+
+function run_corpse_80(
+    source_root,
+    forcing_root,
+    run_directory,
+    build_directory;
+    worker_runner = nothing,
+)
+    modules = corpse_modules()
+    selected_runner =
+        isnothing(worker_runner) ?
+        Base.invokelatest(getproperty, modules.worker, :run_worker) :
+        worker_runner
+    fixture_manifest = joinpath(abspath(forcing_root), "fixture.toml")
+    fortran_runner = (; kwargs...) ->
+        Base.invokelatest(
+            Base.invokelatest(getproperty, modules.fortran, :run);
+            kwargs...,
+        )
+    reference_reducer = (scope, historical, output) -> Base.invokelatest(
+        Base.invokelatest(getproperty, modules.reducer, :generate),
+        scope,
+        historical,
+        output,
+    )
+    payload_builder = (boundaries, oracle, destination) ->
+        build_corpse_fresh_payload(modules, boundaries, oracle, destination)
+    julia_runner = function (;
+        output_root,
+        bundle,
+        boundary_root,
+        fixture_manifest,
+        scope_manifest,
+        calibration_manifest,
+        observer,
+        kwargs...,
+    )
+        return Base.invokelatest(
+            Base.invokelatest(getproperty, modules.julia, :execute),
+            output_root;
+            boundary_root,
+            reduced_reference = bundle.reduced_history,
+            fixture_manifest,
+            scope_manifest,
+            calibration_manifest,
+            observer,
+        )
+    end
+    return Base.invokelatest(
+        selected_runner,
+        source_root,
+        fixture_manifest,
+        run_directory,
+        build_directory;
+        scope_manifest = REPRESENTATIVE_SCOPE,
+        calibration_manifest = CORPSE_CALIBRATION,
+        executable_resolver = verified_executable,
+        fortran_runner,
+        reference_reducer,
+        payload_builder,
+        julia_runner,
     )
 end
 
@@ -1582,6 +1722,14 @@ function main(args = ARGS)
             worker_exit_code =
                 Base.invokelatest(getproperty, worker, :worker_exit_code)
             return Base.invokelatest(worker_exit_code, result)
+        elseif model == "CORPSE"
+            length(args) == 6 || throw(
+                AdapterError(
+                    "CORPSE Representative fresh worker requires a forcing-fixture path",
+                ),
+            )
+            result = run_corpse_80(args[5], args[6], args[3], args[4])
+            return result.status in (:passed, :nonfinite) ? 0 : 1
         elseif model == "MIMICS-C"
             length(args) == 6 || throw(
                 AdapterError(

@@ -54,11 +54,15 @@ end
     @test_throws FreshReferenceAdapter.AdapterError commands.preflight([
         "MIMICS-CN",
     ])
+    @test_throws FreshReferenceAdapter.AdapterError commands.preflight([
+        "CORPSE",
+    ])
     configured = FreshReferenceAdapter.commands(
         "../biogeochem_testbed";
         casa_forcing_root = "/tmp/casa-forcing",
         casa_c_reference_template = "/tmp/casa-c-reference-template",
         casa_cn_reference_template = "/tmp/casa-cn-reference-template",
+        corpse_forcing_root = "/tmp/corpse-forcing",
         mimics_c_forcing_root = "/tmp/forcing",
         mimics_cn_forcing_root = "/tmp/forcing",
         mimics_cn_reference_template = "/tmp/reference-template",
@@ -67,6 +71,7 @@ end
     @test isnothing(configured.preflight(["CASA-CN"]))
     @test isnothing(configured.preflight(["MIMICS-CN"]))
     @test isnothing(configured.preflight(["MIMICS-C"]))
+    @test isnothing(configured.preflight(["CORPSE"]))
     casa_c =
         configured.worker("CASA-C", "/tmp/fresh-casa-c", "/tmp/fresh-build")
     @test "/tmp/casa-forcing" in casa_c.exec
@@ -95,34 +100,25 @@ end
     @test "worker" in mimics_cn.exec
     @test "/tmp/forcing" in mimics_cn.exec
     @test "/tmp/reference-template" in mimics_cn.exec
+    corpse = configured.worker(
+        "CORPSE",
+        "/tmp/fresh-corpse",
+        "/tmp/fresh-build",
+    )
+    @test "worker" in corpse.exec
+    @test "/tmp/corpse-forcing" in corpse.exec
 end
 
-@testset "Fresh model capabilities expose exact remaining gaps" begin
-    @test Set(keys(FreshReferenceAdapter.MISSING_MODEL_COMMANDS)) ==
-          Set(("CORPSE",))
+@testset "Fresh model capabilities are complete" begin
+    @test isempty(FreshReferenceAdapter.MISSING_MODEL_COMMANDS)
     @test Set(keys(FreshReferenceAdapter.MODEL_CAPABILITIES)) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
     for model in FreshReferenceAdapter.ModelProcesses.MODELS
         capability = FreshReferenceAdapter.model_capability(model)
         @test isfile(capability.runner)
-        if model != "CORPSE"
-            @test capability.representative_ready
-            @test isempty(capability.blocker)
-            @test FreshReferenceAdapter.require_model_command(model) ==
-                  capability
-        else
-            @test !capability.representative_ready
-            @test !isempty(capability.blocker)
-            error = try
-                FreshReferenceAdapter.require_model_command(model)
-                nothing
-            catch caught
-                caught
-            end
-            @test error isa FreshReferenceAdapter.AdapterError
-            @test occursin(model, error.message)
-            @test occursin("Representative", error.message)
-        end
+        @test capability.representative_ready
+        @test isempty(capability.blocker)
+        @test FreshReferenceAdapter.require_model_command(model) == capability
     end
     mimics_cn = FreshReferenceAdapter.model_capability("MIMICS-CN")
     @test mimics_cn.deepest_scope == "representative"
@@ -139,10 +135,62 @@ end
         @test casa.shared_build
         @test casa.completed_phases == mimics_cn.completed_phases
     end
+    corpse = FreshReferenceAdapter.model_capability("CORPSE")
+    @test corpse.deepest_scope == "representative"
+    @test corpse.shared_build
+    @test corpse.completed_phases == mimics_cn.completed_phases
     status = FreshReferenceAdapter.status_document()
-    @test status["representative_workers_ready"] === false
+    @test status["representative_workers_ready"] === true
     @test Set(keys(status["model"])) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
+end
+
+@testset "Fresh CORPSE command wires every real bridge" begin
+    captured = Ref{Any}()
+    worker_runner = function (
+        source_root,
+        fixture_manifest,
+        run_directory,
+        build_directory;
+        kwargs...,
+    )
+        captured[] = (;
+            source_root,
+            fixture_manifest,
+            run_directory,
+            build_directory,
+            kwargs...,
+        )
+        return (; status = :passed)
+    end
+    result = FreshReferenceAdapter.run_corpse_80(
+        "/tmp/source",
+        "/tmp/corpse-forcing",
+        "/tmp/corpse-run",
+        "/tmp/shared-build";
+        worker_runner,
+    )
+    @test result.status == :passed
+    @test captured[].fixture_manifest == "/tmp/corpse-forcing/fixture.toml"
+    @test captured[].scope_manifest == FreshReferenceAdapter.REPRESENTATIVE_SCOPE
+    @test captured[].calibration_manifest ==
+          FreshReferenceAdapter.CORPSE_CALIBRATION
+    @test captured[].executable_resolver === FreshReferenceAdapter.verified_executable
+    @test captured[].fortran_runner isa Function
+    @test captured[].reference_reducer isa Function
+    @test captured[].payload_builder isa Function
+    @test captured[].julia_runner isa Function
+    modules = FreshReferenceAdapter.corpse_modules()
+    @test nameof(modules.worker) == :TestbedCORPSEFreshWorker
+    @test nameof(modules.fortran) == :TestbedRepresentativeCORPSEFortran
+    @test nameof(modules.julia) == :TestbedCORPSEFreshJuliaExecutor
+    @test_throws FreshReferenceAdapter.AdapterError FreshReferenceAdapter.main([
+        "worker",
+        "CORPSE",
+        "/tmp/run",
+        "/tmp/build",
+        "/tmp/source",
+    ])
 end
 
 @testset "Fresh MIMICS-C worker comparison and nonfinite contracts" begin
