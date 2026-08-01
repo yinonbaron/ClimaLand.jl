@@ -101,6 +101,7 @@ const REFERENCE_BINDING = Dict(
 const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
 const FRESH_SOURCE_OVERRIDE = "CLIMALAND_VALIDATION_FORTRAN_SOURCE"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
+const PERFORMANCE_BUDGET_SECONDS = 3600.0
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
 const DEFAULT_REFERENCE = joinpath(
     @__DIR__,
@@ -685,7 +686,7 @@ function initial_report(configuration, output_root, scope, policy)
     cell_ids = scope.cell_ids
     eligibility_gaps = model_eligibility_gaps(scope, model_name)
     eligible_ids = eligible_cell_ids(scope, model_name)
-    return Dict(
+    report = Dict(
         "schema_version" => 1,
         "scope" => Dict(
             "name" => configuration.scope,
@@ -724,8 +725,11 @@ function initial_report(configuration, output_root, scope, policy)
                 "path" => policy.calibration_path,
                 "sha256" => sha256sum(policy.calibration_path),
             ),
-            "annual_reducers" =>
-                get(policy.model, "annual_reducers", Dict{String, Any}()),
+            "annual_reducers" => get(
+                policy.model,
+                "annual_reducers",
+                Dict{String, Any}(),
+            ),
             "fixed_daily_samples" => get(
                 policy.model,
                 "fixed_daily_samples",
@@ -762,6 +766,9 @@ function initial_report(configuration, output_root, scope, policy)
             ),
         ],
     )
+    only(report["model"])["comparison_policy"] =
+        deepcopy(report["comparison_policy"])
+    return report
 end
 
 function write_report(output_root, report)
@@ -810,18 +817,20 @@ function validate_available(configuration)
         ),
     )
     configuration.reference_mode == "fresh" &&
-        configuration.scope != "representative" && throw(
-        RunnerError(
-            "fresh references are available only for the Representative Scope",
-        ),
-    )
+        configuration.scope != "representative" &&
+        throw(
+            RunnerError(
+                "fresh references are available only for the Representative Scope",
+            ),
+        )
     configuration.scope == "representative" ||
         length(configuration.models) == 1 &&
-            only(configuration.models) in ("CASA-C", "CASA-CN") || throw(
-        RunnerError(
-            "multi-model validation is available only for the Representative Scope",
-        ),
-    )
+            only(configuration.models) in ("CASA-C", "CASA-CN") ||
+        throw(
+            RunnerError(
+                "multi-model validation is available only for the Representative Scope",
+            ),
+        )
     return nothing
 end
 
@@ -853,9 +862,8 @@ function artifact_payload(directory, role, description)
     files = get(manifest, "files", Dict{String, Any}())
     payload = get(manifest, "payload", Dict{String, Any}())
     relative = get(payload, role, nothing)
-    relative isa String && haskey(files, relative) || throw(
-        RunnerError("$description does not declare its $role payload"),
-    )
+    relative isa String && haskey(files, relative) ||
+        throw(RunnerError("$description does not declare its $role payload"))
     path = joinpath(directory, relative)
     isfile(path) || throw(RunnerError("$description $role payload is missing"))
     return path, manifest
@@ -863,7 +871,8 @@ end
 
 function reference_path(scope, model = "CASA-C")
     override = get(REFERENCE_OVERRIDE, model, nothing)
-    !isnothing(override) && haskey(ENV, override) &&
+    !isnothing(override) &&
+        haskey(ENV, override) &&
         return ENV[override], nothing
     scope != "representative" &&
         model == "CASA-C" &&
@@ -885,11 +894,8 @@ function reference_path(scope, model = "CASA-C")
         end
         return joinpath(directory, "complete_casa_workflow.toml"), hash
     end
-    oracle, manifest = artifact_payload(
-        directory,
-        "oracle",
-        "Representative $model reference",
-    )
+    oracle, manifest =
+        artifact_payload(directory, "oracle", "Representative $model reference")
     get(manifest, "kind", nothing) == "reference" &&
         get(manifest, "model", nothing) == model &&
         get(manifest, "scope", nothing) == "representative" || throw(
@@ -923,7 +929,10 @@ function fixture_manifest_path(scope, model = "CASA-C")
 end
 
 function representative_forcing_directory()
-    return artifact_directory("representative_forcing", "Representative forcing")
+    return artifact_directory(
+        "representative_forcing",
+        "Representative forcing",
+    )
 end
 
 function validate_fixture_scope_provenance(path, scope)
@@ -1193,6 +1202,21 @@ function summarize_budget(budget, units)
     return summary
 end
 
+function corpse_policy_metadata(scientific)
+    calibration = get(scientific, "calibration", Dict{String, Any}())
+    id = get(calibration, "id", nothing)
+    sha256 = get(calibration, "sha256", nothing)
+    id isa AbstractString &&
+        !isempty(strip(id)) &&
+        sha256 isa AbstractString &&
+        occursin(r"^[0-9a-f]{64}$", sha256) || throw(
+        RunnerError(
+            "CORPSE comparison report lacks its applied policy identity",
+        ),
+    )
+    return Dict("id" => String(id), "sha256" => String(sha256))
+end
+
 function compare_fresh_fortran_daily(
     pinned_reference,
     historical_output,
@@ -1318,12 +1342,14 @@ function mimics_policy(model)
     boundary = joinpath(
         @__DIR__,
         "validation",
-        model == "MIMICS-C" ?
-        "mimics_c_full_grid_calibration.toml" :
+        model == "MIMICS-C" ? "mimics_c_full_grid_calibration.toml" :
         "mimics_cn_boundary_calibration.toml",
     )
-    historical =
-        joinpath(@__DIR__, "validation", "$(prefix)_historical_calibration.toml")
+    historical = joinpath(
+        @__DIR__,
+        "validation",
+        "$(prefix)_historical_calibration.toml",
+    )
     tolerance =
         model == "MIMICS-C" ?
         TestbedMIMICSCCalibration.comparison_policy(boundary, historical) :
@@ -1351,12 +1377,12 @@ function project_mimics_evidence!(model_report, scientific, model)
         "fixed_daily_samples" => historical["fixed_daily_samples"],
         "budget_comparison" => historical["budget"],
     )
-    model_report["budget"] = Dict(
-        "carbon" => summarize_budget(scientific["carbon_budget"], "kg_c"),
+    model_report["budget"] =
+        Dict("carbon" => summarize_budget(scientific["carbon_budget"], "kg_c"))
+    model == "MIMICS-CN" && (
+        model_report["budget"]["nitrogen"] =
+            summarize_budget(scientific["nitrogen_budget"], "kg_n")
     )
-    model == "MIMICS-CN" &&
-        (model_report["budget"]["nitrogen"] =
-            summarize_budget(scientific["nitrogen_budget"], "kg_n"))
     return model_report
 end
 
@@ -1375,9 +1401,8 @@ function run_mimics!(
         scope.cell_ids;
         manifest_path = fixture_manifest,
     )
-    budget = TestbedReferenceCellComparisons.ConcurrencyBudget(
-        configuration.workers,
-    )
+    budget =
+        TestbedReferenceCellComparisons.ConcurrencyBudget(configuration.workers)
     started = time_ns()
     result = if model == "MIMICS-C"
         TestbedSelectedMIMICSCWorkflow.run_selected_case(
@@ -1405,11 +1430,7 @@ function run_mimics!(
         get(comparison, "all_match", false) for
         comparison in values(scientific["boundary_comparison"])
     )
-    historical = get(
-        scientific["historical_comparison"],
-        "all_match",
-        false,
-    )
+    historical = get(scientific["historical_comparison"], "all_match", false)
     carbon = get(scientific["carbon_budget"], "all_close", false)
     nitrogen =
         model == "MIMICS-CN" ?
@@ -1420,8 +1441,7 @@ function run_mimics!(
     model_report["coverage"]["eligible_cells"] =
         length(coverage["eligible_cell_ids"])
     model_report["coverage"]["compared_cells"] = coverage["compared_cells"]
-    model_report["coverage"]["eligibility_gaps"] =
-        coverage["eligibility_gaps"]
+    model_report["coverage"]["eligibility_gaps"] = coverage["eligibility_gaps"]
     model_report["comparison"] = Dict(
         "fresh_fortran_boundaries" => boundary,
         "historical" => historical,
@@ -1462,9 +1482,11 @@ function empty_aggregate_report(configuration, output_root, scope)
                 "reference_mode" => configuration.reference_mode,
                 "coverage" => Dict(
                     "scope_cells" => length(scope.cell_ids),
-                    "eligible_cells" => length(eligible_cell_ids(scope, model)),
+                    "eligible_cells" =>
+                        length(eligible_cell_ids(scope, model)),
                     "compared_cells" => 0,
-                    "eligibility_gaps" => model_eligibility_gaps(scope, model),
+                    "eligibility_gaps" =>
+                        model_eligibility_gaps(scope, model),
                 ),
                 "outcome" => "failed",
                 "seconds" => 0.0,
@@ -1477,20 +1499,26 @@ function aggregate_model_reports!(report, model_reports, outcomes, seconds)
     by_model = Dict(outcome.model => outcome for outcome in outcomes)
     report["model"] = map(report["model"]) do placeholder
         model = placeholder["name"]
-        if haskey(model_reports, model)
+        outcome = by_model[model]
+        if outcome.outcome == "passed" && haskey(model_reports, model)
             only(model_reports[model]["model"])
         else
-            outcome = by_model[model]
-            placeholder["outcome"] = outcome.outcome
+            missing_report = outcome.outcome == "passed"
+            placeholder["outcome"] =
+                missing_report ? "failed" : outcome.outcome
             placeholder["seconds"] = outcome.seconds
-            isnothing(outcome.error) || (placeholder["error"] = outcome.error)
+            if missing_report
+                placeholder["error"] = "worker succeeded without a current validation report"
+            elseif !isnothing(outcome.error)
+                placeholder["error"] = outcome.error
+            end
             placeholder
         end
     end
     report["seconds"] = seconds
     report["outcome"] =
-        all(model -> model["outcome"] == "passed", report["model"]) ?
-        "passed" : "failed"
+        all(model -> model["outcome"] == "passed", report["model"]) ? "passed" :
+        "failed"
     return report
 end
 
@@ -1508,20 +1536,19 @@ function configured_fresh_commands(models)
     reference(model) = first(reference_path("representative", model))
     return TestbedFreshReferenceAdapter.commands(
         source_root;
-        casa_forcing_root =
-            isempty(intersect(selected, Set(("CASA-C", "CASA-CN")))) ?
-            nothing : forcing_root,
-        casa_c_reference_template =
-            "CASA-C" in selected ? reference("CASA-C") : nothing,
-        casa_cn_reference_template =
-            "CASA-CN" in selected ? reference("CASA-CN") : nothing,
+        casa_forcing_root = isempty(
+            intersect(selected, Set(("CASA-C", "CASA-CN"))),
+        ) ? nothing : forcing_root,
+        casa_c_reference_template = "CASA-C" in selected ? reference("CASA-C") :
+                                    nothing,
+        casa_cn_reference_template = "CASA-CN" in selected ?
+                                     reference("CASA-CN") : nothing,
         corpse_forcing_root = "CORPSE" in selected ? forcing_root : nothing,
-        mimics_c_forcing_root =
-            "MIMICS-C" in selected ? forcing_root : nothing,
-        mimics_cn_forcing_root =
-            "MIMICS-CN" in selected ? forcing_root : nothing,
-        mimics_cn_reference_template =
-            "MIMICS-CN" in selected ? reference("MIMICS-CN") : nothing,
+        mimics_c_forcing_root = "MIMICS-C" in selected ? forcing_root : nothing,
+        mimics_cn_forcing_root = "MIMICS-CN" in selected ? forcing_root :
+                                 nothing,
+        mimics_cn_reference_template = "MIMICS-CN" in selected ?
+                                       reference("MIMICS-CN") : nothing,
     )
 end
 
@@ -1608,27 +1635,40 @@ function run_fresh!(
     return result.exitcode == 0
 end
 
-function run_multiple!(report, output_root, configuration, scope)
+function run_multiple!(
+    report,
+    output_root,
+    configuration,
+    scope;
+    reference_resolver = reference_path,
+    fixture_resolver = fixture_manifest_path,
+    worker_runner = TestbedModelProcessOrchestration.run_model_workers,
+)
     configuration.reference_mode == "pinned" || throw(
         RunnerError(
             "fresh-reference model commands are not yet connected to the public runner",
         ),
     )
-    fixture_manifest_path(configuration.scope)
+    fixture_resolver(configuration.scope, first(configuration.models))
     for model in configuration.models
-        reference_path(configuration.scope, model)
+        reference_resolver(configuration.scope, model)
     end
     started = time_ns()
     model_root = joinpath(output_root, "models")
     log_root = joinpath(output_root, "logs")
     mkpath(model_root)
     mkpath(log_root)
+    for model in configuration.models
+        stale_report = joinpath(model_root, model, REPORT_FILENAME)
+        isfile(stale_report) && rm(stale_report)
+    end
     project = dirname(Base.active_project())
-    command = model -> addenv(
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) --scope $(configuration.scope) --models $model --reference pinned --workers 1 --output $(joinpath(model_root, model))`,
-        CHILD_PROCESS => "1",
-    )
-    workers_result = TestbedModelProcessOrchestration.run_model_workers(
+    command =
+        model -> addenv(
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) --scope $(configuration.scope) --models $model --reference pinned --workers 1 --output $(joinpath(model_root, model))`,
+            CHILD_PROCESS => "1",
+        )
+    workers_result = worker_runner(
         command;
         models = configuration.models,
         workers = configuration.workers,
@@ -1653,7 +1693,14 @@ end
 # Entry point
 # ============================================================================
 
-function main(args = ARGS)
+function main(
+    args = ARGS;
+    reference_resolver = reference_path,
+    fixture_resolver = fixture_manifest_path,
+    corpse_forcing_resolver = representative_forcing_directory,
+    corpse_runner = TestbedPinnedCORPSEAdapter.run_pinned_corpse,
+    mimics_runner = run_mimics!,
+)
     configuration = try
         parsed = parse_args(args)
         parsed.help || validate_available(parsed)
@@ -1698,7 +1745,14 @@ function main(args = ARGS)
         report = empty_aggregate_report(configuration, output_root, scope)
         started = time_ns()
         try
-            passed = run_multiple!(report, output_root, configuration, scope)
+            passed = run_multiple!(
+                report,
+                output_root,
+                configuration,
+                scope;
+                reference_resolver,
+                fixture_resolver,
+            )
             report_path = write_report(output_root, report)
             print_summary(stdout, report, report_path)
             return passed ? 0 : 1
@@ -1715,10 +1769,10 @@ function main(args = ARGS)
     if model == "CORPSE"
         report = empty_aggregate_report(configuration, output_root, scope)
         try
-            forcing_root, forcing_artifact = representative_forcing_directory()
+            forcing_root, forcing_artifact = corpse_forcing_resolver()
             reference_root, reference_artifact =
-                reference_path(configuration.scope, model)
-            result = TestbedPinnedCORPSEAdapter.run_pinned_corpse(
+                reference_resolver(configuration.scope, model)
+            result = corpse_runner(
                 joinpath(output_root, model);
                 scope_manifest = scope.path,
                 forcing_artifact_root = forcing_root,
@@ -1731,6 +1785,8 @@ function main(args = ARGS)
             model_report["outcome"] = result.passed ? "passed" : "failed"
             model_report["seconds"] = result.seconds
             model_report["comparison_report"] = abspath(result.report)
+            model_report["comparison_policy"] =
+                corpse_policy_metadata(scientific)
             model_report["comparison"] = Dict(
                 "boundaries" => all(
                     all(
@@ -1769,20 +1825,25 @@ function main(args = ARGS)
         end
     end
     policy = try
-        model in ("MIMICS-C", "MIMICS-CN") ?
-        mimics_policy(model) : comparison_policy(model)
+        model in ("MIMICS-C", "MIMICS-CN") ? mimics_policy(model) :
+        comparison_policy(model)
     catch error
         println(stderr, "Validation Runner: ", sprint(showerror, error))
         return 2
     end
     report =
         model in ("MIMICS-C", "MIMICS-CN") ?
-        initial_mimics_report(configuration, output_root, scope, policy, model) :
-        initial_report(configuration, output_root, scope, policy)
+        initial_mimics_report(
+            configuration,
+            output_root,
+            scope,
+            policy,
+            model,
+        ) : initial_report(configuration, output_root, scope, policy)
     started = time_ns()
     try
         pinned_reference, reference_artifact =
-            reference_path(configuration.scope, model)
+            reference_resolver(configuration.scope, model)
         reference = validate_reference_file(pinned_reference, model)
         if model in ("CASA-C", "CASA-CN")
             validate_eligible_reference_values(reference, scope, model)
@@ -1794,17 +1855,16 @@ function main(args = ARGS)
             )
         end
         fixture_manifest, forcing_artifact =
-            fixture_manifest_path(configuration.scope, model)
+            fixture_resolver(configuration.scope, model)
         validate_fixture_scope_provenance(fixture_manifest, scope)
-        model in ("CASA-C", "CASA-CN") &&
-            validate_reference_forcing_artifact(
-                reference,
-                forcing_artifact,
-                model,
-                scope,
-            )
+        model in ("CASA-C", "CASA-CN") && validate_reference_forcing_artifact(
+            reference,
+            forcing_artifact,
+            model,
+            scope,
+        )
         passed = if model in ("MIMICS-C", "MIMICS-CN")
-            run_mimics!(
+            mimics_runner(
                 report,
                 output_root,
                 configuration,
@@ -1816,13 +1876,7 @@ function main(args = ARGS)
             )
         else
             collection = try
-                stage_casa(
-                    scope,
-                    pinned_reference,
-                    policy,
-                    fixture_manifest,
-                    model,
-                )
+                stage_casa(scope, pinned_reference, policy, fixture_manifest, model)
             catch error
                 throw(
                     RunnerError(
@@ -1883,6 +1937,21 @@ function timeout_seconds()
     return seconds
 end
 
+function annotate_performance_budget!(report, seconds; io = stderr)
+    get(get(report, "scope", Dict{String, Any}()), "name", nothing) ==
+    "representative" && seconds > PERFORMANCE_BUDGET_SECONDS || return false
+    report["performance_budget"] = Dict(
+        "exceeded" => true,
+        "limit_seconds" => PERFORMANCE_BUDGET_SECONDS,
+        "seconds" => seconds,
+    )
+    println(
+        io,
+        "::warning::Representative validation exceeded its one-hour performance budget ($(round(seconds; digits = 3)) seconds)",
+    )
+    return true
+end
+
 function child_arguments(args)
     configuration = parse_args(args)
     configuration.help && return collect(args), nothing
@@ -1904,21 +1973,17 @@ function write_timeout_report(args, output_root, limit_seconds, started_at)
     report["timeout"] =
         Dict("expired" => true, "limit_seconds" => limit_seconds)
     for (index, model) in enumerate(configuration.models)
-        completed_path = joinpath(
-            output_root,
-            "models",
-            model,
-            REPORT_FILENAME,
-        )
-        completed = if isfile(completed_path) &&
-                       stat(completed_path).mtime >= started_at
-            try
-                candidate = only(TOML.parsefile(completed_path)["model"])
-                candidate["name"] == model ? candidate : nothing
-            catch
-                nothing
+        completed_path = joinpath(output_root, "models", model, REPORT_FILENAME)
+        completed =
+            if isfile(completed_path) &&
+               stat(completed_path).mtime >= started_at
+                try
+                    candidate = only(TOML.parsefile(completed_path)["model"])
+                    candidate["name"] == model ? candidate : nothing
+                catch
+                    nothing
+                end
             end
-        end
         if isnothing(completed)
             report["model"][index]["outcome"] = "timed_out"
             report["model"][index]["seconds"] = limit_seconds
@@ -1949,15 +2014,15 @@ function terminate_process_tree(process; grace_seconds = 10.0)
         return nothing
     end
     pid = Base.Libc.getpid(process)
-    signal_group(signal) =
-        ccall(:kill, Cint, (Cint, Cint), -pid, signal)
+    signal_group(signal) = ccall(:kill, Cint, (Cint, Cint), -pid, signal)
     signal_group(Base.SIGTERM) == 0 || kill(process, Base.SIGTERM)
     status = timedwait(
         () -> signal_group(0) != 0,
         grace_seconds;
         pollint = min(0.1, grace_seconds / 10),
     )
-    status == :timed_out && signal_group(Base.SIGKILL) != 0 &&
+    status == :timed_out &&
+        signal_group(Base.SIGKILL) != 0 &&
         kill(process, Base.SIGKILL)
     wait(process)
     return nothing
@@ -1980,10 +2045,13 @@ function run_with_deadline(args = ARGS)
         return 2
     end
     project = dirname(Base.active_project())
-    command = Cmd(addenv(
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) $child_args`,
-        CHILD_PROCESS => "1",
-    ); detach = !Sys.iswindows())
+    command = Cmd(
+        addenv(
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) $child_args`,
+            CHILD_PROCESS => "1",
+        );
+        detach = !Sys.iswindows(),
+    )
     started_at = time()
     process = run(pipeline(ignorestatus(command); stdout, stderr); wait = false)
     status = timedwait(
@@ -2010,6 +2078,12 @@ function run_with_deadline(args = ARGS)
         return 124
     end
     wait(process)
+    report_path = joinpath(output_root, REPORT_FILENAME)
+    if isfile(report_path)
+        report = TOML.parsefile(report_path)
+        annotate_performance_budget!(report, time() - started_at) &&
+            write_report(output_root, report)
+    end
     return process.exitcode
 end
 

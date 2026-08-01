@@ -31,10 +31,12 @@ end
 function fake_validation_fresh_commands(audit_directory)
     project = dirname(Base.active_project())
     script = joinpath(@__DIR__, "fake_fresh_reference_process.jl")
-    build = build_directory ->
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory pass`
-    worker = (model, run_directory, build_directory) ->
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory pass`
+    build =
+        build_directory ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory pass`
+    worker =
+        (model, run_directory, build_directory) ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory pass`
     return (; build, worker, preflight = _ -> nothing)
 end
 
@@ -364,10 +366,8 @@ end
 end
 
 @testset "Validation Runner aggregates deterministic model reports" begin
-    configuration = VALIDATION_RUNNER_MODULE.parse_args([
-        "--models",
-        "MIMICS-C,CASA-C",
-    ])
+    configuration =
+        VALIDATION_RUNNER_MODULE.parse_args(["--models", "MIMICS-C,CASA-C"])
     scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
     mktempdir() do output
         report = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
@@ -379,10 +379,14 @@ end
             model => Dict(
                 "model" => [
                     merge(
-                        deepcopy(only(filter(
-                            item -> item["name"] == model,
-                            report["model"],
-                        ))),
+                        deepcopy(
+                            only(
+                                filter(
+                                    item -> item["name"] == model,
+                                    report["model"],
+                                ),
+                            ),
+                        ),
                         Dict("outcome" => "passed", "seconds" => 1.0),
                     ),
                 ],
@@ -445,8 +449,7 @@ end
             "--output",
             output,
         ])
-        scope =
-            VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+        scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
         report = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
             configuration,
             output,
@@ -542,14 +545,8 @@ end
 
 @testset "Validation Runner writes aggregate hard-timeout reports" begin
     mktempdir() do output
-        args = [
-            "--scope",
-            "representative",
-            "--models",
-            "all",
-            "--output",
-            output,
-        ]
+        args =
+            ["--scope", "representative", "--models", "all", "--output", output]
         started_at = time()
         configuration = VALIDATION_RUNNER_MODULE.parse_args(args)
         scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
@@ -606,8 +603,7 @@ end
     if !Sys.iswindows()
         mktempdir() do directory
             ready = joinpath(directory, "ready")
-            script =
-                "trap 'exit 0' TERM; (trap '' TERM; sleep 30) & touch '$ready'; wait"
+            script = "trap 'exit 0' TERM; (trap '' TERM; sleep 30) & touch '$ready'; wait"
             command = Cmd(`sh -c $script`; detach = true)
             process = run(ignorestatus(command); wait = false)
             @test timedwait(() -> isfile(ready), 2; pollint = 0.01) == :ok
@@ -619,14 +615,7 @@ end
             )
             @test process_exited(process)
             @test timedwait(
-                () ->
-                    ccall(
-                        :kill,
-                        Cint,
-                        (Cint, Cint),
-                        -process_group,
-                        0,
-                    ) != 0,
+                () -> ccall(:kill, Cint, (Cint, Cint), -process_group, 0) != 0,
                 1;
                 pollint = 0.01,
             ) == :ok
@@ -749,9 +738,11 @@ end
         @test model["coverage"]["scope_cells"] == 80
         @test model["coverage"]["compared_cells"] == 0
         @test model["comparison_policy"]["boundary_calibration_sha256"] ==
-              bytes2hex(SHA.sha256(read(
-            model["comparison_policy"]["boundary_calibration"],
-        )))
+              bytes2hex(
+            SHA.sha256(
+                read(model["comparison_policy"]["boundary_calibration"]),
+            ),
+        )
         @test !isdir(joinpath(output, "MIMICS-CN", "stages"))
     end
 end
@@ -785,16 +776,13 @@ end
 @testset "Validation Runner projects complete MIMICS evidence" begin
     budget(suffix) = Dict(
         "all_close" => true,
-        "stage" => Dict(
-            "historical" => Dict("residual_$suffix" => -2.5),
-        ),
+        "stage" => Dict("historical" => Dict("residual_$suffix" => -2.5)),
     )
     boundary = Dict(
         "prespin" => Dict(
             "all_match" => false,
-            "cell_failures" => [
-                Dict("cell_id" => 51, "variables" => ["c_labile"]),
-            ],
+            "cell_failures" =>
+                [Dict("cell_id" => 51, "variables" => ["c_labile"])],
         ),
     )
     historical = Dict(
@@ -810,12 +798,11 @@ end
     )
 
     for model in ("MIMICS-C", "MIMICS-CN")
-        projected =
-            VALIDATION_RUNNER_MODULE.project_mimics_evidence!(
-                Dict{String, Any}(),
-                scientific,
-                model,
-            )
+        projected = VALIDATION_RUNNER_MODULE.project_mimics_evidence!(
+            Dict{String, Any}(),
+            scientific,
+            model,
+        )
         @test projected["boundary_comparison"] == boundary
         @test projected["historical"]["annual"] == historical["annual"]
         @test projected["historical"]["fixed_daily_samples"] ==
@@ -824,8 +811,7 @@ end
               historical["budget"]
         @test projected["budget"]["carbon"]["maximum_absolute_residual_kg_c"] ==
               2.5
-        @test haskey(projected["budget"], "nitrogen") ==
-              (model == "MIMICS-CN")
+        @test haskey(projected["budget"], "nitrogen") == (model == "MIMICS-CN")
     end
 end
 
@@ -874,11 +860,8 @@ end
     end
 end
 
-if get(
-    ENV,
-    "CLIMALAND_RUN_MIMICS_CN_REPRESENTATIVE_VALIDATION",
-    "false",
-) == "true"
+if get(ENV, "CLIMALAND_RUN_MIMICS_CN_REPRESENTATIVE_VALIDATION", "false") ==
+   "true"
     @testset "Validation Runner completes pinned Representative MIMICS-CN" begin
         mktempdir() do output
             result = run_validation(
