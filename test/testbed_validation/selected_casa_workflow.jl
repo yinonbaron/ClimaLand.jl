@@ -320,6 +320,38 @@ function restore_plant_stoichiometry!(model, fixed)
     return nothing
 end
 
+function quantize_restart_fields!(component)
+    for variable in propertynames(component)
+        values = parent(getproperty(component, variable))
+        for index in eachindex(values)
+            values[index] = round(1000 * values[index]; digits = 6) / 1000
+        end
+    end
+    return nothing
+end
+
+"""
+    quantize_fortran_restart!(state, passive_multiplier = 1)
+
+Apply the legacy CASA `f18.6`-gram restart precision and labile-C reset.
+`passive_multiplier` is applied after serialization, matching the accelerated
+to normal-spin restart transform.
+"""
+function quantize_fortran_restart!(state, passive_multiplier = 1)
+    passive_multiplier > 0 ||
+        throw(ArgumentError("passive multiplier must be positive"))
+    passive_carbon = parent(state.casa_soil.c_soil_passive)
+    passive_nitrogen = parent(state.casa_soil.n_soil_passive)
+    passive_carbon ./= passive_multiplier
+    passive_nitrogen ./= passive_multiplier
+    quantize_restart_fields!(state.casa_plant)
+    quantize_restart_fields!(state.casa_soil)
+    passive_carbon .*= passive_multiplier
+    passive_nitrogen .*= passive_multiplier
+    fill!(parent(state.casa_plant.c_labile), 0)
+    return state
+end
+
 struct PackedForcing{P, B, F}
     gpp::Matrix{Float64}
     air_temperature::Matrix{Float64}
@@ -1004,6 +1036,7 @@ function workflow_budget_report(
     passive_restoration,
     area,
     element;
+    serialization_adjustment = 0.0,
     rtol,
 )
     units = element == "carbon" ? "kg_c" : "kg_n"
@@ -1017,7 +1050,8 @@ function workflow_budget_report(
     bounded_adjustment =
         sum(get(stage, bounded_key, 0.0) for stage in values(stage_budgets))
     restored = passive_restoration[element]
-    restart_adjustment = sum(area .* (restored["after"] .- restored["before"]))
+    passive_adjustment = sum(area .* (restored["after"] .- restored["before"]))
+    restart_adjustment = passive_adjustment + serialization_adjustment
     report = budget_report(
         first_stage["start_stock_$units"],
         last_stage["stop_stock_$units"],
@@ -1030,6 +1064,8 @@ function workflow_budget_report(
     )
     report["bounded_state_adjustment_$units"] = bounded_adjustment
     report["restart_adjustment_$units"] = restart_adjustment
+    report["passive_restoration_adjustment_$units"] = passive_adjustment
+    report["restart_serialization_adjustment_$units"] = serialization_adjustment
     return report
 end
 
@@ -1271,12 +1307,29 @@ function run_selected_case(
     selected_after_step =
         SelectedAfterStep(budget, configuration, stoichiometry)
     fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
+    restart_serialization_adjustment = Dict("carbon" => 0.0, "nitrogen" => 0.0)
     function prepare_selected_stage!(stage, initial_state, model)
         prepare_stage!(update!, stage, initial_state, model)
         configuration == :carbon_nitrogen || return nothing
+        if stage.name != :prespin
+            carbon_before =
+                area_weighted_stock(initial_state, budget.area_m2, "c_")
+            nitrogen_before =
+                area_weighted_stock(initial_state, budget.area_m2, "n_")
+            quantize_fortran_restart!(
+                initial_state,
+                stage.name == :normal_spin ? 10 : 1,
+            )
+            restart_serialization_adjustment["carbon"] +=
+                area_weighted_stock(initial_state, budget.area_m2, "c_") -
+                carbon_before
+            restart_serialization_adjustment["nitrogen"] +=
+                area_weighted_stock(initial_state, budget.area_m2, "n_") -
+                nitrogen_before
+        end
         parameters =
-            stage.name == :prespin ?
-            setup.prespin.parameters : setup.normal.parameters
+            stage.name == :prespin ? setup.prespin.parameters :
+            setup.normal.parameters
         fixed_plant_stoichiometry[stage.name] =
             use_initial_plant_stoichiometry!(
                 model,
@@ -1333,6 +1386,7 @@ function run_selected_case(
                 passive_restoration,
                 budget.area_m2,
                 "carbon";
+                serialization_adjustment = restart_serialization_adjustment["carbon"],
                 rtol = budget_rtol,
             ),
         )
@@ -1342,6 +1396,7 @@ function run_selected_case(
                 passive_restoration,
                 budget.area_m2,
                 "nitrogen";
+                serialization_adjustment = restart_serialization_adjustment["nitrogen"],
                 rtol = budget_rtol,
             )
         end

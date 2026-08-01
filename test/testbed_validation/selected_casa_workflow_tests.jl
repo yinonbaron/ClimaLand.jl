@@ -69,14 +69,14 @@ end
         ),
     )
     @test Int.(reference["cell_ids"]) == getproperty.(collection.cells, :id)
-    expected_dates = string.([
-        Dates.Date(year, month, 1) + Dates.Day(offset) for
-        year in (1901, 1957, 2014) for month in (1, 4, 7, 10) for
-        offset in 0:6
-    ])
+    expected_dates =
+        string.([
+            Dates.Date(year, month, 1) + Dates.Day(offset) for
+            year in (1901, 1957, 2014) for month in (1, 4, 7, 10) for
+            offset in 0:6
+        ])
     @test reference["historical_coverage"]["dates"] == expected_dates
-    @test reference["historical_coverage"]["final_boundary"] ==
-          "2014-12-31"
+    @test reference["historical_coverage"]["final_boundary"] == "2014-12-31"
     for configuration in TestbedSelectedCASAWorkflow.supported_configurations()
         pinned = reference["configuration"][String(configuration)]
         measured = pinned["tolerance"]["fresh_fortran_boundary"]
@@ -263,13 +263,14 @@ end
           10 .* values(getindex.(normal_rates, 3))
     @test first(values(setup.initial_state.casa_soil.n_mineral)) == 0
     @test values(setup.initial_state.casa_soil.n_mineral)[2:end] == ones(10)
-    diagnostic_names = getproperty.(
-        TestbedSelectedCASAWorkflow.default_diagnostics(
-            :carbon_nitrogen,
-            setup,
-        ),
-        :name,
-    )
+    diagnostic_names =
+        getproperty.(
+            TestbedSelectedCASAWorkflow.default_diagnostics(
+                :carbon_nitrogen,
+                setup,
+            ),
+            :name,
+        )
     @test "diagnostic__n_deposition" in diagnostic_names
     @test "diagnostic__n_net_mineralization" in diagnostic_names
 end
@@ -299,6 +300,22 @@ end
 
     workflow.restore_plant_stoichiometry!(model, fixed)
     @test vec(parent(field)) == configured
+end
+
+@testset "selected-cell CASA-CN preserves legacy restart precision" begin
+    workflow = TestbedSelectedCASAWorkflow
+    state = workflow.load_setup(:carbon_nitrogen).initial_state
+    fill!(parent(state.casa_plant.c_leaf), 0.41779600246129933)
+    fill!(parent(state.casa_plant.c_labile), 0.0035819538579334293)
+    fill!(parent(state.casa_soil.c_soil_passive), 2.137830043792065)
+    fill!(parent(state.casa_soil.n_soil_passive), 0.07306635364914338)
+
+    workflow.quantize_fortran_restart!(state, 10)
+
+    @test all(==(0.417796002), parent(state.casa_plant.c_leaf))
+    @test all(iszero, parent(state.casa_plant.c_labile))
+    @test all(==(2.13783004), parent(state.casa_soil.c_soil_passive))
+    @test all(==(0.07306635), parent(state.casa_soil.n_soil_passive))
 end
 
 @testset "selected-cell CASA-C setup" begin

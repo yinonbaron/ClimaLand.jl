@@ -853,7 +853,36 @@ function run_gridded_case(
     selected_after_step =
         boundary_only ? reduced : GriddedCNAfterStep(budget, bookkeeping)
     fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
+    restart_serialization_adjustment = Dict("carbon" => 0.0, "nitrogen" => 0.0)
     function prepare_stage!(stage, initial_state, model)
+        if stage.name != :prespin
+            carbon_before = selected_casa().area_weighted_stock(
+                initial_state,
+                budget.area_m2,
+                "c_",
+            )
+            nitrogen_before = selected_casa().area_weighted_stock(
+                initial_state,
+                budget.area_m2,
+                "n_",
+            )
+            selected_casa().quantize_fortran_restart!(
+                initial_state,
+                stage.name == :normal_spin ? 10 : 1,
+            )
+            restart_serialization_adjustment["carbon"] +=
+                selected_casa().area_weighted_stock(
+                    initial_state,
+                    budget.area_m2,
+                    "c_",
+                ) - carbon_before
+            restart_serialization_adjustment["nitrogen"] +=
+                selected_casa().area_weighted_stock(
+                    initial_state,
+                    budget.area_m2,
+                    "n_",
+                ) - nitrogen_before
+        end
         fixed_plant_stoichiometry[stage.name] =
             selected_casa().use_initial_plant_stoichiometry!(
                 model,
@@ -929,6 +958,7 @@ function run_gridded_case(
                 passive_restoration,
                 budget.area_m2,
                 "carbon";
+                serialization_adjustment = restart_serialization_adjustment["carbon"],
                 rtol = budget_rtol,
             ),
             "nitrogen" => selected_casa().workflow_budget_report(
@@ -936,6 +966,7 @@ function run_gridded_case(
                 passive_restoration,
                 budget.area_m2,
                 "nitrogen";
+                serialization_adjustment = restart_serialization_adjustment["nitrogen"],
                 rtol = budget_rtol,
             ),
         )
