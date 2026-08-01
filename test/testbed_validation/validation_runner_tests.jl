@@ -338,13 +338,11 @@ end
     end
 end
 
-@testset "Validation Runner rejects unavailable defaults and invalid values" begin
-    defaults = run_validation()
-    @test defaults.exitcode == 2
-    @test occursin(
-        "only one of CASA-C or CASA-CN is available",
-        defaults.stderr,
-    )
+@testset "Validation Runner exposes stable defaults and rejects invalid values" begin
+    defaults = VALIDATION_RUNNER_MODULE.parse_args(String[])
+    @test defaults.scope == "representative"
+    @test defaults.models == collect(VALIDATION_RUNNER_MODULE.MODELS)
+    @test defaults.reference_mode == "pinned"
 
     invalid = run_validation("--scope", "unknown")
     @test invalid.exitcode == 2
@@ -353,6 +351,90 @@ end
     invalid = run_validation("--scope", "core", "--workers", "0")
     @test invalid.exitcode == 2
     @test occursin("workers must be positive", invalid.stderr)
+end
+
+@testset "Validation Runner aggregates deterministic model reports" begin
+    configuration = VALIDATION_RUNNER_MODULE.parse_args([
+        "--models",
+        "MIMICS-C,CASA-C",
+    ])
+    scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+    mktempdir() do output
+        report = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
+            configuration,
+            output,
+            scope,
+        )
+        model_reports = Dict(
+            model => Dict(
+                "model" => [
+                    merge(
+                        deepcopy(only(filter(
+                            item -> item["name"] == model,
+                            report["model"],
+                        ))),
+                        Dict("outcome" => "passed", "seconds" => 1.0),
+                    ),
+                ],
+            ) for model in configuration.models
+        )
+        outcomes = [
+            (;
+                model,
+                outcome = "passed",
+                exitcode = 0,
+                signal = 0,
+                seconds = 1.0,
+                error = nothing,
+            ) for model in configuration.models
+        ]
+
+        VALIDATION_RUNNER_MODULE.aggregate_model_reports!(
+            report,
+            model_reports,
+            outcomes,
+            2.0,
+        )
+
+        @test report["outcome"] == "passed"
+        @test getindex.(report["model"], "name") == configuration.models
+        @test report["seconds"] == 2.0
+    end
+end
+
+@testset "Validation Runner exposes explicit remaining integration blockers" begin
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "MIMICS-C",
+            "--reference",
+            "fresh",
+            "--output",
+            output,
+        )
+        @test result.exitcode == 2
+        @test occursin("fresh-reference model commands", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test only(report["model"])["name"] == "MIMICS-C"
+    end
+
+    mktempdir() do output
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "CORPSE",
+            "--reference",
+            "pinned",
+            "--output",
+            output,
+        )
+        @test result.exitcode == 2
+        @test occursin("Representative CORPSE reference", result.stderr)
+        @test isfile(joinpath(output, "validation_report.toml"))
+    end
 end
 
 @testset "Validation Runner enforces its hard process deadline" begin

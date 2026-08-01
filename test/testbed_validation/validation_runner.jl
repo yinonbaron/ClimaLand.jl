@@ -7,6 +7,10 @@ import NCDatasets
 
 include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
 include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
+include(joinpath(@__DIR__, "selected_mimics_c_workflow.jl"))
+include(joinpath(@__DIR__, "selected_mimics_cn_workflow.jl"))
+include(joinpath(@__DIR__, "model_process_orchestration.jl"))
+include(joinpath(@__DIR__, "pinned_corpse_adapter.jl"))
 
 # ============================================================================
 # Command-line interface
@@ -78,8 +82,17 @@ const CASA_CN_FRESH_DAILY_VARIABLES =
     union(CASA_CN_ANNUAL_MEAN_VARIABLES, CASA_CN_ANNUAL_TOTAL_VARIABLES)
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = Dict(
+    "MIMICS-C" => "CLIMALAND_VALIDATION_MIMICS_C_REFERENCE",
+    "MIMICS-CN" => "CLIMALAND_VALIDATION_MIMICS_CN_REFERENCE",
     "CASA-C" => "CLIMALAND_VALIDATION_CASA_C_REFERENCE",
     "CASA-CN" => "CLIMALAND_VALIDATION_CASA_CN_REFERENCE",
+)
+const REFERENCE_BINDING = Dict(
+    "CORPSE" => "representative_corpse_reference",
+    "MIMICS-C" => "representative_mimics_c_reference",
+    "MIMICS-CN" => "representative_mimics_cn_reference",
+    "CASA-C" => "representative_casa_c_reference",
+    "CASA-CN" => "representative_casa_cn_reference",
 )
 const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
@@ -780,15 +793,11 @@ function validate_available(configuration)
             "$(titlecase(configuration.scope)) Scope is not available yet; use --scope core",
         ),
     )
-    length(configuration.models) == 1 &&
-        only(configuration.models) in ("CASA-C", "CASA-CN") || throw(
+    configuration.scope == "representative" ||
+        length(configuration.models) == 1 &&
+            only(configuration.models) in ("CASA-C", "CASA-CN") || throw(
         RunnerError(
-            "only one of CASA-C or CASA-CN is available in this Validation Runner slice; select one explicitly",
-        ),
-    )
-    configuration.reference_mode == "pinned" || throw(
-        RunnerError(
-            "Fresh Fortran References are not available yet; use --reference pinned",
+            "multi-model validation is available only for the Representative Scope",
         ),
     )
     return nothing
@@ -814,18 +823,62 @@ function artifact_directory(name, description)
     return Pkg.Artifacts.artifact_path(hash), string(hash)
 end
 
+function artifact_payload(directory, role, description)
+    manifest = parse_toml(
+        joinpath(directory, "manifest.toml"),
+        "$description manifest",
+    )
+    files = get(manifest, "files", Dict{String, Any}())
+    payload = get(manifest, "payload", Dict{String, Any}())
+    relative = get(payload, role, nothing)
+    relative isa String && haskey(files, relative) || throw(
+        RunnerError("$description does not declare its $role payload"),
+    )
+    path = joinpath(directory, relative)
+    isfile(path) || throw(RunnerError("$description $role payload is missing"))
+    return path, manifest
+end
+
 function reference_path(scope, model = "CASA-C")
-    override = REFERENCE_OVERRIDE[model]
-    haskey(ENV, override) && return ENV[override], nothing
+    override = get(REFERENCE_OVERRIDE, model, nothing)
+    !isnothing(override) && haskey(ENV, override) &&
+        return ENV[override], nothing
     scope != "representative" &&
         model == "CASA-C" &&
         return DEFAULT_REFERENCE, nothing
-    artifact_name =
-        model == "CASA-C" ? "representative_casa_c_reference" :
-        "representative_casa_cn_reference"
+    artifact_name = REFERENCE_BINDING[model]
     directory, hash =
         artifact_directory(artifact_name, "Representative $model reference")
-    return joinpath(directory, "complete_casa_workflow.toml"), hash
+    model == "CORPSE" && return directory, hash
+    if model in ("CASA-C", "CASA-CN")
+        if isfile(joinpath(directory, "manifest.toml"))
+            oracle = first(
+                artifact_payload(
+                    directory,
+                    "oracle",
+                    "Representative $model reference",
+                ),
+            )
+            return oracle, hash
+        end
+        return joinpath(directory, "complete_casa_workflow.toml"), hash
+    end
+    oracle, manifest = artifact_payload(
+        directory,
+        "oracle",
+        "Representative $model reference",
+    )
+    get(manifest, "kind", nothing) == "reference" &&
+        get(manifest, "model", nothing) == model &&
+        get(manifest, "scope", nothing) == "representative" || throw(
+        RunnerError("Representative $model reference manifest is incompatible"),
+    )
+    document = parse_toml(oracle, "Representative $model reduced oracle")
+    get(document, "model", nothing) == model &&
+        get(document, "scope", nothing) == "representative" || throw(
+        RunnerError("Representative $model reduced oracle is incompatible"),
+    )
+    return oracle, hash
 end
 
 function fixture_manifest_path(scope, model = "CASA-C")
@@ -834,7 +887,21 @@ function fixture_manifest_path(scope, model = "CASA-C")
         return SELECTED_CELL_MANIFEST, nothing
     directory, hash =
         artifact_directory("representative_forcing", "Representative forcing")
+    if isfile(joinpath(directory, "manifest.toml"))
+        fixture = first(
+            artifact_payload(
+                directory,
+                "fixture_manifest",
+                "Representative forcing",
+            ),
+        )
+        return fixture, hash
+    end
     return joinpath(directory, "fixture.toml"), hash
+end
+
+function representative_forcing_directory()
+    return artifact_directory("representative_forcing", "Representative forcing")
 end
 
 function validate_fixture_scope_provenance(path, scope)
@@ -1224,6 +1291,214 @@ function run_casa!(
     return outcome.passed
 end
 
+function mimics_policy(model)
+    prefix = model == "MIMICS-C" ? "mimics_c" : "mimics_cn"
+    boundary = joinpath(
+        @__DIR__,
+        "validation",
+        model == "MIMICS-C" ?
+        "mimics_c_full_grid_calibration.toml" :
+        "mimics_cn_boundary_calibration.toml",
+    )
+    historical =
+        joinpath(@__DIR__, "validation", "$(prefix)_historical_calibration.toml")
+    tolerance =
+        model == "MIMICS-C" ?
+        TestbedMIMICSCCalibration.comparison_policy(boundary, historical) :
+        TestbedMIMICSCNCalibration.comparison_policy(boundary, historical)
+    return (; tolerance, boundary, historical)
+end
+
+function initial_mimics_report(configuration, output_root, scope, policy, model)
+    report = empty_aggregate_report(configuration, output_root, scope)
+    only(report["model"])["comparison_policy"] = Dict(
+        "boundary_calibration" => abspath(policy.boundary),
+        "boundary_calibration_sha256" => sha256sum(policy.boundary),
+        "historical_calibration" => abspath(policy.historical),
+        "historical_calibration_sha256" => sha256sum(policy.historical),
+        "rules" => policy.tolerance,
+    )
+    return report
+end
+
+function run_mimics!(
+    report,
+    output_root,
+    configuration,
+    pinned_reference,
+    fixture_manifest,
+    scope,
+    policy,
+    model,
+)
+    collection = TestbedReferenceCellComparisons.selected_cell_collection(
+        scope.name,
+        scope.cell_ids;
+        manifest_path = fixture_manifest,
+    )
+    budget = TestbedReferenceCellComparisons.ConcurrencyBudget(
+        configuration.workers,
+    )
+    started = time_ns()
+    result = if model == "MIMICS-C"
+        TestbedSelectedMIMICSCWorkflow.run_selected_case(
+            joinpath(output_root, model);
+            collection,
+            concurrency_budget = budget,
+            reference_path = pinned_reference,
+            comparison_policy = policy.tolerance,
+            scope_manifest_path = scope.path,
+            eligibility_gaps = model_eligibility_gaps(scope, model),
+        )
+    else
+        TestbedSelectedMIMICSCNWorkflow.run_selected_case(
+            joinpath(output_root, model);
+            collection,
+            concurrency_budget = budget,
+            reference_path = pinned_reference,
+            comparison_policy = policy.tolerance,
+            eligibility_gaps = model_eligibility_gaps(scope, model),
+        )
+    end
+    seconds = (time_ns() - started) / 1e9
+    scientific = TOML.parsefile(result.report)
+    boundary = all(
+        get(comparison, "all_match", false) for
+        comparison in values(scientific["boundary_comparison"])
+    )
+    historical = get(
+        scientific["historical_comparison"],
+        "all_match",
+        false,
+    )
+    carbon = get(scientific["carbon_budget"], "all_close", false)
+    nitrogen =
+        model == "MIMICS-CN" ?
+        get(scientific["nitrogen_budget"], "all_close", false) : true
+    passed = boundary && historical && carbon && nitrogen
+    model_report = only(report["model"])
+    coverage = scientific["coverage"]
+    model_report["coverage"]["eligible_cells"] =
+        length(coverage["eligible_cell_ids"])
+    model_report["coverage"]["compared_cells"] = coverage["compared_cells"]
+    model_report["coverage"]["eligibility_gaps"] =
+        coverage["eligibility_gaps"]
+    model_report["comparison"] = Dict(
+        "fresh_fortran_boundaries" => boundary,
+        "historical" => historical,
+        "carbon_budget" => carbon,
+        "nitrogen_budget" => nitrogen,
+    )
+    model_report["comparison_report"] = abspath(result.report)
+    model_report["reference"] = Dict(
+        "path" => abspath(pinned_reference),
+        "sha256" => sha256sum(pinned_reference),
+    )
+    model_report["outcome"] = passed ? "passed" : "failed"
+    model_report["seconds"] = seconds
+    report["outcome"] = model_report["outcome"]
+    report["seconds"] = seconds
+    return passed
+end
+
+function empty_aggregate_report(configuration, output_root, scope)
+    return Dict(
+        "schema_version" => 1,
+        "scope" => Dict(
+            "name" => scope.name,
+            "cell_count" => length(scope.cell_ids),
+            "cell_ids" => scope.cell_ids,
+            "manifest" => scope.path,
+            "manifest_sha256" => sha256sum(scope.path),
+        ),
+        "reference_mode" => configuration.reference_mode,
+        "workers" => configuration.workers,
+        "output" => abspath(output_root),
+        "outcome" => "failed",
+        "seconds" => 0.0,
+        "model" => [
+            Dict(
+                "name" => model,
+                "reference_mode" => configuration.reference_mode,
+                "coverage" => Dict(
+                    "scope_cells" => length(scope.cell_ids),
+                    "eligible_cells" => length(eligible_cell_ids(scope, model)),
+                    "compared_cells" => 0,
+                    "eligibility_gaps" => model_eligibility_gaps(scope, model),
+                ),
+                "outcome" => "failed",
+                "seconds" => 0.0,
+            ) for model in configuration.models
+        ],
+    )
+end
+
+function aggregate_model_reports!(report, model_reports, outcomes, seconds)
+    by_model = Dict(outcome.model => outcome for outcome in outcomes)
+    report["model"] = map(report["model"]) do placeholder
+        model = placeholder["name"]
+        if haskey(model_reports, model)
+            only(model_reports[model]["model"])
+        else
+            outcome = by_model[model]
+            placeholder["outcome"] = outcome.outcome
+            placeholder["seconds"] = outcome.seconds
+            isnothing(outcome.error) || (placeholder["error"] = outcome.error)
+            placeholder
+        end
+    end
+    report["seconds"] = seconds
+    report["outcome"] =
+        all(model -> model["outcome"] == "passed", report["model"]) ?
+        "passed" : "failed"
+    return report
+end
+
+function run_multiple!(report, output_root, configuration, scope)
+    configuration.reference_mode == "pinned" || throw(
+        RunnerError(
+            "fresh-reference model commands are not yet connected to the public runner",
+        ),
+    )
+    fixture_manifest_path(configuration.scope)
+    for model in configuration.models
+        reference_path(configuration.scope, model)
+    end
+    started = time_ns()
+    model_root = joinpath(output_root, "models")
+    log_root = joinpath(output_root, "logs")
+    mkpath(model_root)
+    mkpath(log_root)
+    project = dirname(Base.active_project())
+    command = model -> addenv(
+        `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) --scope $(configuration.scope) --models $model --reference pinned --workers 1 --output $(joinpath(model_root, model))`,
+        CHILD_PROCESS => "1",
+    )
+    log_path = joinpath(log_root, "model-workers.log")
+    workers_result = open(log_path, "w") do log
+        TestbedModelProcessOrchestration.run_model_workers(
+            command;
+            models = configuration.models,
+            workers = configuration.workers,
+            worker_stdout = log,
+            worker_stderr = log,
+        )
+    end
+    model_reports = Dict{String, Any}()
+    for model in configuration.models
+        path = joinpath(model_root, model, REPORT_FILENAME)
+        isfile(path) && (model_reports[model] = TOML.parsefile(path))
+    end
+    seconds = (time_ns() - started) / 1e9
+    aggregate_model_reports!(
+        report,
+        model_reports,
+        workers_result.outcomes,
+        seconds,
+    )
+    return report["outcome"] == "passed"
+end
+
 # ============================================================================
 # Entry point
 # ============================================================================
@@ -1253,54 +1528,133 @@ function main(args = ARGS)
         println(stderr, "Validation Runner: ", error.message)
         return 2
     end
+    if length(configuration.models) > 1
+        report = empty_aggregate_report(configuration, output_root, scope)
+        started = time_ns()
+        try
+            passed = run_multiple!(report, output_root, configuration, scope)
+            report_path = write_report(output_root, report)
+            println(
+                stdout,
+                "Validation: $(report["outcome"]) | scope=$(scope.name) " *
+                "| models=$(length(report["model"])) | reference=$(configuration.reference_mode) " *
+                "| seconds=$(round(report["seconds"]; digits = 3))",
+            )
+            println(stdout, "Validation Report: $report_path")
+            return passed ? 0 : 1
+        catch error
+            report["seconds"] = (time_ns() - started) / 1e9
+            report["error"] = sprint(showerror, error)
+            report_path = write_report(output_root, report)
+            println(stderr, "Validation Runner: ", report["error"])
+            println(stderr, "Validation Report: $report_path")
+            return error isa RunnerError ? 2 : 1
+        end
+    end
     model = only(configuration.models)
-    policy = try
-        comparison_policy(model)
-    catch error
-        error isa RunnerError || rethrow()
-        println(stderr, "Validation Runner: ", error.message)
+    if configuration.reference_mode == "fresh"
+        report = empty_aggregate_report(configuration, output_root, scope)
+        report["error"] =
+            "fresh-reference model commands are not yet connected to the public runner"
+        report_path = write_report(output_root, report)
+        println(stderr, "Validation Runner: ", report["error"])
+        println(stderr, "Validation Report: $report_path")
         return 2
     end
-    report = initial_report(configuration, output_root, scope, policy)
+    if model == "CORPSE"
+        report = empty_aggregate_report(configuration, output_root, scope)
+        try
+            forcing_root, _ = representative_forcing_directory()
+            reference_root, _ = reference_path(configuration.scope, model)
+            TestbedPinnedCORPSEAdapter.run_pinned_corpse(
+                joinpath(output_root, model);
+                scope_manifest = scope.path,
+                forcing_artifact_root = forcing_root,
+                reference_artifact_root = reference_root,
+                workers = configuration.workers,
+            )
+            error("CORPSE adapter returned without a scientific result")
+        catch error
+            report["error"] = sprint(showerror, error)
+            report_path = write_report(output_root, report)
+            println(stderr, "Validation Runner: ", report["error"])
+            println(stderr, "Validation Report: $report_path")
+            return error isa TestbedPinnedCORPSEAdapter.AdapterError ||
+                   error isa RunnerError ? 2 : 1
+        end
+    end
+    policy = try
+        model in ("MIMICS-C", "MIMICS-CN") ?
+        mimics_policy(model) : comparison_policy(model)
+    catch error
+        println(stderr, "Validation Runner: ", sprint(showerror, error))
+        return 2
+    end
+    report =
+        model in ("MIMICS-C", "MIMICS-CN") ?
+        initial_mimics_report(configuration, output_root, scope, policy, model) :
+        initial_report(configuration, output_root, scope, policy)
     started = time_ns()
     try
         pinned_reference, reference_artifact =
             reference_path(configuration.scope, model)
         reference = validate_reference_file(pinned_reference, model)
-        validate_eligible_reference_values(reference, scope, model)
-        validate_reference_calibration(
-            reference,
-            policy.calibration_path,
-            model,
-            scope,
-        )
+        if model in ("CASA-C", "CASA-CN")
+            validate_eligible_reference_values(reference, scope, model)
+            validate_reference_calibration(
+                reference,
+                policy.calibration_path,
+                model,
+                scope,
+            )
+        end
         fixture_manifest, forcing_artifact =
             fixture_manifest_path(configuration.scope, model)
         validate_fixture_scope_provenance(fixture_manifest, scope)
-        validate_reference_forcing_artifact(
-            reference,
-            forcing_artifact,
-            model,
-            scope,
-        )
-        collection = try
-            stage_casa(scope, pinned_reference, policy, fixture_manifest, model)
-        catch error
-            throw(
-                RunnerError(
-                    "Pinned $model inputs are incompatible: $(sprint(showerror, error))",
-                ),
+        model in ("CASA-C", "CASA-CN") &&
+            validate_reference_forcing_artifact(
+                reference,
+                forcing_artifact,
+                model,
+                scope,
+            )
+        passed = if model in ("MIMICS-C", "MIMICS-CN")
+            run_mimics!(
+                report,
+                output_root,
+                configuration,
+                pinned_reference,
+                fixture_manifest,
+                scope,
+                policy,
+                model,
+            )
+        else
+            collection = try
+                stage_casa(
+                    scope,
+                    pinned_reference,
+                    policy,
+                    fixture_manifest,
+                    model,
+                )
+            catch error
+                throw(
+                    RunnerError(
+                        "Pinned $model inputs are incompatible: $(sprint(showerror, error))",
+                    ),
+                )
+            end
+            run_casa!(
+                report,
+                output_root,
+                configuration,
+                pinned_reference,
+                collection,
+                policy,
+                model,
             )
         end
-        passed = run_casa!(
-            report,
-            output_root,
-            configuration,
-            pinned_reference,
-            collection,
-            policy,
-            model,
-        )
         model_report = only(report["model"])
         model_report["forcing"] = Dict(
             "manifest" => abspath(fixture_manifest),

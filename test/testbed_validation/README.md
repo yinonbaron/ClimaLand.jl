@@ -673,6 +673,38 @@ also remains informational unless its missing inputs are recovered.
 
 ## Test architecture
 
+### Validation runner
+
+`validation_runner.jl` is the public local and CI entry point. Its defaults are
+the 80-cell Representative Scope, all five models, pinned references, automatic
+bounded process concurrency, and an ephemeral output directory:
+
+```sh
+julia --startup-file=no --project=test \
+  test/testbed_validation/validation_runner.jl \
+  --scope representative --models all --reference pinned \
+  --output validation-output
+```
+
+`--models` accepts `all` or a comma-separated subset; `--workers` bounds the
+number of isolated single-threaded model processes. `--scope` accepts `core`,
+`smoke`, `representative`, `broad`, or `global`. Broad and Global remain later
+iterations. The temporary programmatic aliases `ordinary` and `extended` map to
+Core and Smoke with a deprecation warning.
+
+Pinned mode resolves immutable forcing and reduced Fortran-reference Julia
+artifacts and fails closed on missing or incompatible bundles. Fresh mode is an
+explicit ephemeral diagnostic operation and never updates those bindings;
+reference publication is a separate maintainer-reviewed operation. Known
+Fortran nonfinites appear only as reviewed, model-specific Eligibility Gaps in
+the Scope Manifest. Eligible nonfinites fail validation.
+
+Every execution writes `validation_report.toml`, including scope and artifact
+provenance, applied policy, coverage and gaps, model outcomes, and per-model and
+aggregate timings. Detailed model logs remain separate from this compact
+report. Current completion gaps are tracked in
+[`STABLE_REPRESENTATIVE_V1_READINESS.md`](STABLE_REPRESENTATIVE_V1_READINESS.md).
+
 Ordinary package tests do not compile or run Fortran and do not require large
 archives. They will include:
 
@@ -774,6 +806,9 @@ The regular 80-cell CI contracts are documented in
 [`CASA_C_REPRESENTATIVE_VALIDATION.md`](CASA_C_REPRESENTATIVE_VALIDATION.md)
 and
 [`CASA_CN_REPRESENTATIVE_VALIDATION.md`](CASA_CN_REPRESENTATIVE_VALIDATION.md).
+The current all-model integration status, measured checks, and remaining
+blocking contracts are recorded in
+[`STABLE_REPRESENTATIVE_V1_READINESS.md`](STABLE_REPRESENTATIVE_V1_READINESS.md).
 
 Regenerate one reference configuration only from completed native and
 fresh-Fortran runs:
