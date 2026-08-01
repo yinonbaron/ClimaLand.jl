@@ -5,15 +5,29 @@ import NCDatasets
 
 using ClimaLand
 
-include(joinpath(@__DIR__, "native_workflow.jl"))
-include(joinpath(@__DIR__, "native_casa_c_reconstruction.jl"))
-include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
-include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
-include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
+if !isdefined(@__MODULE__, :TestbedNativeWorkflow)
+    include(joinpath(@__DIR__, "native_workflow.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedNativeCASACReconstruction)
+    include(joinpath(@__DIR__, "native_casa_c_reconstruction.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedSelectedCellFixtures)
+    include(joinpath(@__DIR__, "selected_cell_fixtures.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedReferenceCellComparisons)
+    include(joinpath(@__DIR__, "reference_cell_comparisons.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedSelectedCASAWorkflow)
+    include(joinpath(@__DIR__, "selected_casa_workflow.jl"))
+end
+if !isdefined(@__MODULE__, :TestbedNativeCASACNReconstruction)
+    include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
+end
 
 const Workflow = TestbedSelectedCASAWorkflow
 const NativeCASA = TestbedNativeCASACReconstruction
 const NativeCASACN = TestbedNativeCASACNReconstruction
+const ReferenceCells = TestbedReferenceCellComparisons
 const CASA_C_CALIBRATION_PATH =
     joinpath(@__DIR__, "validation", "casa_c_full_grid_calibration.toml")
 const CASA_CN_CALIBRATION_PATH =
@@ -47,6 +61,12 @@ const STAGE_DIRECTORIES = Dict(
     "accelerated_spin" => "02-accelerated_spin",
     "normal_spin" => "03-normal_spin",
     "historical" => "04-historical",
+)
+const STAGE_END_DATES = Dict(
+    "prespin" => "1901-12-31",
+    "accelerated_spin" => "1920-12-31",
+    "normal_spin" => "1920-12-31",
+    "historical" => "2014-12-31",
 )
 
 function fixture_metadata(collection)
@@ -465,6 +485,335 @@ function generate_reference(
         TOML.print(io, reference; sorted = true)
     end
     return path
+end
+
+function representative_collection(fixture_manifest_path, scope_manifest_path)
+    isfile(fixture_manifest_path) ||
+        error("Representative forcing manifest is missing")
+    isfile(scope_manifest_path) || error("Representative scope is missing")
+    scope = TOML.parsefile(scope_manifest_path)
+    fixture = TOML.parsefile(fixture_manifest_path)
+    scope_ids = Int.(get(scope, "cell_ids", Int[]))
+    get(scope, "schema_version", nothing) == 1 &&
+        get(scope, "name", nothing) == "representative" &&
+        length(scope_ids) == 80 && length(unique(scope_ids)) == 80 || error(
+        "CASA fresh worker requires the immutable 80-cell Representative scope",
+    )
+    selection = get(fixture, "selection", Dict{String, Any}())
+    Int.(get(selection, "representative_cell_ids", Int[])) == scope_ids ||
+        error("Representative forcing cell order differs from the scope")
+    get(selection, "scope_manifest_sha256", nothing) ==
+    TestbedNativeWorkflow.sha256sum(scope_manifest_path) ||
+        error("Representative forcing has stale scope provenance")
+    collection = ReferenceCells.selected_cell_collection(
+        "representative",
+        scope_ids;
+        manifest_path = fixture_manifest_path,
+    )
+    getproperty.(collection.cells, :id) == scope_ids ||
+        error("Representative collection did not preserve scope order")
+    return collection
+end
+
+is_nonfinite_reference(value) = value isa Real && !isfinite(value)
+
+function nonfinite_record(cell_id, stage, date, variable, reason)
+    return Dict(
+        "cell_id" => cell_id,
+        "evidence_side" => "fortran",
+        "first_nonfinite_stage" => stage,
+        "first_nonfinite_date" => date,
+        "first_nonfinite_variable" => variable,
+        "reason" => reason,
+    )
+end
+
+function first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
+    candidates = Dict{String, Any}[]
+
+    function inspect_values!(values, stage, date, variable, reason)
+        values isa AbstractVector && length(values) == length(cell_ids) ||
+            error("Fresh Fortran $stage.$variable has incompatible cell values")
+        any(ismissing, values) &&
+            error("Fresh Fortran $stage.$variable has missing values")
+        for (position, cell_id) in enumerate(cell_ids)
+            is_nonfinite_reference(values[position]) || continue
+            push!(
+                candidates,
+                nonfinite_record(cell_id, stage, date, variable, reason),
+            )
+        end
+    end
+
+    for stage in ("prespin", "accelerated_spin", "normal_spin")
+        states = get(boundaries, stage, nothing)
+        states isa AbstractDict || error("Fresh Fortran boundary lacks $stage")
+        for variable in sort!(String.(collect(keys(states))))
+            inspect_values!(
+                states[variable],
+                stage,
+                STAGE_END_DATES[stage],
+                variable,
+                "fresh Fortran CASA boundary became nonfinite",
+            )
+        end
+    end
+
+    if !isempty(daily)
+        sample_days = Int.(get(daily, "sample_days", Int[]))
+        issorted(sample_days) || error("Fresh Fortran daily samples are unordered")
+        for day_index in eachindex(sample_days)
+            date = string(
+                Dates.Date(1901, 1, 1) + Dates.Day(sample_days[day_index] - 1),
+            )
+            for variable in sort!(
+                setdiff(String.(collect(keys(daily))), ["sample_days"]),
+            )
+                values = daily[variable]
+                length(values) == length(cell_ids) * length(sample_days) ||
+                    error(
+                        "Fresh Fortran historical.$variable has incompatible daily values",
+                    )
+                offset = (day_index - 1) * length(cell_ids)
+                inspect_values!(
+                    @view(values[(offset + 1):(offset + length(cell_ids))]),
+                    "historical",
+                    date,
+                    variable,
+                    "fresh Fortran CASA daily trajectory became nonfinite",
+                )
+            end
+        end
+    end
+
+    if !isempty(annual)
+        years = Int.(get(annual, "years", Int[]))
+        issorted(years) || error("Fresh Fortran annual samples are unordered")
+        for year_index in eachindex(years)
+            for reducer in sort!(
+                setdiff(String.(collect(keys(annual))), ["years"]),
+            )
+                variables = annual[reducer]
+                variables isa AbstractDict ||
+                    error("Fresh Fortran annual.$reducer is malformed")
+                for variable in sort!(String.(collect(keys(variables))))
+                    values = variables[variable]
+                    length(values) == length(cell_ids) * length(years) || error(
+                        "Fresh Fortran annual.$reducer.$variable has incompatible values",
+                    )
+                    offset = (year_index - 1) * length(cell_ids)
+                    inspect_values!(
+                        @view(
+                            values[(offset + 1):(offset + length(cell_ids))]
+                        ),
+                        "historical",
+                        "$(years[year_index])-12-31",
+                        "$reducer.$variable",
+                        "fresh Fortran CASA annual trajectory became nonfinite",
+                    )
+                end
+            end
+        end
+    end
+
+    states = get(boundaries, "historical", nothing)
+    states isa AbstractDict || error("Fresh Fortran boundary lacks historical")
+    for variable in sort!(String.(collect(keys(states))))
+        inspect_values!(
+            states[variable],
+            "historical",
+            STAGE_END_DATES["historical"],
+            variable,
+            "fresh Fortran CASA boundary became nonfinite",
+        )
+    end
+    stage_order = Dict(
+        "prespin" => 1,
+        "accelerated_spin" => 2,
+        "normal_spin" => 3,
+        "historical" => 4,
+    )
+    sort!(
+        candidates;
+        by = record -> (
+            record["cell_id"],
+            stage_order[record["first_nonfinite_stage"]],
+            record["first_nonfinite_date"],
+            record["first_nonfinite_variable"],
+        ),
+    )
+    records = Dict{String, Any}[]
+    for candidate in candidates
+        if isempty(records) ||
+           records[end]["cell_id"] != candidate["cell_id"]
+            push!(records, candidate)
+        end
+    end
+    return records
+end
+
+function refresh_representative_fortran_reference(
+    configuration,
+    collection,
+    fortran_root,
+    reference_template,
+    output_path;
+    build_metadata_path,
+    scope_manifest_path,
+)
+    configuration in Workflow.supported_configurations() ||
+        error("configuration must be :carbon_only or :carbon_nitrogen")
+    isdir(fortran_root) || error("Fresh Fortran run root is missing")
+    isfile(reference_template) || error("CASA reference template is missing")
+    isfile(build_metadata_path) || error("Shared build metadata is missing")
+    ispath(output_path) && error("Fresh CASA oracle output already exists")
+    reference = TOML.parsefile(reference_template)
+    get(reference, "schema_version", nothing) == 1 &&
+        get(reference, "tier", nothing) == "representative" ||
+        error("CASA reference template is not Representative")
+    cell_ids = getproperty.(collection.cells, :id)
+    Int.(get(reference, "cell_ids", Int[])) == cell_ids ||
+        error("CASA reference template differs from the Representative scope")
+    configurations = get(reference, "configuration", Dict{String, Any}())
+    name = String(configuration)
+    haskey(configurations, name) ||
+        error("CASA reference template lacks $name")
+
+    indices = source_indices(fortran_root, cell_ids)
+    boundaries = fortran_boundaries(fortran_root, configuration, indices)
+    annual =
+        configuration == :carbon_nitrogen ?
+        fortran_annual(fortran_root, cell_ids) : Dict{String, Any}()
+    daily =
+        configuration == :carbon_nitrogen ?
+        fortran_daily(fortran_root, cell_ids) : Dict{String, Any}()
+    nonfinite_records =
+        first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
+    isempty(nonfinite_records) || return (
+        oracle_path = nothing,
+        nonfinite_records,
+    )
+
+    refreshed = deepcopy(reference)
+    configuration_reference = refreshed["configuration"][name]
+    configuration_reference["fresh_fortran"] = Dict(
+        "boundary" => boundaries,
+        "annual" => annual,
+        "historical" => daily,
+    )
+    calibration_path =
+        configuration == :carbon_only ?
+        CASA_C_CALIBRATION_PATH : CASA_CN_CALIBRATION_PATH
+    configuration_reference["tolerance"]["fresh_fortran_boundary"] =
+        measured_boundary_tolerance(
+            calibration_path,
+            configuration_reference["native_julia"]["boundary"],
+            boundaries,
+        )
+    if configuration == :carbon_nitrogen
+        configuration_reference["tolerance"]["fresh_fortran_annual"] =
+            calibrated_fortran_annual_tolerance()
+        configuration_reference["tolerance"]["fresh_fortran_historical"] =
+            calibrated_fortran_daily_tolerance()
+    end
+    provenance = configuration_reference["provenance"]
+    provenance["fresh_fortran_boundary_sha256"] = Dict(
+        stage => TestbedNativeWorkflow.sha256sum(
+            joinpath(fortran_root, "stages", directory, "casa_final.csv"),
+        ) for (stage, directory) in STAGE_DIRECTORIES
+    )
+    provenance["fresh_fortran_calibration_sha256"] =
+        TestbedNativeWorkflow.sha256sum(calibration_path)
+    provenance["shared_build_metadata_sha256"] =
+        TestbedNativeWorkflow.sha256sum(build_metadata_path)
+    provenance["scope_manifest_sha256"] =
+        TestbedNativeWorkflow.sha256sum(scope_manifest_path)
+    if configuration == :carbon_nitrogen
+        provenance["fresh_fortran_annual_sha256"] =
+            TestbedNativeWorkflow.sha256sum(
+                joinpath(
+                    fortran_root,
+                    "fresh_reference",
+                    "ann_casaclm_pool_flux_1901_2014.nc",
+                ),
+            )
+        provenance["fresh_fortran_daily_sha256"] = Dict(
+            string(year) => TestbedNativeWorkflow.sha256sum(
+                joinpath(
+                    fortran_root,
+                    "stages",
+                    "04-historical",
+                    "casaclm_pool_flux_$(year)_daily.nc",
+                ),
+            ) for year in (1901, 2014)
+        )
+    end
+    mkpath(dirname(output_path))
+    open(output_path, "w") do io
+        TOML.print(io, refreshed; sorted = true)
+    end
+    return (; oracle_path = output_path, nonfinite_records)
+end
+
+function finish_representative_worker(
+    configuration,
+    fixture_manifest_path,
+    scope_manifest_path,
+    fortran_root,
+    julia_root,
+    reference_template;
+    build_metadata_path,
+    oracle_path = joinpath(dirname(julia_root), "fresh_casa_oracle.toml"),
+    reference_builder = refresh_representative_fortran_reference,
+    julia_runner = Workflow.run_selected_case,
+)
+    ispath(julia_root) && error("Fresh CASA Julia output already exists")
+    ispath(oracle_path) && error("Fresh CASA oracle output already exists")
+    isdir(fortran_root) || error("Fresh Fortran run root is missing")
+    isfile(reference_template) || error("CASA reference template is missing")
+    isfile(build_metadata_path) || error("Shared build metadata is missing")
+    collection = representative_collection(
+        fixture_manifest_path,
+        scope_manifest_path,
+    )
+    built = reference_builder(
+        configuration,
+        collection,
+        fortran_root,
+        reference_template,
+        oracle_path;
+        build_metadata_path,
+        scope_manifest_path,
+    )
+    built isa NamedTuple && hasproperty(built, :nonfinite_records) ||
+        error("Fresh CASA reference builder returned an incompatible result")
+    if !isempty(built.nonfinite_records)
+        return (
+            oracle_path = nothing,
+            julia = nothing,
+            report_path = nothing,
+            nonfinite_records = built.nonfinite_records,
+        )
+    end
+    built.oracle_path == oracle_path ||
+        error("Fresh CASA reference builder returned the wrong oracle")
+    julia = julia_runner(
+        julia_root;
+        configuration,
+        collection,
+        reference_path = oracle_path,
+        compare_references = true,
+        concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+    )
+    report_path = getproperty(julia, :report)
+    isfile(report_path) || error("Fresh CASA Julia report is missing")
+    return (
+        ;
+        oracle_path,
+        julia,
+        report_path,
+        nonfinite_records = Dict{String, Any}[],
+    )
 end
 
 function main(args = ARGS)

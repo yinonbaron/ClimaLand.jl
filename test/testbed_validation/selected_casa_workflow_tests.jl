@@ -4,6 +4,10 @@ import TOML
 
 import NCDatasets
 
+if !isdefined(@__MODULE__, :finish_representative_worker)
+    include(joinpath(@__DIR__, "generate_selected_casa_workflow_reference.jl"))
+end
+
 @testset "selected-cell complete CASA workflow contract" begin
     stages = TestbedSelectedCASAWorkflow.COMPLETE_STAGES
 
@@ -428,4 +432,192 @@ end
     )
     @test getindex.(ordered_report["cell_failures"], "cell_id") ==
           getproperty.(subset.cells, :id)
+end
+
+@testset "Representative CASA worker reports first Fortran nonfinites" begin
+    cell_ids = [11, 22, 33]
+    finite = [1.0, 2.0, 3.0]
+    boundaries = Dict(
+        stage => Dict("casa_plant.c_leaf" => copy(finite)) for
+        stage in keys(STAGE_DIRECTORIES)
+    )
+    boundaries["accelerated_spin"]["casa_plant.c_leaf"][1] = Inf
+    boundaries["historical"]["casa_plant.c_leaf"][1] = -Inf
+    daily = Dict(
+        "sample_days" => [1, 2],
+        "casa_soil.n_mineral" => [1.0, NaN, 3.0, 1.0, NaN, 3.0],
+    )
+    annual = Dict(
+        "years" => [1901, 1902],
+        "annual_mean" => Dict(
+            "casa_soil.c_soil_slow" => [1.0, 2.0, Inf, 1.0, 2.0, Inf],
+        ),
+        "annual_total" => Dict("diagnostic.cgpp" => ones(6)),
+    )
+
+    records = first_fortran_nonfinites(
+        boundaries,
+        annual,
+        daily,
+        cell_ids,
+    )
+
+    @test getindex.(records, "cell_id") == cell_ids
+    @test getindex.(records, "first_nonfinite_stage") ==
+          ["accelerated_spin", "historical", "historical"]
+    @test getindex.(records, "first_nonfinite_date") ==
+          ["1920-12-31", "1901-01-01", "1901-12-31"]
+    @test getindex.(records, "first_nonfinite_variable") == [
+        "casa_plant.c_leaf",
+        "casa_soil.n_mineral",
+        "annual_mean.casa_soil.c_soil_slow",
+    ]
+    @test all(record -> record["evidence_side"] == "fortran", records)
+end
+
+@testset "Representative CASA finish seam is exact and fail closed" begin
+    mktempdir() do directory
+        scope_path = joinpath(directory, "representative.toml")
+        scope = Dict(
+            "schema_version" => 1,
+            "name" => "representative",
+            "cell_ids" => collect(1:80),
+        )
+        open(scope_path, "w") do io
+            TOML.print(io, scope; sorted = true)
+        end
+        fixture_file = joinpath(directory, "forcing.bin")
+        write(fixture_file, "synthetic forcing marker")
+        fixture_path = joinpath(directory, "fixture.toml")
+        fixture = Dict(
+            "schema_version" => 1,
+            "selection" => Dict(
+                "representative_cell_ids" => collect(1:80),
+                "scope_manifest_sha256" =>
+                    TestbedNativeWorkflow.sha256sum(scope_path),
+            ),
+            "fixture" => Dict(
+                "forcing" => Dict(
+                    "filename" => basename(fixture_file),
+                    "bytes" => filesize(fixture_file),
+                    "sha256" =>
+                        TestbedNativeWorkflow.sha256sum(fixture_file),
+                ),
+            ),
+            "cell" => [
+                Dict("id" => id, "pft" => 1, "reasons" => ["synthetic"]) for
+                id in 1:80
+            ],
+        )
+        open(fixture_path, "w") do io
+            TOML.print(io, fixture; sorted = true)
+        end
+        fortran_root = joinpath(directory, "fortran")
+        mkpath(fortran_root)
+        reference_template = joinpath(directory, "template.toml")
+        write(reference_template, "schema_version = 1\n")
+        build_metadata_path = joinpath(directory, "build_metadata.toml")
+        write(build_metadata_path, "schema_version = 1\n")
+        configurations = Symbol[]
+
+        reference_builder = function (
+            configuration,
+            collection,
+            root,
+            template,
+            output_path;
+            build_metadata_path,
+            scope_manifest_path,
+        )
+            push!(configurations, configuration)
+            @test getproperty.(collection.cells, :id) == collect(1:80)
+            @test root == fortran_root
+            @test template == reference_template
+            @test scope_manifest_path == scope_path
+            @test isfile(build_metadata_path)
+            write(output_path, "synthetic oracle")
+            return (
+                oracle_path = output_path,
+                nonfinite_records = Dict{String, Any}[],
+            )
+        end
+        julia_runner = function (output_root; kwargs...)
+            @test kwargs[:reference_path] |> isfile
+            @test kwargs[:compare_references]
+            @test kwargs[:concurrency_budget].workers == 1
+            mkpath(output_root)
+            report = joinpath(output_root, "reconstruction_report.toml")
+            write(report, "schema_version = 1\n")
+            return (; report)
+        end
+
+        for configuration in (:carbon_only, :carbon_nitrogen)
+            name = String(configuration)
+            result = finish_representative_worker(
+                configuration,
+                fixture_path,
+                scope_path,
+                fortran_root,
+                joinpath(directory, "julia-$name"),
+                reference_template;
+                build_metadata_path,
+                oracle_path = joinpath(directory, "oracle-$name.toml"),
+                reference_builder,
+                julia_runner,
+            )
+            @test isfile(result.oracle_path)
+            @test isfile(result.report_path)
+            @test isempty(result.nonfinite_records)
+        end
+        @test configurations == [:carbon_only, :carbon_nitrogen]
+
+        nonfinite = [
+            nonfinite_record(
+                1,
+                "prespin",
+                "1901-12-31",
+                "casa_plant.c_leaf",
+                "synthetic",
+            ),
+        ]
+        blocked = finish_representative_worker(
+            :carbon_only,
+            fixture_path,
+            scope_path,
+            fortran_root,
+            joinpath(directory, "julia-blocked"),
+            reference_template;
+            build_metadata_path,
+            oracle_path = joinpath(directory, "oracle-blocked.toml"),
+            reference_builder = (args...; kwargs...) -> (
+                oracle_path = nothing,
+                nonfinite_records = nonfinite,
+            ),
+            julia_runner = (args...; kwargs...) ->
+                error("Julia must not run after Fortran nonfinite evidence"),
+        )
+        @test blocked.nonfinite_records == nonfinite
+        @test isnothing(blocked.oracle_path)
+        @test isnothing(blocked.julia)
+        @test isnothing(blocked.report_path)
+
+        stale = deepcopy(fixture)
+        stale["selection"]["scope_manifest_sha256"] = repeat("0", 64)
+        open(fixture_path, "w") do io
+            TOML.print(io, stale; sorted = true)
+        end
+        @test_throws ErrorException representative_collection(
+            fixture_path,
+            scope_path,
+        )
+        @test_throws ErrorException finish_representative_worker(
+            :carbon_only,
+            fixture_path,
+            scope_path,
+            fortran_root,
+            joinpath(directory, "julia-missing-build"),
+            reference_template;
+            build_metadata_path = joinpath(directory, "missing-build.toml"),
+        )
+    end
 end
