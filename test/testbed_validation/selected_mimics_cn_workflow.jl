@@ -840,6 +840,7 @@ function run_selected_case(
     reference_path = nothing,
     comparison_policy = nothing,
     eligibility_gaps = Dict{String, Any}[],
+    nonfinite_observer = nothing,
 )
     reference = if compare_references
         isnothing(reference_path) &&
@@ -866,6 +867,9 @@ function run_selected_case(
     boundary_snapshots = Dict{String, Any}()
     budget = native_mimics.BudgetAccumulator(setup.grid)
     annual_npp = setup.forcing.annual_npp_tracker
+    diagnostics = native_mimics.mimics_cn_diagnostics(
+        setup.normal.model.mimics_soil.parameters,
+    )
     model_for_stage(stage) =
         stage.name == :prespin ? setup.prespin.model : setup.normal.model
     fixed_plant_stoichiometry = Dict{Symbol, Vector{Float64}}()
@@ -886,7 +890,7 @@ function run_selected_case(
     function update_drivers!(stage, index, time)
         update_forcing!(setup.forcing, stage, index, time)
     end
-    function after_step!(stage, step, _, p, _)
+    function after_step!(stage, step, Y, p, _)
         native_mimics.native_mimics().accumulate_annual_npp!(
             annual_npp,
             p,
@@ -896,6 +900,9 @@ function run_selected_case(
             model_for_stage(stage),
             fixed_plant_stoichiometry[stage.name],
         )
+        if !isnothing(nonfinite_observer)
+            nonfinite_observer(stage, step, Y, p, diagnostics)
+        end
     end
     carbon_budget(stage, initial_state, final_state) =
         native_mimics.budget_report(
@@ -956,9 +963,7 @@ function run_selected_case(
             prepare_stage!,
             update_forcing! = update_drivers!,
             after_step!,
-            diagnostics = native_mimics.mimics_cn_diagnostics(
-                setup.normal.model.mimics_soil.parameters,
-            ),
+            diagnostics,
             output_eltype = Float32,
             deflatelevel = 1,
             provenance = stage -> stage_provenance(setup, stage),

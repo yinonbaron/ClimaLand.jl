@@ -26,6 +26,24 @@ CLIMALAND_VALIDATION_MIMICS_CN_REFERENCE=OUTPUT_ORACLE \
   --workers 1 --output validation-output
 ```
 
+The ephemeral fresh-reference adapter now performs those two steps as one
+MIMICS-CN worker: it runs the pinned shared Fortran executable, reduces the
+80-cell output, runs the existing selected-cell Julia comparison with the
+frozen policy, and writes the standard `comparison.toml`. Configure
+`FreshReferenceAdapter.commands` with `mimics_cn_forcing_root` and
+`mimics_cn_reference_template` before passing its build, worker, and preflight
+commands to `run_fresh_reference`. The other four model workers remain
+fail-closed.
+
+The worker checks every fresh Fortran stage boundary and every selected daily
+historical value. Julia checks every prognostic state step, plus every
+diagnostic step. At the first nonfinite evidence it writes
+`nonfinite_results.toml` with the exact side, cell, stage, no-leap date, and
+variable, then stops before comparison. Fresh-reference orchestration converts
+those records into unreviewed `eligibility_gap_proposals.toml`; it never edits
+the frozen Scope Manifest. Ordinary scientific comparison failures remain
+failures and preserve their complete output directory.
+
 The runner requires exact ordered Scope Manifest cell IDs and rejects every
 nonfinite value for an eligible cell. A known nonfinite Fortran trajectory may
 be omitted only by adding one reviewed, model-specific Eligibility Gap to the
