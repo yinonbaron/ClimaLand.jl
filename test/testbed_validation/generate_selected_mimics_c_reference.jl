@@ -250,7 +250,17 @@ function budget_values(boundary, annual, grid, eligible_positions)
     )
 end
 
-function write_reference(collection, scope_manifest_path, fortran_root, path)
+function write_reference(
+    collection,
+    scope_manifest_path,
+    fortran_root,
+    path;
+    build_metadata_path = joinpath(
+        fortran_root,
+        "build",
+        "build_metadata.toml",
+    ),
+)
     cell_ids = Int.(getproperty.(collection.cells, :id))
     length(cell_ids) == 80 ||
         error("Representative MIMICS-C oracle requires exactly 80 cells")
@@ -305,9 +315,7 @@ function write_reference(collection, scope_manifest_path, fortran_root, path)
                 "configuration/workflow.toml",
                 workflow_path,
             ),
-            "fortran_build_sha256" => sha256sum(
-                joinpath(fortran_root, "build", "build_metadata.toml"),
-            ),
+            "fortran_build_sha256" => sha256sum(build_metadata_path),
             "boundary_source_sha256" => boundary_sources,
             "fresh_historical_source_sha256" => historical_sources,
         ),
@@ -333,8 +341,8 @@ function write_reference(collection, scope_manifest_path, fortran_root, path)
 end
 
 function main(args = ARGS)
-    length(args) == 4 || error(
-        "usage: generate_selected_mimics_c_reference.jl FIXTURE_MANIFEST SCOPE_MANIFEST FORTRAN_ROOT OUTPUT_PATH",
+    length(args) in (4, 5) || error(
+        "usage: generate_selected_mimics_c_reference.jl FIXTURE_MANIFEST SCOPE_MANIFEST FORTRAN_ROOT OUTPUT_PATH [BUILD_METADATA]",
     )
     fixture_manifest, scope_manifest, fortran_root, output_path = args
     scope = TOML.parsefile(scope_manifest)
@@ -348,6 +356,12 @@ function main(args = ARGS)
         scope_manifest,
         fortran_root,
         output_path,
+        ;
+        build_metadata_path = length(args) == 5 ? args[5] : joinpath(
+            fortran_root,
+            "build",
+            "build_metadata.toml",
+        ),
     )
 end
 

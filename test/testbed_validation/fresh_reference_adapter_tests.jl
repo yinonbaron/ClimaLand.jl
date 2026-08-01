@@ -49,14 +49,26 @@ end
         "CASA-C",
     ])
     @test_throws FreshReferenceAdapter.AdapterError commands.preflight([
+        "MIMICS-C",
+    ])
+    @test_throws FreshReferenceAdapter.AdapterError commands.preflight([
         "MIMICS-CN",
     ])
     configured = FreshReferenceAdapter.commands(
         "../biogeochem_testbed";
+        mimics_c_forcing_root = "/tmp/forcing",
         mimics_cn_forcing_root = "/tmp/forcing",
         mimics_cn_reference_template = "/tmp/reference-template",
     )
     @test isnothing(configured.preflight(["MIMICS-CN"]))
+    @test isnothing(configured.preflight(["MIMICS-C"]))
+    mimics_c = configured.worker(
+        "MIMICS-C",
+        "/tmp/fresh-mimics-c",
+        "/tmp/fresh-build",
+    )
+    @test "worker" in mimics_c.exec
+    @test "/tmp/forcing" in mimics_c.exec
     mimics_cn = configured.worker(
         "MIMICS-CN",
         "/tmp/fresh-mimics-cn",
@@ -69,13 +81,13 @@ end
 
 @testset "Fresh model capabilities expose exact remaining gaps" begin
     @test Set(keys(FreshReferenceAdapter.MISSING_MODEL_COMMANDS)) ==
-          Set(("CASA-C", "CASA-CN", "MIMICS-C", "CORPSE"))
+          Set(("CASA-C", "CASA-CN", "CORPSE"))
     @test Set(keys(FreshReferenceAdapter.MODEL_CAPABILITIES)) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
     for model in FreshReferenceAdapter.ModelProcesses.MODELS
         capability = FreshReferenceAdapter.model_capability(model)
         @test isfile(capability.runner)
-        if model == "MIMICS-CN"
+        if model in ("MIMICS-C", "MIMICS-CN")
             @test capability.representative_ready
             @test isempty(capability.blocker)
             @test FreshReferenceAdapter.require_model_command(model) ==
@@ -99,10 +111,104 @@ end
     @test mimics_cn.shared_build
     @test mimics_cn.completed_phases ==
           ("fortran", "julia", "comparison", "eligibility_gap_proposal")
+    mimics_c = FreshReferenceAdapter.model_capability("MIMICS-C")
+    @test mimics_c.deepest_scope == "representative"
+    @test mimics_c.shared_build
+    @test mimics_c.completed_phases == mimics_cn.completed_phases
     status = FreshReferenceAdapter.status_document()
     @test status["representative_workers_ready"] === false
     @test Set(keys(status["model"])) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
+end
+
+@testset "Fresh MIMICS-C worker comparison and nonfinite contracts" begin
+    mktempdir() do directory
+        oracle = joinpath(directory, "oracle.toml")
+        write(oracle, "model = \"MIMICS-C\"\n")
+        scientific = joinpath(directory, "scientific.toml")
+        open(scientific, "w") do io
+            TOML.print(
+                io,
+                Dict(
+                    "schema_version" => 1,
+                    "coverage" => Dict(
+                        "scope_cells" => 80,
+                        "compared_cells" => 80,
+                    ),
+                    "boundary_comparison" => Dict(
+                        stage => Dict("all_match" => true) for
+                        stage in ("prespin", "spin", "historical")
+                    ),
+                    "historical_comparison" => Dict("all_match" => true),
+                    "carbon_budget" => Dict("all_close" => true),
+                );
+                sorted = true,
+            )
+        end
+        comparison = FreshReferenceAdapter.write_mimics_c_comparison(
+            directory,
+            scientific,
+            oracle,
+        )
+        @test comparison.passed
+        report = TOML.parsefile(comparison.path)
+        @test report["model"] == "MIMICS-C"
+        @test report["outcome"] == "passed"
+
+        boundaries = Dict(
+            "prespin" => Dict("casa_plant.c_leaf" => [1.0, 2.0]),
+            "spin" => Dict("casa_plant.c_leaf" => [Inf, 2.0]),
+            "historical" =>
+                Dict("mimics_soil.c_microbe_r" => [Inf, -Inf]),
+        )
+        boundary = FreshReferenceAdapter.first_mimics_c_boundary_nonfinites(
+            boundaries,
+            [51, 3442],
+        )
+        @test getindex.(boundary, "first_nonfinite_stage") ==
+              ["spin", "historical"]
+
+        read_year = year -> begin
+            values = zeros(2, 365)
+            year == 1901 && (values[2, 60] = Inf)
+            Dict("diagnostic.cnpp" => values)
+        end
+        historical =
+            FreshReferenceAdapter.first_mimics_c_historical_nonfinites(
+                1901:1901,
+                [51, 3442],
+                read_year,
+            )
+        @test only(historical)["first_nonfinite_date"] == "1901-03-01"
+        earliest = FreshReferenceAdapter.earliest_mimics_c_nonfinites(
+            boundary,
+            historical,
+        )
+        @test earliest[2]["first_nonfinite_date"] == "1901-03-01"
+
+        observer =
+            FreshReferenceAdapter.mimics_c_julia_nonfinite_observer([51, 3442])
+        runner = (; nonfinite_observer) -> nonfinite_observer(
+            (; name = :historical),
+            365 + 60,
+            (; mimics_soil = (; c_microbe_r = [1.0, Inf])),
+            nothing,
+            (),
+        )
+        result = FreshReferenceAdapter.run_mimics_c_julia(
+            directory,
+            runner;
+            nonfinite_observer = observer,
+        )
+        @test isnothing(result.julia)
+        @test only(result.nonfinite)["evidence_side"] == "julia"
+        @test only(result.nonfinite)["first_nonfinite_date"] == "1902-03-01"
+        proposal_input = TOML.parsefile(
+            joinpath(directory, "nonfinite_results.toml"),
+        )
+        @test proposal_input["model"] == "MIMICS-C"
+        @test only(proposal_input["nonfinite"])["cell_id"] == 3442
+    end
 end
 
 @testset "Fresh MIMICS-CN bridge writes the standard comparison contract" begin

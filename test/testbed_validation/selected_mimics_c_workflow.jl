@@ -791,6 +791,7 @@ function run_selected_case(
         "$(collection.name).toml",
     ),
     eligibility_gaps = nothing,
+    nonfinite_observer = nothing,
 )
     reference = if compare_references
         isnothing(reference_path) &&
@@ -829,6 +830,7 @@ function run_selected_case(
         setup.built.mimics["fmet_p(3)"],
     )
     set_initial_cache! = ClimaLand.make_set_initial_cache(setup.built.model)
+    diagnostics = native_mimics.mimics_diagnostics()
     function update_drivers!(stage, index, time)
         update_forcing!(setup.forcing, stage, index, time)
         native_mimics.casa().apply_stoichiometry!(
@@ -848,13 +850,16 @@ function run_selected_case(
             time,
         )
     end
-    function after_step!(stage, _, Y, p, _)
+    function after_step!(stage, step, Y, p, _)
         native_mimics.accumulate_annual_npp!(
             setup.forcing.annual_npp_tracker,
             p,
         )
         native_mimics.accumulate_budget!(budget, stage, p)
         native_mimics.casa().update_stoichiometry!(stoichiometry, Y)
+        if !isnothing(nonfinite_observer)
+            nonfinite_observer(stage, step, Y, p, diagnostics)
+        end
     end
     carbon_budget(stage, initial_state, final_state) =
         native_mimics.carbon_budget_report(
@@ -903,7 +908,7 @@ function run_selected_case(
         update_forcing! = update_drivers!,
         before_step!,
         after_step!,
-        diagnostics = native_mimics.mimics_diagnostics(),
+        diagnostics,
         output_eltype = Float32,
         deflatelevel = 1,
         provenance = stage -> stage_provenance(setup, stage),

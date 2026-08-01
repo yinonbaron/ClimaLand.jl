@@ -756,11 +756,14 @@ end
         TestbedNativeWorkflow.NativeStage(:historical, 2, 1),
     )
     mktempdir() do output_root
+        observed = Tuple{Symbol, Int}[]
         result = SelectedMIMICSC.run_selected_case(
             output_root;
             collection,
             stages,
             compare_references = false,
+            nonfinite_observer = (stage, step, _, _, _) ->
+                push!(observed, (stage.name, step)),
         )
         report = TOML.parsefile(result.report)
         @test report["coverage"]["scope_cell_ids"] ==
@@ -773,5 +776,13 @@ end
         @test isfinite(
             report["carbon_budget"]["maximum_absolute_residual_kg_c"],
         )
+        @test observed == [
+            (:prespin, 1),
+            (:prespin, 2),
+            (:spin, 1),
+            (:spin, 2),
+            (:historical, 1),
+            (:historical, 2),
+        ]
     end
 end

@@ -5,6 +5,20 @@ carbon-only CLM5/GSWP3 chain and compares both its CASA plant and MIMICS soil
 histories with the published MIMICS-C archive. Large drivers, references, and
 run outputs remain outside this repository.
 
+The separate ephemeral fresh-reference adapter exposes MIMICS-C as a complete
+Representative worker. It uses the shared verified Fortran executable for a
+three-stage 80-cell carbon-only workflow, creates a reduced oracle inside the
+isolated run directory, and runs the selected-cell Julia workflow once with
+the frozen boundary and historical policies. Its normalized result is
+`comparison.toml`; ordinary scientific mismatches fail and preserve the run.
+
+Every fresh Fortran stage boundary and selected historical daily value is
+checked for nonfinite output. Julia checks every prognostic and diagnostic
+value after every native step. The first exact side, cell, stage, no-leap date,
+and variable are written to `nonfinite_results.toml` for orchestration to turn
+into an unreviewed Eligibility Gap proposal. The worker never edits the Scope
+Manifest or pinned artifact bindings.
+
 The bounded matrix in `mimics_c_reconstruction.toml` contains the last public
 source revision before archive creation and the committed pre-Q10 KO4 table
 named by the archive metadata. The current source and JAMES KO4 table are
