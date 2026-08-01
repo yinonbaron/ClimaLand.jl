@@ -52,22 +52,32 @@ const MIMICS_CN_STAGE_END_DATES = Dict(
 
 const MODEL_CAPABILITIES = Dict(
     "CASA-C" => (
-        runner = joinpath(@__DIR__, "casa_c_reconstruction.jl"),
-        entrypoint = "run-case",
-        deepest_scope = "global-archive-reconstruction",
-        shared_build = false,
-        completed_phases = ("fortran",),
-        representative_ready = false,
-        blocker = "the reconstruction runner builds internally and does not emit an 80-cell fresh oracle, Julia comparison, or Eligibility Gap proposal",
+        runner = joinpath(@__DIR__, "casa_fresh_worker.jl"),
+        entrypoint = "run_worker",
+        deepest_scope = "representative",
+        shared_build = true,
+        completed_phases = (
+            "fortran",
+            "julia",
+            "comparison",
+            "eligibility_gap_proposal",
+        ),
+        representative_ready = true,
+        blocker = "",
     ),
     "CASA-CN" => (
-        runner = joinpath(@__DIR__, "casa_cn_reconstruction.jl"),
-        entrypoint = "run-case",
-        deepest_scope = "global-archive-reconstruction",
-        shared_build = false,
-        completed_phases = ("fortran",),
-        representative_ready = false,
-        blocker = "the reconstruction runner builds internally and does not emit an 80-cell fresh oracle, Julia comparison, or Eligibility Gap proposal",
+        runner = joinpath(@__DIR__, "casa_fresh_worker.jl"),
+        entrypoint = "run_worker",
+        deepest_scope = "representative",
+        shared_build = true,
+        completed_phases = (
+            "fortran",
+            "julia",
+            "comparison",
+            "eligibility_gap_proposal",
+        ),
+        representative_ready = true,
+        blocker = "",
     ),
     "MIMICS-C" => (
         runner = joinpath(@__DIR__, "selected_mimics_c_validation.jl"),
@@ -201,6 +211,9 @@ end
 
 function commands(
     source_root;
+    casa_forcing_root = nothing,
+    casa_c_reference_template = nothing,
+    casa_cn_reference_template = nothing,
     mimics_c_forcing_root = nothing,
     mimics_cn_forcing_root = nothing,
     mimics_cn_reference_template = nothing,
@@ -218,7 +231,15 @@ function commands(
             build_directory,
             source_root,
         ]
-        if model == "MIMICS-C"
+        if model in ("CASA-C", "CASA-CN")
+            reference_template =
+                model == "CASA-C" ? casa_c_reference_template :
+                casa_cn_reference_template
+            isnothing(casa_forcing_root) ||
+                push!(arguments, abspath(casa_forcing_root))
+            isnothing(reference_template) ||
+                push!(arguments, abspath(reference_template))
+        elseif model == "MIMICS-C"
             isnothing(mimics_c_forcing_root) ||
                 push!(arguments, abspath(mimics_c_forcing_root))
         elseif model == "MIMICS-CN"
@@ -232,6 +253,18 @@ function commands(
     preflight = models -> begin
         selected = ModelProcesses.select_models(models)
         foreach(require_model_command, selected)
+        for (model, reference_template) in (
+            "CASA-C" => casa_c_reference_template,
+            "CASA-CN" => casa_cn_reference_template,
+        )
+            model in selected || continue
+            !isnothing(casa_forcing_root) &&
+                !isnothing(reference_template) || throw(
+                AdapterError(
+                    "$model Representative fresh worker requires forcing and reference-template paths",
+                ),
+            )
+        end
         if "MIMICS-C" in selected
             !isnothing(mimics_c_forcing_root) || throw(
                 AdapterError(
@@ -259,6 +292,36 @@ function model_capability(model)
     model in ModelProcesses.MODELS ||
         throw(AdapterError("unknown fresh-reference model: $model"))
     return MODEL_CAPABILITIES[model]
+end
+
+function casa_modules()
+    parent = parentmodule(@__MODULE__)
+    isdefined(parent, :TestbedCASAFreshWorker) || Base.include(
+        parent,
+        joinpath(@__DIR__, "casa_fresh_worker.jl"),
+    )
+    return Base.invokelatest(getproperty, parent, :TestbedCASAFreshWorker)
+end
+
+function run_casa_80(
+    model,
+    source_root,
+    forcing_root,
+    reference_template,
+    run_directory,
+    build_directory,
+)
+    worker = casa_modules()
+    run_worker = Base.invokelatest(getproperty, worker, :run_worker)
+    return Base.invokelatest(
+        run_worker,
+        model,
+        source_root,
+        forcing_root,
+        reference_template,
+        run_directory,
+        build_directory,
+    )
 end
 
 function require_model_command(model)
@@ -1501,7 +1564,25 @@ function main(args = ARGS)
         )
         model = args[2]
         require_model_command(model)
-        if model == "MIMICS-C"
+        if model in ("CASA-C", "CASA-CN")
+            length(args) == 7 || throw(
+                AdapterError(
+                    "$model Representative fresh worker requires forcing and reference-template paths",
+                ),
+            )
+            result = run_casa_80(
+                model,
+                args[5],
+                args[6],
+                args[7],
+                args[3],
+                args[4],
+            )
+            worker = casa_modules()
+            worker_exit_code =
+                Base.invokelatest(getproperty, worker, :worker_exit_code)
+            return Base.invokelatest(worker_exit_code, result)
+        elseif model == "MIMICS-C"
             length(args) == 6 || throw(
                 AdapterError(
                     "MIMICS-C Representative fresh worker requires a forcing path",

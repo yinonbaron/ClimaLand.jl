@@ -30,3 +30,9 @@ both return status 1. Nonfinite evidence is written to
 `nonfinite_results.toml` with the exact cell, side, stage, date, and variable;
 an unrelated infrastructure exception is not converted into scientific
 evidence.
+
+The fresh-reference adapter requires a shared Representative forcing directory
+and a separate immutable reference template for each selected CASA model. Its
+preflight rejects missing paths before starting the shared build, then launches
+each CASA model in its own process with the common forcing and the matching
+model-specific template.

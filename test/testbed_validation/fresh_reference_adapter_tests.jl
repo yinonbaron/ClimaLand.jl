@@ -56,12 +56,30 @@ end
     ])
     configured = FreshReferenceAdapter.commands(
         "../biogeochem_testbed";
+        casa_forcing_root = "/tmp/casa-forcing",
+        casa_c_reference_template = "/tmp/casa-c-reference-template",
+        casa_cn_reference_template = "/tmp/casa-cn-reference-template",
         mimics_c_forcing_root = "/tmp/forcing",
         mimics_cn_forcing_root = "/tmp/forcing",
         mimics_cn_reference_template = "/tmp/reference-template",
     )
+    @test isnothing(configured.preflight(["CASA-C"]))
+    @test isnothing(configured.preflight(["CASA-CN"]))
     @test isnothing(configured.preflight(["MIMICS-CN"]))
     @test isnothing(configured.preflight(["MIMICS-C"]))
+    casa_c =
+        configured.worker("CASA-C", "/tmp/fresh-casa-c", "/tmp/fresh-build")
+    @test "/tmp/casa-forcing" in casa_c.exec
+    @test "/tmp/casa-c-reference-template" in casa_c.exec
+    @test !("/tmp/casa-cn-reference-template" in casa_c.exec)
+    casa_cn = configured.worker(
+        "CASA-CN",
+        "/tmp/fresh-casa-cn",
+        "/tmp/fresh-build",
+    )
+    @test "/tmp/casa-forcing" in casa_cn.exec
+    @test "/tmp/casa-cn-reference-template" in casa_cn.exec
+    @test !("/tmp/casa-c-reference-template" in casa_cn.exec)
     mimics_c = configured.worker(
         "MIMICS-C",
         "/tmp/fresh-mimics-c",
@@ -81,13 +99,13 @@ end
 
 @testset "Fresh model capabilities expose exact remaining gaps" begin
     @test Set(keys(FreshReferenceAdapter.MISSING_MODEL_COMMANDS)) ==
-          Set(("CASA-C", "CASA-CN", "CORPSE"))
+          Set(("CORPSE",))
     @test Set(keys(FreshReferenceAdapter.MODEL_CAPABILITIES)) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
     for model in FreshReferenceAdapter.ModelProcesses.MODELS
         capability = FreshReferenceAdapter.model_capability(model)
         @test isfile(capability.runner)
-        if model in ("MIMICS-C", "MIMICS-CN")
+        if model != "CORPSE"
             @test capability.representative_ready
             @test isempty(capability.blocker)
             @test FreshReferenceAdapter.require_model_command(model) ==
@@ -115,6 +133,12 @@ end
     @test mimics_c.deepest_scope == "representative"
     @test mimics_c.shared_build
     @test mimics_c.completed_phases == mimics_cn.completed_phases
+    for model in ("CASA-C", "CASA-CN")
+        casa = FreshReferenceAdapter.model_capability(model)
+        @test casa.deepest_scope == "representative"
+        @test casa.shared_build
+        @test casa.completed_phases == mimics_cn.completed_phases
+    end
     status = FreshReferenceAdapter.status_document()
     @test status["representative_workers_ready"] === false
     @test Set(keys(status["model"])) ==
@@ -464,9 +488,11 @@ end
     end
 end
 
-@testset "CASA-C tracer is explicitly not a Representative worker" begin
+@testset "CASA-C tracer remains separate from the Representative worker" begin
     @test FreshReferenceAdapter.CASA_C_TRACER_MODEL == "CASA-C"
     @test FreshReferenceAdapter.CASA_C_TRACER_SCOPE == "one-cell-boundary"
+    @test nameof(FreshReferenceAdapter.casa_modules()) ==
+          :TestbedCASAFreshWorker
     @test_throws FreshReferenceAdapter.AdapterError FreshReferenceAdapter.main([
         "worker",
         "CASA-C",
