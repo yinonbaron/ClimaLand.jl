@@ -39,9 +39,12 @@ function create_boundary_payload(reference_root, archive_path, manifest_path)
     all(relative -> isfile(joinpath(reference_root, relative)), members) ||
         error("CORPSE boundary source is incomplete")
     mkpath(dirname(archive_path))
-    allowed(path) =
-        path in members ||
-        any(startswith(member, "$path/") for member in members)
+    allowed(path) = begin
+        relative = relpath(path, reference_root)
+        relative == "." ||
+        relative in members ||
+        any(startswith(member, "$relative/") for member in members)
+    end
     Tar.create(allowed, reference_root, archive_path; portable = true)
     document = Dict(
         "schema_version" => 1,
