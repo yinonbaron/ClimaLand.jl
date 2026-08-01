@@ -30,6 +30,7 @@ include("selected_corpse_workflow_tests.jl")
 include("selected_corpse_workflow_regression_tests.jl")
 include("model_process_orchestration_tests.jl")
 include("fresh_reference_orchestration_tests.jl")
+include("reference_publication_tests.jl")
 include("validation_runner_tests.jl")
 include("scientific_validation_workflow_tests.jl")
 
