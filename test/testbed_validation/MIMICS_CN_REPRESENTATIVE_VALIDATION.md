@@ -61,3 +61,21 @@ not for publication. Publication requires regenerating the same payload with
 the canonical `x86_64-linux-gnu` Fortran toolchain, then staging it through
 `reference_publication.jl`; ordinary local runs cannot claim canonical
 provenance or update `Artifacts.toml`.
+
+After a successful local proof run, verify and record the exact output with:
+
+```sh
+julia --startup-file=no --project=.buildkite \
+  test/testbed_validation/mimics_cn_proof_run.jl \
+  VALIDATION_OUTPUT REDUCED_ORACLE \
+  VALIDATION_OUTPUT/mimics_cn_local_candidate.toml
+```
+
+This fails unless the four stage, historical, carbon-budget, and
+nitrogen-budget checks passed; coverage and reviewed Eligibility Gaps exactly
+match the 80-cell Scope Manifest; and the oracle/comparison hashes agree with
+both worker receipts. The resulting manifest records the exact oracle,
+comparison, receipt, and Scope Manifest SHA-256 values. It is explicitly
+`canonical = false`, `publishable = false`, and is not a
+`publication_candidate.toml`; promotion still requires a separate canonical
+Linux/GNU Fortran run through `reference_publication.jl`.
