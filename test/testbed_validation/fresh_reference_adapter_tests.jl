@@ -44,12 +44,31 @@ end
     @test abspath("../biogeochem_testbed") in build.exec
     @test "worker" in worker.exec
     @test "CASA-C" in worker.exec
+    @test abspath("../biogeochem_testbed") in worker.exec
+    @test_throws FreshReferenceAdapter.AdapterError commands.preflight([
+        "CASA-C",
+    ])
+    mimics_cn = commands.mimics_cn(
+        "/tmp/forcing",
+        "/tmp/reference-template",
+        "/tmp/fresh-mimics-cn",
+        "/tmp/fresh-build",
+    )
+    @test "run-mimics-cn-80" in mimics_cn.exec
+    @test "/tmp/forcing" in mimics_cn.exec
+    @test "/tmp/reference-template" in mimics_cn.exec
 end
 
-@testset "Incomplete model mappings fail closed" begin
+@testset "Fresh model capabilities expose exact remaining gaps" begin
     @test Set(keys(FreshReferenceAdapter.MISSING_MODEL_COMMANDS)) ==
           Set(FreshReferenceAdapter.ModelProcesses.MODELS)
+    @test Set(keys(FreshReferenceAdapter.MODEL_CAPABILITIES)) ==
+          Set(FreshReferenceAdapter.ModelProcesses.MODELS)
     for model in FreshReferenceAdapter.ModelProcesses.MODELS
+        capability = FreshReferenceAdapter.model_capability(model)
+        @test isfile(capability.runner)
+        @test !capability.representative_ready
+        @test !isempty(capability.blocker)
         error = try
             FreshReferenceAdapter.require_model_command(model)
             nothing
@@ -60,6 +79,15 @@ end
         @test occursin(model, error.message)
         @test occursin("Representative", error.message)
     end
+    mimics_cn = FreshReferenceAdapter.model_capability("MIMICS-CN")
+    @test mimics_cn.deepest_scope == "representative"
+    @test mimics_cn.shared_build
+    @test mimics_cn.completed_phases == ("fortran", "julia")
+    @test occursin("comparison", lowercase(mimics_cn.blocker))
+    status = FreshReferenceAdapter.status_document()
+    @test status["representative_workers_ready"] === false
+    @test Set(keys(status["model"])) ==
+          Set(FreshReferenceAdapter.ModelProcesses.MODELS)
 end
 
 @testset "Fresh-reference tracer requires an empty directory" begin
@@ -79,6 +107,21 @@ end
     end
 end
 
+@testset "Fresh MIMICS-CN workflow records the shared build source" begin
+    mktempdir() do directory
+        path = joinpath(directory, "workflow.toml")
+        open(path, "w") do io
+            TOML.print(
+                io,
+                Dict("schema_version" => 1, "source_commit" => "archive"),
+            )
+        end
+        FreshReferenceAdapter.pin_workflow_source!(path)
+        @test TOML.parsefile(path)["source_commit"] ==
+              FreshReferenceAdapter.PINNED_SOURCE_COMMIT
+    end
+end
+
 @testset "CASA-C tracer is explicitly not a Representative worker" begin
     @test FreshReferenceAdapter.CASA_C_TRACER_MODEL == "CASA-C"
     @test FreshReferenceAdapter.CASA_C_TRACER_SCOPE == "one-cell-boundary"
@@ -87,5 +130,6 @@ end
         "CASA-C",
         "/tmp/run",
         "/tmp/build",
+        abspath("../biogeochem_testbed"),
     ],)
 end

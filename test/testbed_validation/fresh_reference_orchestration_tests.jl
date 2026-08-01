@@ -18,6 +18,29 @@ function fake_fresh_commands(
     return (; build, worker)
 end
 
+@testset "Fresh reference preflights commands before building" begin
+    mktempdir() do directory
+        audit = joinpath(directory, "audit")
+        temporary = joinpath(directory, "temporary")
+        mkpath(audit)
+        mkpath(temporary)
+        commands = fake_fresh_commands(audit)
+
+        @test_throws ErrorException FreshReferences.run_fresh_reference(
+            "fresh",
+            commands.build,
+            commands.worker;
+            models = "MIMICS-CN",
+            temporary_parent = temporary,
+            preflight = _ -> error("Representative worker unavailable"),
+            worker_stdout = devnull,
+            worker_stderr = devnull,
+        )
+        @test isempty(readdir(audit))
+        @test isempty(readdir(temporary))
+    end
+end
+
 @testset "Fresh reference rejects an unverified shared build" begin
     mktempdir() do directory
         audit = joinpath(directory, "audit")

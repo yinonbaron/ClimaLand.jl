@@ -100,12 +100,14 @@ function run_fresh_reference(
     models = collect(ModelProcesses.MODELS),
     workers = ModelProcesses.default_worker_count(),
     temporary_parent = nothing,
+    preflight = _ -> nothing,
     worker_stdout = stdout,
     worker_stderr = stderr,
 )
     reference_mode == "fresh" ||
         throw(ArgumentError("fresh-reference orchestration requires explicit fresh mode"))
     selected = ModelProcesses.select_models(models)
+    preflight(selected)
     run_root = isnothing(temporary_parent) ?
                mktempdir(; prefix = "fresh-reference-", cleanup = false) :
                mktempdir(

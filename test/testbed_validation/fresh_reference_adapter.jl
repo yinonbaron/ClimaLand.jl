@@ -20,12 +20,56 @@ const CASA_C_TRACER_SCOPE = "one-cell-boundary"
 const CASA_C_TRACER_CONTRACT = "fortran-archive-integrity-tracer"
 const CASA_C_TRACER_FIXTURE = joinpath(@__DIR__, "fixtures", "casa_c_cell_51")
 
+const MODEL_CAPABILITIES = Dict(
+    "CASA-C" => (
+        runner = joinpath(@__DIR__, "casa_c_reconstruction.jl"),
+        entrypoint = "run-case",
+        deepest_scope = "global-archive-reconstruction",
+        shared_build = false,
+        completed_phases = ("fortran",),
+        representative_ready = false,
+        blocker = "the reconstruction runner builds internally and does not emit an 80-cell fresh oracle, Julia comparison, or Eligibility Gap proposal",
+    ),
+    "CASA-CN" => (
+        runner = joinpath(@__DIR__, "casa_cn_reconstruction.jl"),
+        entrypoint = "run-case",
+        deepest_scope = "global-archive-reconstruction",
+        shared_build = false,
+        completed_phases = ("fortran",),
+        representative_ready = false,
+        blocker = "the reconstruction runner builds internally and does not emit an 80-cell fresh oracle, Julia comparison, or Eligibility Gap proposal",
+    ),
+    "MIMICS-C" => (
+        runner = joinpath(@__DIR__, "mimics_c_reconstruction.jl"),
+        entrypoint = "run-case",
+        deepest_scope = "global-archive-reconstruction",
+        shared_build = false,
+        completed_phases = ("fortran",),
+        representative_ready = false,
+        blocker = "the reconstruction runner builds internally and has no 80-cell shared-build worker or standard comparison/proposal output",
+    ),
+    "MIMICS-CN" => (
+        runner = joinpath(@__DIR__, "selected_mimics_cn_validation.jl"),
+        entrypoint = "SelectedMIMICSCNValidation.write_workflow",
+        deepest_scope = "representative",
+        shared_build = true,
+        completed_phases = ("fortran", "julia"),
+        representative_ready = false,
+        blocker = "the 80-cell module seam lacks the standard comparison report and nonfinite Eligibility Gap proposal bridge",
+    ),
+    "CORPSE" => (
+        runner = joinpath(@__DIR__, "corpse_c_reconstruction.jl"),
+        entrypoint = "run",
+        deepest_scope = "global-reconstruction",
+        shared_build = false,
+        completed_phases = ("fortran",),
+        representative_ready = false,
+        blocker = "the reconstruction runner builds internally; the selected generator is fixed to the legacy 37-cell fixture and publication-shaped output",
+    ),
+)
 const MISSING_MODEL_COMMANDS = Dict(
-    "CASA-C" => "no command generates the 80-cell Representative Fortran workflow and compares its Julia trajectory without publishing",
-    "CASA-CN" => "no command generates the 80-cell Representative Fortran workflow and compares its Julia trajectory without publishing",
-    "MIMICS-C" => "no command generates the 80-cell Representative Fortran CASA/MIMICS workflow and invokes the selected Julia comparison",
-    "MIMICS-CN" => "selected_mimics_cn_validation.jl is tied to the 37-cell issue-43 template, not the 80-cell Representative report contract",
-    "CORPSE" => "generate_complete_selected_corpse_reference.jl is tied to the selected CORPSE fixture and a publication destination, not the 80-cell Representative report contract",
+    model => capability.blocker for
+    (model, capability) in MODEL_CAPABILITIES
 )
 
 struct AdapterError <: Exception
@@ -104,17 +148,57 @@ function commands(source_root)
             `$(Base.julia_cmd()) --startup-file=no $SCRIPT_PATH build $source_root $build_directory`
     worker =
         (model, run_directory, build_directory) ->
-            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH worker $model $run_directory $build_directory`
-    return (; build, worker)
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH worker $model $run_directory $build_directory $source_root`
+    preflight = models -> begin
+        foreach(require_model_command, ModelProcesses.select_models(models))
+        nothing
+    end
+    mimics_cn =
+        (forcing_root, reference_template, run_directory, build_directory) ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH run-mimics-cn-80 $source_root $forcing_root $reference_template $run_directory $build_directory`
+    return (; build, worker, preflight, mimics_cn)
+end
+
+function model_capability(model)
+    model in ModelProcesses.MODELS ||
+        throw(AdapterError("unknown fresh-reference model: $model"))
+    return MODEL_CAPABILITIES[model]
 end
 
 function require_model_command(model)
-    model in ModelProcesses.MODELS ||
-        throw(AdapterError("unknown fresh-reference model: $model"))
+    capability = model_capability(model)
+    capability.representative_ready && return capability
     throw(
         AdapterError(
             "$model Representative fresh worker is unavailable: " *
-            MISSING_MODEL_COMMANDS[model],
+            capability.blocker,
+        ),
+    )
+end
+
+function status_document()
+    models = Dict(
+        model => Dict(
+            "runner" => capability.runner,
+            "entrypoint" => capability.entrypoint,
+            "deepest_scope" => capability.deepest_scope,
+            "shared_build" => capability.shared_build,
+            "completed_phases" => collect(capability.completed_phases),
+            "representative_ready" => capability.representative_ready,
+            "blocker" => capability.blocker,
+        ) for (model, capability) in MODEL_CAPABILITIES
+    )
+    return Dict(
+        "schema_version" => 1,
+        "representative_workers_ready" => all(
+            capability.representative_ready for
+            capability in values(MODEL_CAPABILITIES)
+        ),
+        "model" => models,
+        "available_tracer" => Dict(
+            "model" => CASA_C_TRACER_MODEL,
+            "scope" => CASA_C_TRACER_SCOPE,
+            "contract" => CASA_C_TRACER_CONTRACT,
         ),
     )
 end
@@ -150,6 +234,101 @@ function require_empty_directory(path)
         mkpath(path)
     end
     return path
+end
+
+function pin_workflow_source!(path)
+    workflow = TOML.parsefile(path)
+    get(workflow, "schema_version", nothing) == 1 ||
+        throw(AdapterError("MIMICS-CN workflow schema is incompatible"))
+    workflow["source_commit"] = PINNED_SOURCE_COMMIT
+    Harness.write_toml_atomic(path, workflow)
+    return path
+end
+
+function run_mimics_cn_80(
+    source_root,
+    forcing_root,
+    reference_template,
+    run_directory,
+    build_directory,
+)
+    source_root = abspath(source_root)
+    forcing_root = abspath(forcing_root)
+    reference_template = abspath(reference_template)
+    run_directory = abspath(run_directory)
+    executable = verified_executable(build_directory)
+    Harness.source_commit(source_root) == PINNED_SOURCE_COMMIT || throw(
+        AdapterError("MIMICS-CN source is not pinned"),
+    )
+    isempty(Harness.source_code_status(source_root)) || throw(
+        AdapterError("MIMICS-CN SOURCE_CODE has local modifications"),
+    )
+    fixture_manifest = joinpath(forcing_root, "fixture.toml")
+    scope_manifest = joinpath(
+        @__DIR__,
+        "validation",
+        "scopes",
+        "representative.toml",
+    )
+    fixture = TOML.parsefile(fixture_manifest)
+    scope = TOML.parsefile(scope_manifest)
+    fixture_ids = Int.(fixture["selection"]["representative_cell_ids"])
+    fixture_ids == Int.(scope["cell_ids"]) && length(fixture_ids) == 80 ||
+        throw(AdapterError("MIMICS-CN forcing is not the Representative scope"))
+    isfile(joinpath(reference_template, "configuration", "workflow.toml")) ||
+        throw(AdapterError("MIMICS-CN reference template is incomplete"))
+    require_empty_directory(run_directory)
+
+    parent = parentmodule(@__MODULE__)
+    isdefined(parent, :SelectedMIMICSCNValidation) || Base.include(
+        parent,
+        joinpath(@__DIR__, "selected_mimics_cn_validation.jl"),
+    )
+    selected = getfield(parent, :SelectedMIMICSCNValidation)
+    prepared = selected.write_workflow(
+        source_root,
+        reference_template,
+        run_directory;
+        fixture_root = forcing_root,
+        points = 80,
+    )
+    pin_workflow_source!(prepared.workflow_path)
+    stages = selected.run_fortran(
+        executable,
+        prepared.workflow_path,
+        run_directory,
+    )
+    julia_root = joinpath(run_directory, "julia")
+    julia = selected.run_julia(
+        source_root,
+        reference_template,
+        run_directory,
+        julia_root;
+        fixture_root = forcing_root,
+        points = 80,
+    )
+    Harness.write_toml_atomic(
+        joinpath(run_directory, "fortran_output.toml"),
+        Dict(
+            "schema_version" => 1,
+            "model" => "MIMICS-CN",
+            "scope" => "representative",
+            "shared_executable_sha256" => sha256sum(executable),
+            "workflow" => prepared.workflow_path,
+            "stages" => length(stages),
+        ),
+    )
+    Harness.write_toml_atomic(
+        joinpath(run_directory, "julia_output.toml"),
+        Dict(
+            "schema_version" => 1,
+            "model" => "MIMICS-CN",
+            "scope" => "representative",
+            "report" => abspath(julia.report),
+            "report_sha256" => sha256sum(julia.report),
+        ),
+    )
+    return (; stages, julia)
 end
 
 function verify_fixture(fixture_directory, manifest)
@@ -292,7 +471,11 @@ end
 
 function main(args = ARGS)
     isempty(args) &&
-        throw(AdapterError("expected build, worker, status, or trace-casa-c"))
+        throw(
+            AdapterError(
+                "expected build, worker, status, trace-casa-c, or run-mimics-cn-80",
+            ),
+        )
     mode = first(args)
     if mode == "build"
         length(args) == 3 || throw(
@@ -303,9 +486,9 @@ function main(args = ARGS)
         build_shared_fortran(args[2], args[3])
         return 0
     elseif mode == "worker"
-        length(args) == 4 || throw(
+        length(args) == 5 || throw(
             AdapterError(
-                "usage: fresh_reference_adapter.jl worker MODEL RUN_DIRECTORY BUILD_DIRECTORY",
+                "usage: fresh_reference_adapter.jl worker MODEL RUN_DIRECTORY BUILD_DIRECTORY SOURCE_ROOT",
             ),
         )
         verified_executable(args[4])
@@ -324,21 +507,16 @@ function main(args = ARGS)
             fixture_directory = fixture,
         )
         return 0
-    elseif mode == "status"
-        TOML.print(
-            stdout,
-            Dict(
-                "schema_version" => 1,
-                "representative_workers_ready" => false,
-                "missing_model_command" => MISSING_MODEL_COMMANDS,
-                "available_tracer" => Dict(
-                    "model" => CASA_C_TRACER_MODEL,
-                    "scope" => CASA_C_TRACER_SCOPE,
-                    "contract" => CASA_C_TRACER_CONTRACT,
-                ),
-            );
-            sorted = true,
+    elseif mode == "run-mimics-cn-80"
+        length(args) == 6 || throw(
+            AdapterError(
+                "usage: fresh_reference_adapter.jl run-mimics-cn-80 SOURCE_ROOT FORCING_ROOT REFERENCE_TEMPLATE RUN_DIRECTORY BUILD_DIRECTORY",
+            ),
         )
+        run_mimics_cn_80(args[2:end]...)
+        return 0
+    elseif mode == "status"
+        TOML.print(stdout, status_document(); sorted = true)
         println()
         return 0
     end
