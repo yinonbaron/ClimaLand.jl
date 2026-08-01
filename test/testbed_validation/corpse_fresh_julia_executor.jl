@@ -30,7 +30,31 @@ end
 
 const FINITE_OBSERVATION = Dict{String, Vector{Float64}}()
 
+function finite_trajectory(state, parameters)
+    for component in propertynames(state)
+        component_state = getproperty(state, component)
+        for variable in propertynames(component_state)
+            data = getproperty(component_state, variable)
+            values = try
+                parent(data)
+            catch
+                continue
+            end
+            all(isfinite, values) || return false
+        end
+    end
+    for description in native_corpse().REDUCED_VARIABLES
+        parts = native_corpse().reduced_field(description, state, parameters)
+        for index in eachindex(first(parts))
+            value = description.scale * sum(part[index] for part in parts)
+            isfinite(value) || return false
+        end
+    end
+    return true
+end
+
 function nonfinite_values(state, parameters)
+    finite_trajectory(state, parameters) && return nothing
     values = Dict{String, Any}()
     for component in propertynames(state)
         component_state = getproperty(state, component)
@@ -46,11 +70,9 @@ function nonfinite_values(state, parameters)
     end
     for description in native_corpse().REDUCED_VARIABLES
         parts = native_corpse().reduced_field(description, state, parameters)
-        bad = any(eachindex(first(parts))) do index
-            value = description.scale * sum(part[index] for part in parts)
-            !isfinite(value)
-        end
-        if bad
+        if any(index -> !isfinite(
+            description.scale * sum(part[index] for part in parts),
+        ), eachindex(first(parts)))
             combined = description.scale .* copy(first(parts))
             for part in parts[2:end]
                 combined .+= description.scale .* part
@@ -73,12 +95,16 @@ function (callback::ObservedAfterStep)(stage, step, state, parameters, time)
     selected_corpse().accumulate_annual_npp!(callback.annual_npp, parameters)
     callback.reduced(stage, step, state, parameters, time)
     nonfinite = nonfinite_values(state, parameters)
-    callback.observer(
-        String(stage.name),
-        step,
-        noleap_date(stage, step),
-        isempty(nonfinite) ? FINITE_OBSERVATION : nonfinite,
-    )
+    if isnothing(nonfinite)
+        callback.observer(stage.name, step, nothing, FINITE_OBSERVATION)
+    else
+        callback.observer(
+            String(stage.name),
+            step,
+            noleap_date(stage, step),
+            nonfinite,
+        )
+    end
     return nothing
 end
 

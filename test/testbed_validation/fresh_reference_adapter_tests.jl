@@ -1,9 +1,25 @@
 using Test
 import SHA
 import TOML
+import ClimaCore
+import NCDatasets
 
 include(joinpath(@__DIR__, "fresh_reference_adapter.jl"))
 const FreshReferenceAdapter = TestbedFreshReferenceAdapter
+
+function observer_cost(observer, stage, state, parameters, diagnostics, steps)
+    observer(stage, 1, state, parameters, diagnostics)
+    GC.gc(false)
+    bytes = Base.@allocated for step in 2:(steps + 1)
+        state.casa_plant.c_leaf[1] = step
+        observer(stage, step, state, parameters, diagnostics)
+    end
+    seconds = @elapsed for step in 2:(steps + 1)
+        state.casa_plant.c_leaf[1] = step
+        observer(stage, step, state, parameters, diagnostics)
+    end
+    return (; bytes, seconds)
+end
 
 @testset "Fresh-reference adapter verifies shared builds" begin
     mktempdir() do directory
@@ -504,6 +520,33 @@ end
     end
 end
 
+@testset "Fresh MIMICS finite observers are allocation-free" begin
+    state = ClimaCore.Fields.FieldVector(;
+        casa_plant = (; c_leaf = fill(1.0, 80)),
+        mimics_soil = (; c_microbe_r = fill(2.0, 80)),
+    )
+    diagnostics = ((;
+        name = "diagnostic__cnpp",
+        compute = (Y, _) -> Y.casa_plant.c_leaf,
+    ),)
+    stage = (; name = :historical, write_output = true)
+    for factory in (
+        FreshReferenceAdapter.mimics_c_julia_nonfinite_observer,
+        FreshReferenceAdapter.mimics_cn_julia_nonfinite_observer,
+    )
+        cost = observer_cost(
+            factory(collect(1:80)),
+            stage,
+            state,
+            nothing,
+            diagnostics,
+            10_000,
+        )
+        @test cost.bytes == 0
+        @test cost.seconds < 1.0
+    end
+end
+
 @testset "Fresh-reference tracer requires an empty directory" begin
     mktempdir() do directory
         fresh = joinpath(directory, "fresh")
@@ -518,6 +561,83 @@ end
         @test_throws FreshReferenceAdapter.AdapterError FreshReferenceAdapter.require_empty_directory(
             file,
         )
+    end
+end
+
+@testset "CASA-C tracer rejects unsafe comparison selectors" begin
+    cases = (
+        (
+            "reference_time_start",
+            "1; error(\"injected\")",
+            "reference_time_start",
+        ),
+        ("reference_time_start", 1.0, "reference_time_start"),
+        ("reference_time_start", true, "reference_time_start"),
+        ("reference_time_start", 0, "reference_time_start"),
+        ("reference_time_stop", 0, "reference time range"),
+        ("reference_time_stop", 10_001, "reference time range"),
+        ("candidate_time_offset", 10_001, "candidate_time_offset"),
+        ("candidate_time_offset", typemin(Int), "candidate_time_offset"),
+    )
+    for (key, value, expected_message) in cases
+        mktempdir() do directory
+            fixture = joinpath(directory, "fixture")
+            mkpath(fixture)
+            manifest = Dict(
+                "schema_version" => 1,
+                "generation" => Dict("roundtrip_exact" => true),
+                "fixture" => Dict{String, Any}(),
+                "comparison" => Dict{String, Any}(
+                    "reference_time_start" => 1,
+                    "reference_time_stop" => 365,
+                    "candidate_time_offset" => 1900,
+                ),
+            )
+            manifest["comparison"][key] = value
+            open(joinpath(fixture, "fixture.toml"), "w") do io
+                TOML.print(io, manifest; sorted = true)
+            end
+
+            error = try
+                FreshReferenceAdapter.main([
+                    "trace-casa-c",
+                    joinpath(directory, "source"),
+                    joinpath(directory, "run"),
+                    joinpath(directory, "build"),
+                    fixture,
+                ])
+                nothing
+            catch caught
+                caught
+            end
+
+            @test error isa FreshReferenceAdapter.AdapterError
+            @test occursin(expected_message, sprint(showerror, error))
+            @test !ispath(joinpath(directory, "injected"))
+        end
+    end
+end
+
+@testset "CASA-C tracer comparison uses structured arguments" begin
+    mktempdir() do directory
+        reference = joinpath(directory, "reference.nc")
+        candidate = joinpath(directory, "candidate.nc")
+        for path in (reference, candidate)
+            NCDatasets.NCDataset(path, "c") do dataset
+                NCDatasets.defDim(dataset, "time", 2)
+                time = NCDatasets.defVar(dataset, "time", Int, ("time",))
+                time[:] = [1, 2]
+            end
+        end
+        report = joinpath(directory, "comparison.toml")
+
+        @test FreshReferenceAdapter.compare_casa_c_tracer(
+            reference,
+            candidate,
+            report,
+            (; start = 1, stop = 2, offset = 0),
+        )
+        @test TOML.parsefile(report)["outcome"] == "passed"
     end
 end
 

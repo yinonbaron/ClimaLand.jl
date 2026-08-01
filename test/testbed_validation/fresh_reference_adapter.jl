@@ -4,6 +4,9 @@ end
 if !isdefined(@__MODULE__, :TestbedReferenceHarness)
     include(joinpath(@__DIR__, "reference_harness.jl"))
 end
+if !isdefined(@__MODULE__, :TestbedNetCDFCompare)
+    include(joinpath(@__DIR__, "netcdf_compare.jl"))
+end
 
 module TestbedFreshReferenceAdapter
 
@@ -13,12 +16,16 @@ import TOML
 const ModelProcesses =
     getfield(parentmodule(@__MODULE__), :TestbedModelProcessOrchestration)
 const Harness = getfield(parentmodule(@__MODULE__), :TestbedReferenceHarness)
+const NetCDFCompare =
+    getfield(parentmodule(@__MODULE__), :TestbedNetCDFCompare)
 const SCRIPT_PATH = @__FILE__
 const PINNED_SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 const CASA_C_TRACER_MODEL = "CASA-C"
 const CASA_C_TRACER_SCOPE = "one-cell-boundary"
 const CASA_C_TRACER_CONTRACT = "fortran-archive-integrity-tracer"
 const CASA_C_TRACER_FIXTURE = joinpath(@__DIR__, "fixtures", "casa_c_cell_51")
+const MAX_TRACER_TIME_INDEX = 10_000
+const MAX_TRACER_WINDOW_DAYS = 366
 const MIMICS_C_BOUNDARY_CALIBRATION =
     joinpath(@__DIR__, "validation", "mimics_c_full_grid_calibration.toml")
 const MIMICS_C_HISTORICAL_CALIBRATION =
@@ -680,31 +687,149 @@ function mimics_cn_nonfinite_records(
     return records
 end
 
-function mimics_cn_julia_nonfinite_observer(cell_ids)
-    return (stage, step, Y, p, diagnostics) -> begin
-        values = Dict{String, Any}(
-            "$(component).$(variable)" => vec(
-                parent(getproperty(getproperty(Y, component), variable)),
-            ) for component in propertynames(Y) for
-            variable in propertynames(getproperty(Y, component))
-        )
-        for diagnostic in diagnostics
-            values[replace(diagnostic.name, "__" => ".")] = vec(
-                parent(diagnostic.compute(Y, p)),
+struct MIMICSStateVariable
+    component::Symbol
+    variable::Symbol
+    name::String
+end
+
+mutable struct MIMICSJuliaNonfiniteObserver
+    model::Symbol
+    cell_ids::Vector{Int}
+    state_variables::Vector{MIMICSStateVariable}
+    diagnostic_names::Vector{String}
+    initialized::Bool
+end
+
+function initialize!(observer::MIMICSJuliaNonfiniteObserver, Y, diagnostics)
+    for component in propertynames(Y)
+        for variable in propertynames(getproperty(Y, component))
+            push!(
+                observer.state_variables,
+                MIMICSStateVariable(
+                    component,
+                    variable,
+                    "$component.$variable",
+                ),
             )
         end
-        records = mimics_cn_nonfinite_records(
-            values,
-            cell_ids;
-            evidence_side = "julia",
-            stage = String(stage.name),
-            date = mimics_cn_stage_date(stage, step),
-            reason = "fresh Julia MIMICS-CN trajectory became nonfinite",
+    end
+    for diagnostic in diagnostics
+        push!(
+            observer.diagnostic_names,
+            replace(diagnostic.name, "__" => "."),
         )
-        isempty(records) || throw(MIMICSCNNonfiniteError(records))
+    end
+    observer.initialized = true
+    return observer
+end
+
+@inline function all_finite(values, expected_length)
+    length(values) == expected_length || throw(
+        AdapterError("MIMICS trajectory has incompatible values"),
+    )
+    for value in values
+        value isa Real && isfinite(value) || return false
+    end
+    return true
+end
+
+function named_storage_type(::Type{T}) where {T}
+    T <: NamedTuple && return T
+    :values in fieldnames(T) || return nothing
+    storage = fieldtype(T, :values)
+    return storage <: NamedTuple ? storage : nothing
+end
+
+@generated function finite_mimics_state(Y::T, cell_count) where {T}
+    root_type = named_storage_type(T)
+    isnothing(root_type) && return :(throw(
+        AdapterError("MIMICS trajectory state layout is unsupported"),
+    ))
+    root = T <: NamedTuple ? :Y : :(getfield(Y, :values))
+    checks = Expr[]
+    for component in fieldnames(root_type)
+        component_type = fieldtype(root_type, component)
+        component_storage_type = named_storage_type(component_type)
+        isnothing(component_storage_type) && return :(throw(
+            AdapterError("MIMICS trajectory component layout is unsupported"),
+        ))
+        component_value = :(getfield($root, $(QuoteNode(component))))
+        component_storage = component_type <: NamedTuple ? component_value :
+                            :(getfield($component_value, :values))
+        for variable in fieldnames(component_storage_type)
+            values = :(parent(getfield(
+                $component_storage,
+                $(QuoteNode(variable)),
+            )))
+            push!(checks, :(all_finite($values, cell_count) || return false))
+        end
+    end
+    return Expr(:block, checks..., :(return true))
+end
+
+function nonfinite_mimics_values(observer, Y, p, diagnostics)
+    values = Dict{String, Any}()
+    for description in observer.state_variables
+        values[description.name] = vec(
+            parent(
+                getproperty(
+                    getproperty(Y, description.component),
+                    description.variable,
+                ),
+            ),
+        )
+    end
+    length(diagnostics) == length(observer.diagnostic_names) || throw(
+        AdapterError("MIMICS trajectory diagnostics changed during execution"),
+    )
+    for (name, diagnostic) in zip(observer.diagnostic_names, diagnostics)
+        values[name] = vec(parent(diagnostic.compute(Y, p)))
+    end
+    return values
+end
+
+function (observer::MIMICSJuliaNonfiniteObserver)(
+    stage,
+    step,
+    Y,
+    p,
+    diagnostics,
+)
+    observer.initialized || initialize!(observer, Y, diagnostics)
+    finite_mimics_state(Y, length(observer.cell_ids)) &&
         return nothing
+    values = nonfinite_mimics_values(observer, Y, p, diagnostics)
+    model = observer.model
+    stage_name = String(stage.name)
+    date = model == :c ? mimics_c_stage_date(stage, step) :
+           mimics_cn_stage_date(stage, step)
+    reason = model == :c ?
+             "fresh Julia MIMICS-C trajectory became nonfinite" :
+             "fresh Julia MIMICS-CN trajectory became nonfinite"
+    records = mimics_cn_nonfinite_records(
+        values,
+        observer.cell_ids;
+        evidence_side = "julia",
+        stage = stage_name,
+        date,
+        reason,
+    )
+    if model == :c
+        throw(MIMICSCNonfiniteError(records))
+    else
+        throw(MIMICSCNNonfiniteError(records))
     end
 end
+
+mimics_cn_julia_nonfinite_observer(cell_ids) =
+    MIMICSJuliaNonfiniteObserver(
+        :cn,
+        Int.(cell_ids),
+        MIMICSStateVariable[],
+        String[],
+        false,
+    )
 
 function first_mimics_cn_historical_nonfinites(
     years,
@@ -897,6 +1022,7 @@ function write_mimics_cn_comparison(run_directory, scientific_path, oracle_path)
     report["model"] = "MIMICS-CN"
     report["scope"] = "representative"
     report["outcome"] = passed ? "passed" : "failed"
+    report["coverage"]["eligible_cells"] = 80
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => sha256sum(oracle_path),
@@ -984,30 +1110,14 @@ function mimics_c_stage_date(stage, step)
     )
 end
 
-function mimics_c_julia_nonfinite_observer(cell_ids)
-    return (stage, step, Y, p, diagnostics) -> begin
-        values = Dict{String, Any}(
-            "$(component).$(variable)" => vec(
-                parent(getproperty(getproperty(Y, component), variable)),
-            ) for component in propertynames(Y) for
-            variable in propertynames(getproperty(Y, component))
-        )
-        for diagnostic in diagnostics
-            values[replace(diagnostic.name, "__" => ".")] =
-                vec(parent(diagnostic.compute(Y, p)))
-        end
-        records = mimics_cn_nonfinite_records(
-            values,
-            cell_ids;
-            evidence_side = "julia",
-            stage = String(stage.name),
-            date = mimics_c_stage_date(stage, step),
-            reason = "fresh Julia MIMICS-C trajectory became nonfinite",
-        )
-        isempty(records) || throw(MIMICSCNonfiniteError(records))
-        return nothing
-    end
-end
+mimics_c_julia_nonfinite_observer(cell_ids) =
+    MIMICSJuliaNonfiniteObserver(
+        :c,
+        Int.(cell_ids),
+        MIMICSStateVariable[],
+        String[],
+        false,
+    )
 
 function first_mimics_c_historical_nonfinites(years, cell_ids, read_year)
     records = Dict{String, Any}[]
@@ -1196,6 +1306,7 @@ function write_mimics_c_comparison(run_directory, scientific_path, oracle_path)
     report["model"] = "MIMICS-C"
     report["scope"] = "representative"
     report["outcome"] = passed ? "passed" : "failed"
+    report["coverage"]["eligible_cells"] = 80
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => sha256sum(oracle_path),
@@ -1559,6 +1670,55 @@ function verify_fixture(fixture_directory, manifest)
     return true
 end
 
+function tracer_comparison_window(manifest)
+    comparison = get(manifest, "comparison", nothing)
+    comparison isa AbstractDict ||
+        throw(AdapterError("CASA-C tracer fixture lacks comparison settings"))
+    integer(key) = begin
+        value = get(comparison, key, nothing)
+        value isa Integer && !(value isa Bool) || throw(
+            AdapterError("CASA-C tracer $key must be an Integer"),
+        )
+        Int(value)
+    end
+    start = integer("reference_time_start")
+    stop = integer("reference_time_stop")
+    offset = integer("candidate_time_offset")
+    1 <= start <= MAX_TRACER_TIME_INDEX || throw(
+        AdapterError("CASA-C tracer reference_time_start is out of range"),
+    )
+    start <= stop <= MAX_TRACER_TIME_INDEX &&
+        stop - start + 1 <= MAX_TRACER_WINDOW_DAYS || throw(
+        AdapterError("CASA-C tracer reference time range is invalid"),
+    )
+    -MAX_TRACER_TIME_INDEX <= offset <= MAX_TRACER_TIME_INDEX || throw(
+        AdapterError("CASA-C tracer candidate_time_offset is out of range"),
+    )
+    return (; start, stop, offset)
+end
+
+function compare_casa_c_tracer(reference, candidate, report, window)
+    result = NetCDFCompare.compare_netcdf(
+        reference,
+        candidate;
+        reference_selectors = Dict("time" => window.start:window.stop),
+        candidate_offsets = Dict("time" => window.offset),
+    )
+    Harness.write_toml_atomic(
+        report,
+        Dict(
+            "schema_version" => 1,
+            "model" => CASA_C_TRACER_MODEL,
+            "scope" => CASA_C_TRACER_SCOPE,
+            "contract" => CASA_C_TRACER_CONTRACT,
+            "outcome" => result.ok ? "passed" : "failed",
+            "failed_variables" => result.failed_variables,
+            "metadata_mismatches" => result.metadata_mismatches,
+        ),
+    )
+    return result.ok
+end
+
 function run_casa_c_tracer(
     source_root,
     run_directory,
@@ -1568,9 +1728,10 @@ function run_casa_c_tracer(
     source_root = abspath(source_root)
     run_directory = abspath(run_directory)
     fixture_directory = abspath(fixture_directory)
-    executable = verified_executable(build_directory)
     manifest = TOML.parsefile(joinpath(fixture_directory, "fixture.toml"))
     verify_fixture(fixture_directory, manifest)
+    comparison_window = tracer_comparison_window(manifest)
+    executable = verified_executable(build_directory)
     files = manifest["fixture"]
     source_inputs = (
         "GRID_CN/pftlookup_igbp_updated4_exud0.csv",
@@ -1631,10 +1792,13 @@ function run_casa_c_tracer(
     reference = joinpath(fixture_directory, files["output"]["filename"])
     isfile(candidate) ||
         throw(AdapterError("CASA-C tracer did not produce its daily output"))
-    comparison_script = joinpath(@__DIR__, "netcdf_compare.jl")
     comparison_path = joinpath(run_directory, "comparison.toml")
-    comparison = `$(Base.julia_cmd()) --startup-file=no --project=$(dirname(Base.active_project())) -e $(_comparison_expression(comparison_script, reference, candidate, comparison_path, manifest))`
-    success(run(ignorestatus(comparison))) || throw(
+    compare_casa_c_tracer(
+        reference,
+        candidate,
+        comparison_path,
+        comparison_window,
+    ) || throw(
         AdapterError("CASA-C tracer comparison failed; see $comparison_path"),
     )
     Harness.write_toml_atomic(
@@ -1650,34 +1814,6 @@ function run_casa_c_tracer(
         ),
     )
     return comparison_path
-end
-
-function _comparison_expression(script, reference, candidate, report, manifest)
-    start = manifest["comparison"]["reference_time_start"]
-    stop = manifest["comparison"]["reference_time_stop"]
-    offset = manifest["comparison"]["candidate_time_offset"]
-    return """
-    include($(repr(script)))
-    import TOML
-    result = TestbedNetCDFCompare.compare_netcdf(
-        $(repr(reference)), $(repr(candidate));
-        reference_selectors = Dict("time" => $start:$stop),
-        candidate_offsets = Dict("time" => $offset),
-    )
-    report = Dict(
-        "schema_version" => 1,
-        "model" => $(repr(CASA_C_TRACER_MODEL)),
-        "scope" => $(repr(CASA_C_TRACER_SCOPE)),
-        "contract" => $(repr(CASA_C_TRACER_CONTRACT)),
-        "outcome" => result.ok ? "passed" : "failed",
-        "failed_variables" => result.failed_variables,
-        "metadata_mismatches" => result.metadata_mismatches,
-    )
-    open($(repr(report)), "w") do io
-        TOML.print(io, report; sorted = true)
-    end
-    exit(result.ok ? 0 : 1)
-    """
 end
 
 function main(args = ARGS)

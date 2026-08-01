@@ -166,6 +166,49 @@ end
     end
 end
 
+@testset "Fresh reference rejects invalid comparison contracts" begin
+    for behavior in (
+        "missing-comparison",
+        "malformed-comparison",
+        "wrong-schema",
+        "boolean-schema",
+        "wrong-model",
+        "wrong-scope",
+        "failed-comparison",
+        "wrong-scope-count",
+        "wrong-eligible-count",
+        "partial-comparison",
+    )
+        mktempdir() do directory
+            audit = joinpath(directory, "audit")
+            temporary = joinpath(directory, "temporary")
+            mkpath(audit)
+            mkpath(temporary)
+            commands = fake_fresh_commands(
+                audit;
+                worker_behaviors = Dict("MIMICS-C" => behavior),
+            )
+
+            result = FreshReferences.run_fresh_reference(
+                "fresh",
+                commands.build,
+                commands.worker;
+                models = "MIMICS-C",
+                temporary_parent = temporary,
+                worker_stdout = devnull,
+                worker_stderr = devnull,
+            )
+
+            @test result.exitcode == 1
+            @test result.outcome == "failed"
+            @test result.preserved
+            @test isdir(result.run_root)
+            @test only(result.outcomes).outcome == "failed"
+            @test !isnothing(only(result.outcomes).error)
+        end
+    end
+end
+
 @testset "Fresh reference mode is never selected implicitly" begin
     mktempdir() do directory
         commands = fake_fresh_commands(directory)

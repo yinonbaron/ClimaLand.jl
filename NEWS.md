@@ -2,6 +2,11 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add an explicit fresh-reference mode for all five
+  Representative biogeochemistry comparisons. The Validation Runner now uses
+  one verified shared Fortran build, isolated parallel model workers, strict
+  comparison contracts, and retained failure evidence without modifying pinned
+  references. Issue [#54](https://github.com/yinonbaron/ClimaLand.jl/issues/54).
 - ![][badge-✨feature] Added a public Validation Runner that defaults to the
   80-cell Representative comparison for all five biogeochemistry models, with
   immutable reference-publication tooling and a required scientific-validation

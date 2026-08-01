@@ -8,6 +8,45 @@ import TOML
 
 const ModelProcesses =
     getfield(parentmodule(@__MODULE__), :TestbedModelProcessOrchestration)
+const EXPECTED_COVERAGE = Dict(
+    model => (scope_cells = 80, eligible_cells = model == "CORPSE" ? 78 : 80)
+    for model in ModelProcesses.MODELS
+)
+
+function require_count(coverage, key, expected, model)
+    value = get(coverage, key, nothing)
+    value isa Integer && !(value isa Bool) && value == expected ||
+        error("$model comparison has invalid $key coverage")
+    return value
+end
+
+function validated_comparison(model, path)
+    isfile(path) || error("$model comparison report is missing")
+    report = try
+        TOML.parsefile(path)
+    catch error
+        message = sprint(showerror, error)
+        throw(ErrorException("$model comparison report is malformed: $message"))
+    end
+    schema_version = get(report, "schema_version", nothing)
+    schema_version isa Integer && !(schema_version isa Bool) &&
+        schema_version == 1 ||
+        error("$model comparison report schema is incompatible")
+    get(report, "model", nothing) == model ||
+        error("$model comparison report identifies the wrong model")
+    get(report, "scope", nothing) == "representative" ||
+        error("$model comparison report is not Representative")
+    get(report, "outcome", nothing) == "passed" ||
+        error("$model comparison did not pass")
+    coverage = get(report, "coverage", nothing)
+    coverage isa AbstractDict ||
+        error("$model comparison lacks coverage")
+    expected = EXPECTED_COVERAGE[model]
+    require_count(coverage, "scope_cells", expected.scope_cells, model)
+    require_count(coverage, "eligible_cells", expected.eligible_cells, model)
+    require_count(coverage, "compared_cells", expected.eligible_cells, model)
+    return report
+end
 
 function run_build(build_command, build_directory, worker_stdout, worker_stderr)
     started_ns = time_ns()
@@ -168,13 +207,24 @@ function run_fresh_reference(
         worker_stderr,
     )
     proposal_paths = Dict{String, String}()
-    comparisons = Dict{String, Any}()
     for model in selected
-        comparison_path = joinpath(model_directories[model], "comparison.toml")
-        isfile(comparison_path) &&
-            (comparisons[model] = TOML.parsefile(comparison_path))
         path = write_proposals(model, model_directories[model])
         isnothing(path) || (proposal_paths[model] = path)
+    end
+    process_outcomes = Dict(
+        outcome.model => outcome for outcome in workers_result.outcomes
+    )
+    comparisons = Dict{String, Any}()
+    comparison_errors = Dict{String, String}()
+    for model in selected
+        haskey(proposal_paths, model) && continue
+        process_outcomes[model].outcome == "passed" || continue
+        comparison_path = joinpath(model_directories[model], "comparison.toml")
+        try
+            comparisons[model] = validated_comparison(model, comparison_path)
+        catch error
+            comparison_errors[model] = sprint(showerror, error)
+        end
     end
     outcomes = map(workers_result.outcomes) do outcome
         haskey(proposal_paths, outcome.model) ?
@@ -184,9 +234,18 @@ function run_fresh_reference(
                 outcome = "nonfinite",
                 error = "fresh trajectory produced an Eligibility Gap proposal",
             ),
+        ) : haskey(comparison_errors, outcome.model) ?
+        merge(
+            outcome,
+            (;
+                outcome = "failed",
+                error = comparison_errors[outcome.model],
+            ),
         ) : outcome
     end
-    passed = workers_result.exitcode == 0 && isempty(proposal_paths)
+    passed =
+        workers_result.exitcode == 0 && isempty(proposal_paths) &&
+        isempty(comparison_errors)
     preserved = !passed
     preserved || rm(run_root; recursive = true)
     return (;

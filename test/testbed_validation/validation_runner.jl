@@ -1571,9 +1571,6 @@ function run_fresh!(
             model_report["outcome"] = outcome.outcome
             model_report["seconds"] = outcome.seconds
             isnothing(outcome.error) || (model_report["error"] = outcome.error)
-            outcome.outcome == "passed" &&
-                (model_report["coverage"]["compared_cells"] =
-                    model_report["coverage"]["eligible_cells"])
         else
             model_report["outcome"] = "not_run"
             model_report["seconds"] = 0.0
@@ -1583,8 +1580,14 @@ function run_fresh!(
             model_report["eligibility_gap_proposal"] =
                 abspath(result.proposal_paths[model])
         end
-        haskey(result.comparisons, model) &&
-            (model_report["comparison"] = result.comparisons[model])
+        if haskey(result.comparisons, model)
+            comparison = result.comparisons[model]
+            model_report["comparison"] = comparison
+            model_report["outcome"] = comparison["outcome"]
+            for key in ("scope_cells", "eligible_cells", "compared_cells")
+                model_report["coverage"][key] = comparison["coverage"][key]
+            end
+        end
     end
     build = fresh_outcome_record(result.build)
     report["fresh_reference"] = Dict(

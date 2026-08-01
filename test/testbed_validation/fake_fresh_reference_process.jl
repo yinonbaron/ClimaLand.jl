@@ -40,9 +40,38 @@ elseif mode == "worker"
             ),
         )
     end
-    for name in ("fortran_output", "julia_output", "comparison")
+    for name in ("fortran_output", "julia_output")
         open(joinpath(run_directory, "$name.toml"), "w") do io
             TOML.print(io, Dict("model" => model))
+        end
+    end
+    if behavior != "missing-comparison"
+        comparison_path = joinpath(run_directory, "comparison.toml")
+        if behavior == "malformed-comparison"
+            write(comparison_path, "not valid = [toml\n")
+        else
+            expected = model == "CORPSE" ? 78 : 80
+            comparison = Dict(
+                "schema_version" =>
+                    behavior == "wrong-schema" ? 2 :
+                    behavior == "boolean-schema" ? true : 1,
+                "model" => behavior == "wrong-model" ? "CASA-C" : model,
+                "scope" =>
+                    behavior == "wrong-scope" ? "smoke" : "representative",
+                "outcome" =>
+                    behavior == "failed-comparison" ? "failed" : "passed",
+                "coverage" => Dict(
+                    "scope_cells" =>
+                        behavior == "wrong-scope-count" ? 79 : 80,
+                    "eligible_cells" => behavior == "wrong-eligible-count" ?
+                                        expected - 1 : expected,
+                    "compared_cells" => behavior == "partial-comparison" ?
+                                        expected - 1 : expected,
+                ),
+            )
+            open(comparison_path, "w") do io
+                TOML.print(io, comparison; sorted = true)
+            end
         end
     end
     if behavior == "nonfinite"

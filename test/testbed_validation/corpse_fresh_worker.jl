@@ -11,6 +11,7 @@ export NonfiniteError,
 
 const MODEL = "CORPSE"
 const STAGES = ("prespin", "spin", "spin_continuation", "historical")
+const STAGE_SYMBOLS = (:prespin, :spin, :spin_continuation, :historical)
 const REVIEWED_GAPS = Dict(51 => 17, 3442 => 11)
 
 struct WorkerError <: Exception
@@ -115,9 +116,9 @@ function TrajectoryObserver(evidence_side, cell_ids, eligible_cell_ids)
 end
 
 function (observer::TrajectoryObserver)(stage, step, date, values)
-    stage_name = String(stage)
-    stage_rank = findfirst(==(stage_name), STAGES)
-    isnothing(stage_rank) && throw(WorkerError("unknown CORPSE stage $stage_name"))
+    stage_rank = stage isa Symbol ? findfirst(==(stage), STAGE_SYMBOLS) :
+                 findfirst(==(stage), STAGES)
+    isnothing(stage_rank) && throw(WorkerError("unknown CORPSE stage $stage"))
     step isa Integer && step > 0 ||
         throw(WorkerError("CORPSE trajectory step must be positive"))
     stage_rank >= observer.last_stage_rank ||
@@ -126,6 +127,8 @@ function (observer::TrajectoryObserver)(stage, step, date, values)
         throw(WorkerError("CORPSE trajectory steps are not strictly increasing"))
     observer.last_stage_rank = stage_rank
     observer.last_step = step
+    isempty(values) && return nothing
+    stage_name = stage isa Symbol ? STAGES[stage_rank] : String(stage)
 
     variables = sort!(String.(collect(keys(values))))
     records = Dict{String, Any}[]
