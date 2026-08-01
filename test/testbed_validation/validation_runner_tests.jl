@@ -669,11 +669,84 @@ end
         @test model["name"] == "MIMICS-CN"
         @test model["coverage"]["scope_cells"] == 80
         @test model["coverage"]["compared_cells"] == 0
-        @test report["comparison_policy"]["boundary_calibration_sha256"] ==
+        @test model["comparison_policy"]["boundary_calibration_sha256"] ==
               bytes2hex(SHA.sha256(read(
-            report["comparison_policy"]["boundary_calibration"],
+            model["comparison_policy"]["boundary_calibration"],
         )))
         @test !isdir(joinpath(output, "MIMICS-CN", "stages"))
+    end
+end
+
+@testset "Validation Runner accepts explicit MIMICS-C and fails closed" begin
+    mktempdir() do output
+        missing = joinpath(output, "missing-reference.toml")
+        result = run_validation(
+            "--scope",
+            "representative",
+            "--models",
+            "MIMICS-C",
+            "--output",
+            output;
+            environment = Dict(
+                "CLIMALAND_VALIDATION_MIMICS_C_REFERENCE" => missing,
+            ),
+        )
+
+        @test result.exitcode == 2
+        @test occursin("Pinned MIMICS-C reference is missing", result.stderr)
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        model = only(report["model"])
+        @test model["name"] == "MIMICS-C"
+        @test model["coverage"]["scope_cells"] == 80
+        @test model["coverage"]["compared_cells"] == 0
+        @test !isdir(joinpath(output, "MIMICS-C", "stages"))
+    end
+end
+
+@testset "Validation Runner projects complete MIMICS evidence" begin
+    budget(suffix) = Dict(
+        "all_close" => true,
+        "stage" => Dict(
+            "historical" => Dict("residual_$suffix" => -2.5),
+        ),
+    )
+    boundary = Dict(
+        "prespin" => Dict(
+            "all_match" => false,
+            "cell_failures" => [
+                Dict("cell_id" => 51, "variables" => ["c_labile"]),
+            ],
+        ),
+    )
+    historical = Dict(
+        "annual" => Dict("all_match" => true),
+        "fixed_daily_samples" => Dict("all_match" => true),
+        "budget" => Dict("all_match" => true),
+    )
+    scientific = Dict(
+        "boundary_comparison" => boundary,
+        "historical_comparison" => historical,
+        "carbon_budget" => budget("kg_c"),
+        "nitrogen_budget" => budget("kg_n"),
+    )
+
+    for model in ("MIMICS-C", "MIMICS-CN")
+        projected =
+            VALIDATION_RUNNER_MODULE.project_mimics_evidence!(
+                Dict{String, Any}(),
+                scientific,
+                model,
+            )
+        @test projected["boundary_comparison"] == boundary
+        @test projected["historical"]["annual"] == historical["annual"]
+        @test projected["historical"]["fixed_daily_samples"] ==
+              historical["fixed_daily_samples"]
+        @test projected["historical"]["budget_comparison"] ==
+              historical["budget"]
+        @test projected["budget"]["carbon"]["maximum_absolute_residual_kg_c"] ==
+              2.5
+        @test haskey(projected["budget"], "nitrogen") ==
+              (model == "MIMICS-CN")
     end
 end
 
@@ -753,7 +826,46 @@ if get(
             @test isempty(model["coverage"]["eligibility_gaps"])
             @test model["outcome"] == "passed"
             @test all(values(model["comparison"]))
+            @test haskey(model, "boundary_comparison")
+            @test haskey(model["historical"], "annual")
+            @test haskey(model["historical"], "fixed_daily_samples")
+            @test haskey(model["historical"], "budget_comparison")
+            @test haskey(model["budget"], "carbon")
+            @test haskey(model["budget"], "nitrogen")
             @test report["outcome"] == "passed"
+        end
+    end
+end
+
+if get(ENV, "CLIMALAND_RUN_MIMICS_C_REPRESENTATIVE_VALIDATION", "false") ==
+   "true"
+    @testset "Validation Runner completes pinned Representative MIMICS-C" begin
+        mktempdir() do output
+            result = run_validation(
+                "--scope",
+                "representative",
+                "--models",
+                "MIMICS-C",
+                "--reference",
+                "pinned",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            )
+
+            @test result.exitcode == 0
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            model = only(report["model"])
+            @test model["coverage"]["compared_cells"] == 80
+            @test isempty(model["coverage"]["eligibility_gaps"])
+            @test model["outcome"] == "passed"
+            @test all(values(model["comparison"]))
+            @test haskey(model, "boundary_comparison")
+            @test haskey(model["historical"], "annual")
+            @test haskey(model["historical"], "fixed_daily_samples")
+            @test haskey(model["historical"], "budget_comparison")
+            @test haskey(model["budget"], "carbon")
         end
     end
 end

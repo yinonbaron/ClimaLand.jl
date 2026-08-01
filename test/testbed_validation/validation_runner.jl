@@ -1334,6 +1334,23 @@ function initial_mimics_report(configuration, output_root, scope, policy, model)
     return report
 end
 
+function project_mimics_evidence!(model_report, scientific, model)
+    historical = scientific["historical_comparison"]
+    model_report["boundary_comparison"] = scientific["boundary_comparison"]
+    model_report["historical"] = Dict(
+        "annual" => historical["annual"],
+        "fixed_daily_samples" => historical["fixed_daily_samples"],
+        "budget_comparison" => historical["budget"],
+    )
+    model_report["budget"] = Dict(
+        "carbon" => summarize_budget(scientific["carbon_budget"], "kg_c"),
+    )
+    model == "MIMICS-CN" &&
+        (model_report["budget"]["nitrogen"] =
+            summarize_budget(scientific["nitrogen_budget"], "kg_n"))
+    return model_report
+end
+
 function run_mimics!(
     report,
     output_root,
@@ -1402,6 +1419,7 @@ function run_mimics!(
         "carbon_budget" => carbon,
         "nitrogen_budget" => nitrogen,
     )
+    project_mimics_evidence!(model_report, scientific, model)
     model_report["comparison_report"] = abspath(result.report)
     model_report["reference"] = Dict(
         "path" => abspath(pinned_reference),
