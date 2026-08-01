@@ -10,6 +10,7 @@ include(joinpath(@__DIR__, "native_casa_cn_reconstruction.jl"))
 include(joinpath(@__DIR__, "selected_mimics_c_workflow.jl"))
 include(joinpath(@__DIR__, "selected_mimics_cn_workflow.jl"))
 include(joinpath(@__DIR__, "model_process_orchestration.jl"))
+include(joinpath(@__DIR__, "pinned_corpse_executor.jl"))
 include(joinpath(@__DIR__, "pinned_corpse_adapter.jl"))
 
 # ============================================================================
@@ -82,6 +83,7 @@ const CASA_CN_FRESH_DAILY_VARIABLES =
     union(CASA_CN_ANNUAL_MEAN_VARIABLES, CASA_CN_ANNUAL_TOTAL_VARIABLES)
 const REPORT_FILENAME = "validation_report.toml"
 const REFERENCE_OVERRIDE = Dict(
+    "CORPSE" => "CLIMALAND_VALIDATION_CORPSE_REFERENCE",
     "MIMICS-C" => "CLIMALAND_VALIDATION_MIMICS_C_REFERENCE",
     "MIMICS-CN" => "CLIMALAND_VALIDATION_MIMICS_CN_REFERENCE",
     "CASA-C" => "CLIMALAND_VALIDATION_CASA_C_REFERENCE",
@@ -1565,16 +1567,50 @@ function main(args = ARGS)
     if model == "CORPSE"
         report = empty_aggregate_report(configuration, output_root, scope)
         try
-            forcing_root, _ = representative_forcing_directory()
-            reference_root, _ = reference_path(configuration.scope, model)
-            TestbedPinnedCORPSEAdapter.run_pinned_corpse(
+            forcing_root, forcing_artifact = representative_forcing_directory()
+            reference_root, reference_artifact =
+                reference_path(configuration.scope, model)
+            result = TestbedPinnedCORPSEAdapter.run_pinned_corpse(
                 joinpath(output_root, model);
                 scope_manifest = scope.path,
                 forcing_artifact_root = forcing_root,
                 reference_artifact_root = reference_root,
                 workers = configuration.workers,
             )
-            error("CORPSE adapter returned without a scientific result")
+            scientific = TOML.parsefile(result.report)
+            model_report = only(report["model"])
+            model_report["coverage"] = result.coverage
+            model_report["outcome"] = result.passed ? "passed" : "failed"
+            model_report["seconds"] = result.seconds
+            model_report["comparison_report"] = abspath(result.report)
+            model_report["comparison"] = Dict(
+                "boundaries" => all(
+                    all(
+                        record["all_match"] for
+                        record in values(stage["comparison"])
+                    ) for stage in values(scientific["stage"])
+                ),
+                "annual_summaries_and_daily_samples" => all(
+                    record["all_match"] for
+                    records in values(scientific["reduced_historical"])
+                    for record in values(records)
+                ),
+                "carbon_budget" => scientific["budget"]["verified"],
+            )
+            model_report["budget"] = scientific["budget"]
+            model_report["reference"] = Dict(
+                "path" => abspath(reference_root),
+                "artifact" => reference_artifact,
+            )
+            model_report["forcing"] = Dict(
+                "path" => abspath(forcing_root),
+                "artifact" => forcing_artifact,
+            )
+            report["outcome"] = model_report["outcome"]
+            report["seconds"] = result.seconds
+            report_path = write_report(output_root, report)
+            print_summary(stdout, report, report_path)
+            return result.passed ? 0 : 1
         catch error
             report["error"] = sprint(showerror, error)
             report_path = write_report(output_root, report)
