@@ -46,6 +46,29 @@ import TOML
     end
 end
 
+@testset "MIMICS-CN long-stage budgets use stable ordered accumulation" begin
+    # Saved from the 80-cell Representative spin report. Repeating the mean
+    # daily contribution with ordinary Float64 addition alone exceeds the
+    # unchanged process-budget tolerance at this stage length.
+    stage_steps = 20 * 365 * 499
+    saved_external_input_kg_n = 6.426046879622582e13
+    daily_input_kg_n = saved_external_input_kg_n / stage_steps
+    naive = 0.0
+    stable = TestbedNativeWorkflow.CompensatedSum(Float64)
+    for _ in 1:stage_steps
+        naive += daily_input_kg_n
+        TestbedNativeWorkflow.add_term!(stable, daily_input_kg_n)
+    end
+
+    @test abs(naive - saved_external_input_kg_n) /
+          saved_external_input_kg_n > 5e-12
+    @test isapprox(
+        TestbedNativeWorkflow.compensated_value(stable),
+        saved_external_input_kg_n;
+        rtol = eps(Float64),
+    )
+end
+
 @testset "native MIMICS-CN Fortran restart semantics" begin
     casa_value = 0.19582245315201095
     mimics_value = 0.014294174123456

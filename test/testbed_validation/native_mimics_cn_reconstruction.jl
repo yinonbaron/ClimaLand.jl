@@ -55,6 +55,7 @@ grid_parity() =
     getfield(parentmodule(@__MODULE__), :TestbedGridTransitionParity)
 selected_casa() =
     getfield(parentmodule(@__MODULE__), :TestbedSelectedCASAWorkflow)
+const CompensatedSum = native_workflow().CompensatedSum
 
 # -----------------------------------------------------------------------------
 # Stage and comparison definitions
@@ -851,23 +852,31 @@ end
 
 mutable struct BudgetAccumulator
     area_m2::Vector{Float64}
-    carbon_input::Dict{Symbol, Float64}
-    carbon_output::Dict{Symbol, Float64}
-    carbon_adjustment::Dict{Symbol, Float64}
-    nitrogen_input::Dict{Symbol, Float64}
-    nitrogen_output::Dict{Symbol, Float64}
-    nitrogen_adjustment::Dict{Symbol, Float64}
+    carbon_input::Dict{Symbol, CompensatedSum{Float64}}
+    carbon_output::Dict{Symbol, CompensatedSum{Float64}}
+    carbon_adjustment::Dict{Symbol, CompensatedSum{Float64}}
+    nitrogen_input::Dict{Symbol, CompensatedSum{Float64}}
+    nitrogen_output::Dict{Symbol, CompensatedSum{Float64}}
+    nitrogen_adjustment::Dict{Symbol, CompensatedSum{Float64}}
 end
 
 BudgetAccumulator(grid) = BudgetAccumulator(
     getproperty.(grid, :area_m2),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
-    Dict{Symbol, Float64}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
+    Dict{Symbol, CompensatedSum{Float64}}(),
 )
+
+function accumulate_budget_term!(table, stage, value)
+    accumulator = get!(table, stage) do
+        CompensatedSum(Float64)
+    end
+    native_workflow().add_term!(accumulator, value)
+    return nothing
+end
 
 function accumulate_budget!(budget, stage, p)
     area = budget.area_m2
@@ -911,7 +920,7 @@ function accumulate_budget!(budget, stage, p)
         (budget.nitrogen_output, nitrogen_output),
         (budget.nitrogen_adjustment, nitrogen_adjustment),
     )
-        table[name] = get(table, name, 0.0) + DAY_SECONDS * value
+        accumulate_budget_term!(table, name, DAY_SECONDS * value)
     end
     return nothing
 end
@@ -921,14 +930,20 @@ function budget_report(budget, stage, initial_state, final_state, element; rtol)
     prefix = element == :carbon ? "c_" : "n_"
     units = element == :carbon ? "kg_c" : "kg_n"
     input =
-        element == :carbon ? budget.carbon_input[name] :
-        budget.nitrogen_input[name]
+        native_workflow().compensated_value(
+            element == :carbon ? budget.carbon_input[name] :
+            budget.nitrogen_input[name],
+        )
     output =
-        element == :carbon ? budget.carbon_output[name] :
-        budget.nitrogen_output[name]
+        native_workflow().compensated_value(
+            element == :carbon ? budget.carbon_output[name] :
+            budget.nitrogen_output[name],
+        )
     adjustment =
-        element == :carbon ? budget.carbon_adjustment[name] :
-        budget.nitrogen_adjustment[name]
+        native_workflow().compensated_value(
+            element == :carbon ? budget.carbon_adjustment[name] :
+            budget.nitrogen_adjustment[name],
+        )
     start_stock = selected_casa().area_weighted_stock(
         initial_state,
         budget.area_m2,

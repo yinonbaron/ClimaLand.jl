@@ -26,6 +26,29 @@ struct NativeStage
     end
 end
 
+"""An order-preserving compensated sum for long diagnostic reductions."""
+mutable struct CompensatedSum{T <: AbstractFloat}
+    total::T
+    correction::T
+end
+
+CompensatedSum(::Type{T} = Float64) where {T <: AbstractFloat} =
+    CompensatedSum(zero(T), zero(T))
+
+function add_term!(accumulator::CompensatedSum{T}, value) where {T}
+    term = convert(T, value)
+    updated = accumulator.total + term
+    accumulator.correction +=
+        abs(accumulator.total) >= abs(term) ?
+        (accumulator.total - updated) + term :
+        (term - updated) + accumulator.total
+    accumulator.total = updated
+    return accumulator
+end
+
+compensated_value(accumulator::CompensatedSum) =
+    accumulator.total + accumulator.correction
+
 step_count(stage::NativeStage) = stage.forcing_days * stage.repeats
 
 function forcing_index(stage::NativeStage, step)
