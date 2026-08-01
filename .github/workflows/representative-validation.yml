@@ -1,0 +1,150 @@
+name: Representative Scientific Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  representative-validation:
+    name: Representative scientific validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      JULIA_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      VALIDATION_OUTPUT: validation-output
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+      - name: Cache Julia depot and validation artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.julia/packages
+            ~/.julia/compiled
+            ~/.julia/artifacts
+            ~/.julia/scratchspaces
+            ~/.julia/registries
+          key: representative-${{ runner.os }}-julia-1.12-${{ hashFiles('test/Project.toml', 'test/Manifest.toml', 'test/testbed_validation/validation/Artifacts.toml') }}
+          restore-keys: |
+            representative-${{ runner.os }}-julia-1.12-
+      - name: Install validation dependencies
+        run: julia --startup-file=no --project=test -e 'using Pkg; Pkg.instantiate()'
+      - name: Stage all pinned Representative artifacts
+        id: stage_artifacts
+        continue-on-error: true
+        run: |
+          mkdir -p "${VALIDATION_OUTPUT}/logs"
+          set -o pipefail
+          julia --startup-file=no --project=test -e '
+            import Pkg
+            artifacts_toml = joinpath(pwd(), "test", "testbed_validation", "validation", "Artifacts.toml")
+            required = (
+                "representative_forcing",
+                "representative_corpse_reference",
+                "representative_mimics_c_reference",
+                "representative_mimics_cn_reference",
+                "representative_casa_c_reference",
+                "representative_casa_cn_reference",
+            )
+            hashes = map(name -> Pkg.Artifacts.artifact_hash(name, artifacts_toml), required)
+            missing = filter(index -> isnothing(hashes[index]), eachindex(required))
+            isempty(missing) || error(
+                "Required pinned artifacts are unpublished: " *
+                join(map(index -> required[index], missing), ", "),
+            )
+            for (name, hash) in zip(required, hashes)
+                Pkg.Artifacts.ensure_artifact_installed(name, artifacts_toml)
+                Pkg.Artifacts.artifact_exists(hash) || error("Required pinned artifact $name is unavailable")
+                println("Staged $name ($hash)")
+            end
+          ' 2>&1 | tee "${VALIDATION_OUTPUT}/logs/artifact-staging.log"
+      - name: Run all Representative model comparisons
+        id: validation
+        if: steps.stage_artifacts.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p "${VALIDATION_OUTPUT}/logs"
+          set -o pipefail
+          julia --startup-file=no --project=test \
+            test/testbed_validation/validation_runner.jl \
+            --scope representative \
+            --models all \
+            --reference pinned \
+            --output "${VALIDATION_OUTPUT}" \
+            2>&1 | tee "${VALIDATION_OUTPUT}/logs/validation-runner.log" &
+          validation_pid=$!
+          while kill -0 "${validation_pid}" 2>/dev/null; do
+            if (( SECONDS >= 3600 )); then
+              echo "::warning title=Representative validation exceeded its performance budget::The scientific validation job has run for more than one hour."
+              break
+            fi
+            sleep 30
+          done
+          wait "${validation_pid}"
+      - name: Preserve a compact preflight failure report
+        if: always()
+        env:
+          STAGING_OUTCOME: ${{ steps.stage_artifacts.outcome }}
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        run: |
+          if [[ ! -f "${VALIDATION_OUTPUT}/validation_report.toml" ]]; then
+            mkdir -p "${VALIDATION_OUTPUT}"
+            {
+              printf '%s\n' \
+                'schema_version = 1' \
+                'reference_mode = "pinned"' \
+                'outcome = "failed"' \
+                'seconds = 0.0' \
+                "artifact_staging_outcome = \"${STAGING_OUTCOME}\"" \
+                "validation_runner_outcome = \"${VALIDATION_OUTCOME}\"" \
+                '' \
+                '[scope]' \
+                'name = "representative"' \
+                'cell_count = 80'
+              for model in CORPSE MIMICS-C MIMICS-CN CASA-C CASA-CN; do
+                printf '\n[[model]]\nname = "%s"\nreference_mode = "pinned"\noutcome = "failed"\nseconds = 0.0\n' "${model}"
+                printf '[model.coverage]\nscope_cells = 80\neligible_cells = 0\ncompared_cells = 0\neligibility_gaps = []\n'
+              done
+            } > "${VALIDATION_OUTPUT}/validation_report.toml"
+          fi
+      - name: Upload compact validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: representative-validation-report
+          path: validation-output/validation_report.toml
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload detailed failure logs
+        if: steps.stage_artifacts.outcome != 'success' || steps.validation.outcome != 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: representative-validation-failure-logs
+          path: validation-output/logs/**/*.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Enforce staging and scientific outcomes
+        if: always()
+        env:
+          STAGING_OUTCOME: ${{ steps.stage_artifacts.outcome }}
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        run: |
+          [[ "${STAGING_OUTCOME}" == "success" ]] || {
+            echo "Pinned Representative artifacts did not stage; publication issue #55 must complete before this required job can pass."
+            exit 1
+          }
+          [[ "${VALIDATION_OUTCOME}" == "success" ]] || {
+            echo "The public Validation Runner did not complete all five Representative comparisons."
+            exit 1
+          }
