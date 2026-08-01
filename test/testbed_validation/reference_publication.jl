@@ -219,6 +219,13 @@ function validate_payload(payload, kind, generation; model = nothing)
     )
 end
 
+"""
+    validate_candidate(candidate_root)
+
+Verify a publication candidate and return its compatible forcing/reference bundles.
+
+Called from `stage_publication` before any archives are created.
+"""
 function validate_candidate(candidate_root)
     isdir(candidate_root) ||
         fail("publication candidate is missing at $candidate_root")
@@ -379,6 +386,15 @@ function write_expected_manifest(path, bundle, archive, release_base_url)
     return manifest
 end
 
+"""
+    stage_publication(candidate_root, output, artifacts_toml, release_base_url;
+                      expected_manifest_directory = nothing)
+
+Stage immutable archives, expected manifests, and artifact bindings atomically.
+
+Return the output path, generation, and published model names. Existing output is
+never overwritten.
+"""
 function stage_publication(
     candidate_root,
     output,
@@ -478,6 +494,13 @@ function stage_publication(
     )
 end
 
+"""
+    main(args = ARGS)
+
+Run the explicit `stage` publication command and return a successful exit code.
+
+Called from the script entry point after command-line arguments are collected.
+"""
 function main(args = ARGS)
     4 <= length(args) <= 6 || fail(
         "usage: reference_publication.jl stage CANDIDATE OUTPUT RELEASE_BASE_URL [ARTIFACTS_TOML [EXPECTED_MANIFEST_DIRECTORY]]",

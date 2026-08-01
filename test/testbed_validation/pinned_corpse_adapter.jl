@@ -59,6 +59,13 @@ function safe_payload_path(root, relative, description)
     return path
 end
 
+"""
+    validate_bundle(root, kind, roles; model = nothing)
+
+Verify a bundle manifest, required payload roles, checksums, and provenance.
+
+Called from `pinned_corpse_bundle` and `forcing_bundle` before payload resolution.
+"""
 function validate_bundle(root, kind, roles; model = nothing)
     isdir(root) || fail("$kind bundle is missing at $root")
     islink(root) && fail("$kind bundle must not be a symbolic link")
@@ -123,6 +130,13 @@ function pinned_corpse_bundle(root)
     )
 end
 
+"""
+    forcing_bundle(root)
+
+Resolve and verify the Representative forcing fixture bundle.
+
+Called from `run_pinned_corpse` before the scientific executor starts.
+"""
 function forcing_bundle(root)
     verified = validate_bundle(root, "forcing", ("fixture_manifest",))
     fixture_manifest = verified.paths["fixture_manifest"]
@@ -137,6 +151,13 @@ function forcing_bundle(root)
     )
 end
 
+"""
+    representative_scope(path)
+
+Verify and return the immutable, ordered 80-cell Representative Scope Manifest.
+
+Called from `run_pinned_corpse` before bundle compatibility is checked.
+"""
 function representative_scope(path)
     manifest = parse_toml(path, "Representative Scope Manifest")
     cell_ids = try
@@ -152,6 +173,13 @@ function representative_scope(path)
     return (; path, manifest, cell_ids, sha256 = sha256sum(path))
 end
 
+"""
+    verify_compatibility(scope, forcing, reference)
+
+Require the scope, forcing, and CORPSE reference to share one compatibility set.
+
+Called from `run_pinned_corpse` before the scientific executor starts.
+"""
 function verify_compatibility(scope, forcing, reference)
     for provenance in (forcing.provenance, reference.provenance)
         get(provenance, "scope_manifest_sha256", nothing) == scope.sha256 ||
@@ -169,6 +197,13 @@ function verify_compatibility(scope, forcing, reference)
     return nothing
 end
 
+"""
+    validate_result(result)
+
+Verify the CORPSE executor result and complete 78-cell eligible coverage.
+
+Called from `run_pinned_corpse` after the scientific executor finishes.
+"""
 function validate_result(result)
     all(
         hasproperty(result, name) for

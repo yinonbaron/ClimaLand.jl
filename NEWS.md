@@ -2,6 +2,12 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Added a public Validation Runner that defaults to the
+  80-cell Representative comparison for all five biogeochemistry models, with
+  immutable reference-publication tooling and a required scientific-validation
+  CI workflow. Issues [#55](https://github.com/yinonbaron/ClimaLand.jl/issues/55),
+  [#56](https://github.com/yinonbaron/ClimaLand.jl/issues/56), and
+  [#57](https://github.com/yinonbaron/ClimaLand.jl/issues/57).
 - ![][badge-✨feature] Add immutable Core and Smoke Scope Manifests and a
   Git-versioned CASA-C Comparison Policy to the Validation Runner, with strict
   nesting, reviewed Eligibility Gaps, fail-closed nonfinite handling, and
