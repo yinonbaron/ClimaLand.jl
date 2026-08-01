@@ -699,6 +699,38 @@ reference publication is a separate maintainer-reviewed operation. Known
 Fortran nonfinites appear only as reviewed, model-specific Eligibility Gaps in
 the Scope Manifest. Eligible nonfinites fail validation.
 
+### Reference publication
+
+`reference_publication.jl` is the explicit staging operation for a successful
+canonical run. It does not upload assets or edit the input `Artifacts.toml`.
+The candidate must declare the canonical `x86_64-linux-gnu` platform, a
+versioned GNU Fortran compiler, and the pinned
+`climaland-biogeochem-reference-linux-gfortran-v1` toolchain identity. Local
+macOS fresh runs are useful evidence, but are intentionally not publishable.
+
+```sh
+julia --startup-file=no --project=. \
+  test/testbed_validation/reference_publication.jl stage \
+  CANDIDATE STAGED_OUTPUT \
+  https://github.com/OWNER/REPOSITORY/releases/download/IMMUTABLE_TAG \
+  test/testbed_validation/validation/Artifacts.toml
+```
+
+A shared forcing, Scope Manifest, shared-parameter, or comparison-schema
+change must stage the forcing and all five model bundles together. A
+model-specific change stages exactly one model and additionally takes the
+existing expected-manifest directory as the final argument. Before accepting
+that update, the operation checks all six existing manifests against their
+artifact tree, archive checksum, immutable URL, and binding.
+
+The staged directory contains read-only archives, expected manifests, a copied
+`Artifacts.toml`, and `publication.toml`. Maintainers review this complete
+directory, upload every listed archive to the named immutable release, verify
+the uploaded checksums, and only then commit the staged bindings and manifests.
+Incomplete provenance, noncanonical toolchains, stale bindings, mixed shared
+identities, partial model sets, and an existing output directory all fail
+before the atomic staging move.
+
 Every execution writes `validation_report.toml`, including scope and artifact
 provenance, applied policy, coverage and gaps, model outcomes, and per-model and
 aggregate timings. Detailed model logs remain separate from this compact

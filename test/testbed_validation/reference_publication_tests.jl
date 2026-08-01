@@ -21,7 +21,11 @@ function write_publication_manifest(path, document)
     end
 end
 
-function provenance(; forcing_sha256 = HEX_B, canonical = true)
+function provenance(;
+    forcing_sha256 = HEX_B,
+    canonical = true,
+    compiler_identity = "GNU Fortran 14.2.0",
+)
     return Dict(
         "scope_manifest_sha256" => HEX_A,
         "forcing_sha256" => Dict("forcing.nc" => forcing_sha256),
@@ -30,7 +34,7 @@ function provenance(; forcing_sha256 = HEX_B, canonical = true)
         "parameter_sha256" => Dict("parameters.toml" => HEX_A),
         "comparison_schema" => "reduced-comparison-oracle-v1",
         "generator_revision" => "89abcdef0123456789abcdef0123456789abcdef",
-        "compiler_identity" => "GNU Fortran 14.2.0",
+        "compiler_identity" => compiler_identity,
         "build_platform" =>
             canonical ? "x86_64-linux-gnu" : "aarch64-apple-darwin",
         "toolchain_identity" => CANONICAL_TOOLCHAIN,
@@ -44,6 +48,7 @@ function write_payload_manifest(
     generation = "representative-v1",
     forcing_sha256 = HEX_B,
     canonical = true,
+    compiler_identity = "GNU Fortran 14.2.0",
     payload_text = kind,
 )
     mkpath(directory)
@@ -74,7 +79,8 @@ function write_payload_manifest(
         "canonical" => canonical,
         "files" => files,
         "payload" => payload,
-        "provenance" => provenance(; forcing_sha256, canonical),
+        "provenance" =>
+            provenance(; forcing_sha256, canonical, compiler_identity),
     )
     isnothing(model) || (document["model"] = model)
     write_publication_manifest(joinpath(directory, "manifest.toml"), document)
@@ -88,6 +94,7 @@ function make_candidate(
     omitted_model = nothing,
     incompatible_model = nothing,
     canonical = true,
+    compiler_identity = "GNU Fortran 14.2.0",
     generation = "representative-v1",
     payload_suffix = "",
 )
@@ -109,6 +116,7 @@ function make_candidate(
         "forcing";
         generation,
         canonical,
+        compiler_identity,
         payload_text = "forcing$payload_suffix",
     )
     for model in models
@@ -120,6 +128,7 @@ function make_candidate(
             generation,
             forcing_sha256 = model == incompatible_model ? HEX_C : HEX_B,
             canonical,
+            compiler_identity,
             payload_text = "$model$payload_suffix",
         )
     end
@@ -204,6 +213,7 @@ end
                 joinpath(destination, "manifests", "$(asset["binding"]).toml")
             @test isfile(archive)
             @test sha256sum(archive) == asset["sha256"]
+            @test stat(archive).mode & 0o777 == 0o444
             @test isfile(manifest)
             expected = TOML.parsefile(manifest)
             @test expected["artifact"]["git_tree_sha1"] ==
@@ -272,6 +282,14 @@ end
             "noncanonical",
             root -> make_candidate(root; canonical = false),
             "canonical Linux",
+        ),
+        (
+            "non-GNU Fortran",
+            root -> make_candidate(
+                root;
+                compiler_identity = "Intel Fortran Compiler 2021",
+            ),
+            "canonical Linux/GNU Fortran",
         ),
         (
             "incomplete provenance",
@@ -391,5 +409,65 @@ end
         @test error isa ReferencePublication.PublicationError
         @test occursin("existing compatibility set", sprint(showerror, error))
         @test !ispath(rejected)
+
+        forcing_manifest_path = joinpath(
+            initial,
+            "manifests",
+            "representative_forcing.toml",
+        )
+        forcing_manifest = TOML.parsefile(forcing_manifest_path)
+        forcing_manifest["provenance"]["forcing_sha256"]["forcing.nc"] =
+            HEX_C
+        write_publication_manifest(forcing_manifest_path, forcing_manifest)
+        mixed = joinpath(directory, "mixed-existing-generation")
+        error = try
+            ReferencePublication.stage_publication(
+                model_candidate,
+                mixed,
+                joinpath(initial, "Artifacts.toml"),
+                RELEASE_URL;
+                expected_manifest_directory = joinpath(initial, "manifests"),
+            )
+            nothing
+        catch exception
+            exception
+        end
+        @test error isa ReferencePublication.PublicationError
+        @test occursin("forcing expected manifest", sprint(showerror, error))
+        @test !ispath(mixed)
+
+        shared_again = make_candidate(joinpath(directory, "shared-again"))
+        clean_initial = joinpath(directory, "clean-initial")
+        ReferencePublication.stage_publication(
+            shared_again,
+            clean_initial,
+            artifacts,
+            RELEASE_URL,
+        )
+        staged_bindings =
+            TOML.parsefile(joinpath(clean_initial, "Artifacts.toml"))
+        staged_bindings["representative_mimics_c_reference"]["git-tree-sha1"] =
+            repeat("d", 40)
+        write_publication_manifest(
+            joinpath(clean_initial, "Artifacts.toml"),
+            staged_bindings,
+        )
+        stale_binding = joinpath(directory, "stale-binding")
+        error = try
+            ReferencePublication.stage_publication(
+                model_candidate,
+                stale_binding,
+                joinpath(clean_initial, "Artifacts.toml"),
+                RELEASE_URL;
+                expected_manifest_directory =
+                    joinpath(clean_initial, "manifests"),
+            )
+            nothing
+        catch exception
+            exception
+        end
+        @test error isa ReferencePublication.PublicationError
+        @test occursin("artifact binding", sprint(showerror, error))
+        @test !ispath(stale_binding)
     end
 end
