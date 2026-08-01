@@ -1,6 +1,9 @@
 if !isdefined(@__MODULE__, :TestbedNativeCORPSECReconstruction)
     include(joinpath(@__DIR__, "native_corpse_c_reconstruction.jl"))
 end
+if !isdefined(@__MODULE__, :TestbedPinnedCORPSEAdapter)
+    include(joinpath(@__DIR__, "pinned_corpse_adapter.jl"))
+end
 
 module GeneratePinnedCORPSEPayload
 
@@ -9,6 +12,8 @@ import TOML
 
 native_corpse() =
     getfield(parentmodule(@__MODULE__), :TestbedNativeCORPSECReconstruction)
+pinned_adapter() =
+    getfield(parentmodule(@__MODULE__), :TestbedPinnedCORPSEAdapter)
 
 const STAGES = Dict(
     "prespin" => "01-prespin",
@@ -66,7 +71,7 @@ function generate(reference_root, reduced_reference, destination)
         "corpse_c_representative_calibration.toml",
     )
     calibration = native_corpse().calibration_policy(calibration_path)
-    native_corpse().verify_boundary_reference(calibration, reference_root)
+    pinned_adapter().verify_calibrated_boundaries(calibration, reference_root)
     native_corpse().verify_reduced_reference(calibration, reduced_reference)
     mkpath(destination)
     boundaries = create_boundary_payload(

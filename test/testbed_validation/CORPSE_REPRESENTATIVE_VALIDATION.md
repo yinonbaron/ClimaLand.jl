@@ -23,7 +23,11 @@ The adapter verifies the outer bundle, both companion schemas, all archive
 members, the Representative forcing compatibility identity, and the reviewed
 gaps before the scientific executor starts. The executor applies the existing
 `corpse-c-representative-fresh-fortran-v1` calibration without changing its
-tolerances or reference values.
+tolerances or reference values. The deterministic CASA/CORPSE boundary CSVs
+and reduced NetCDF remain byte-pinned to that calibration. Reconstruction and
+stage metadata are pinned by the immutable artifact and checked for their
+schema, stage, grid, and source provenance, but are not compared to the old
+byte hashes because they contain run-specific absolute paths and elapsed time.
 
 Create the four payload files from a verified fresh Fortran run with:
 

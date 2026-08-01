@@ -33,6 +33,7 @@ const EXPECTED_BOUNDARY_MEMBERS = Set((
 ))
 const REDUCERS =
     Set(("annual_mean", "end_of_year", "annual_total", "fixed_daily_sample"))
+const FORTRAN_SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 
 struct AdapterError <: Exception
     message::String
@@ -231,8 +232,72 @@ function materialize_boundaries(callback, bundle)
             sha256sum(path) == expected ||
                 fail("CORPSE boundary member differs from its manifest")
         end
+        validate_boundary_documents(root)
         callback(root)
     end
+end
+
+function validate_boundary_documents(root)
+    report = parse_toml(
+        joinpath(root, "reconstruction_report.toml"),
+        "CORPSE reconstruction report",
+    )
+    get(report, "schema_version", nothing) == 1 &&
+    get(report, "status", nothing) == "complete" &&
+    get(report, "points", nothing) == 4263 &&
+    get(report, "source_commit", nothing) == FORTRAN_SOURCE_COMMIT ||
+        fail("CORPSE reconstruction report has incompatible provenance")
+    for (name, directory) in CORPSE_STAGES
+        stage_root = joinpath(root, "stages", directory)
+        metadata = parse_toml(
+            joinpath(stage_root, "stage_metadata.toml"),
+            "CORPSE $name stage metadata",
+        )
+        outputs = get(metadata, "outputs", nothing)
+        get(metadata, "schema_version", nothing) == 1 &&
+        get(metadata, "name", nothing) == name &&
+        get(metadata, "status", nothing) == "complete" &&
+        get(metadata, "elapsed_seconds", nothing) isa Real &&
+        get(metadata, "elapsed_seconds", -1) >= 0 &&
+        get(metadata, "control", nothing) isa AbstractDict &&
+        get(metadata, "inputs", nothing) isa AbstractVector &&
+        outputs isa AbstractDict &&
+        all(
+            haskey(outputs, file) for
+            file in ("casa_final.csv", "corpse_final.csv")
+        ) || fail("CORPSE $name stage metadata has an incompatible schema")
+        grid_lines = readlines(joinpath(stage_root, "grid.csv"))
+        isempty(grid_lines) && fail("CORPSE $name boundary grid is empty")
+        header = strip.(split(first(grid_lines), ','))
+        first(header) == "ijcam" && "ivt_igbp" in header ||
+            fail("CORPSE $name boundary grid has an incompatible schema")
+    end
+    return nothing
+end
+
+"Verify only the deterministic, scientifically consumed calibrated boundaries."
+function verify_calibrated_boundaries(calibration, reference_root)
+    stage_provenance = get(
+        get(calibration, "provenance", Dict{String, Any}()),
+        "fortran_stage",
+        Dict{String, Any}(),
+    )
+    for (name, directory) in CORPSE_STAGES
+        records = get(stage_provenance, name, Dict{String, Any}())
+        stage_root = joinpath(reference_root, "stages", directory)
+        for (key, filename) in (
+            "casa_boundary" => "casa_final.csv",
+            "corpse_boundary" => "corpse_final.csv",
+        )
+            record = get(records, key, Dict{String, Any}())
+            id = "fortran/$directory/$filename"
+            get(record, "id", nothing) == id &&
+            get(record, "sha256", nothing) ==
+            sha256sum(joinpath(stage_root, filename)) ||
+                fail("calibrated CORPSE boundary differs for $id")
+        end
+    end
+    return nothing
 end
 
 """

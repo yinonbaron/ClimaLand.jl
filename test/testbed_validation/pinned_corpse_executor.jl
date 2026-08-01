@@ -13,6 +13,8 @@ selected_corpse() = native_corpse().selected_corpse()
 native_casa() = selected_corpse().native_casa()
 native_workflow() = native_corpse().native_workflow()
 reference_cells() = selected_corpse().reference_cells()
+pinned_adapter() =
+    getfield(parentmodule(@__MODULE__), :TestbedPinnedCORPSEAdapter)
 
 struct PackedForcingCallback{F, S, M, A}
     forcing::F
@@ -111,7 +113,7 @@ function execute(
         "corpse_c_representative_calibration.toml",
     )
     calibration = native_corpse().calibration_policy(calibration_path)
-    native_corpse().verify_boundary_reference(calibration, boundary_root)
+    pinned_adapter().verify_calibrated_boundaries(calibration, boundary_root)
     calibration_provenance = calibration["provenance"]
     calibration_provenance["fortran_reduced_historical"]["sha256"] ==
     native_workflow().sha256sum(bundle.reduced_history) ||

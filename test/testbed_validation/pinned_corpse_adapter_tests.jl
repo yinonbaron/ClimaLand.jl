@@ -57,7 +57,47 @@ function write_bundle(root, kind, scope_sha256; model = nothing)
         for relative in paths
             path = joinpath(boundary_root, relative)
             mkpath(dirname(path))
-            write(path, relative)
+            if relative == "reconstruction_report.toml"
+                write_toml(
+                    path,
+                    Dict(
+                        "schema_version" => 1,
+                        "status" => "complete",
+                        "points" => 4263,
+                        "source_commit" => PinnedCORPSE.FORTRAN_SOURCE_COMMIT,
+                    ),
+                )
+            elseif basename(relative) == "grid.csv"
+                write(path, "ijcam,ivt_igbp\n1,1\n")
+            elseif basename(relative) == "stage_metadata.toml"
+                stage = only(
+                    name for
+                    (name, directory) in PinnedCORPSE.CORPSE_STAGES if
+                    occursin("stages/$directory/", relative)
+                )
+                write_toml(
+                    path,
+                    Dict(
+                        "schema_version" => 1,
+                        "name" => stage,
+                        "status" => "complete",
+                        "elapsed_seconds" => 9876.5,
+                        "control" => Dict(
+                            "source" => "/different/generated/run/$stage.lst",
+                        ),
+                        "inputs" => [
+                            Dict("source" => "/different/generated/input.csv"),
+                        ],
+                        "outputs" => Dict(
+                            name =>
+                                Dict("bytes" => 1, "md5" => "different") for
+                            name in ("casa_final.csv", "corpse_final.csv")
+                        ),
+                    ),
+                )
+            else
+                write(path, relative)
+            end
             members[relative] = sha256sum(path)
         end
         Tar.create(boundary_root, joinpath(root, payload["boundaries"]))
@@ -140,6 +180,57 @@ function make_inputs(root)
     return (; scope, forcing, reference)
 end
 
+@testset "Pinned CORPSE separates scientific hashes from regenerated metadata" begin
+    mktempdir() do root
+        inputs = make_inputs(root)
+        bundle = PinnedCORPSE.pinned_corpse_bundle(inputs.reference)
+        PinnedCORPSE.materialize_boundaries(bundle) do boundary_root
+            stages = Dict{String, Any}()
+            for (name, directory) in PinnedCORPSE.CORPSE_STAGES
+                stages[name] = Dict(
+                    key => Dict(
+                        "id" => "fortran/$directory/$filename",
+                        "sha256" => sha256sum(
+                            joinpath(
+                                boundary_root,
+                                "stages",
+                                directory,
+                                filename,
+                            ),
+                        ),
+                    ) for (key, filename) in (
+                        "casa_boundary" => "casa_final.csv",
+                        "corpse_boundary" => "corpse_final.csv",
+                    )
+                )
+            end
+            calibration = Dict("provenance" => Dict("fortran_stage" => stages))
+            @test isnothing(
+                PinnedCORPSE.verify_calibrated_boundaries(
+                    calibration,
+                    boundary_root,
+                ),
+            )
+            @test isnothing(
+                PinnedCORPSE.validate_boundary_documents(boundary_root),
+            )
+            write(
+                joinpath(
+                    boundary_root,
+                    "stages",
+                    PinnedCORPSE.CORPSE_STAGES["historical"],
+                    "corpse_final.csv",
+                ),
+                "scientifically changed",
+            )
+            @test_throws PinnedCORPSE.AdapterError PinnedCORPSE.verify_calibrated_boundaries(
+                calibration,
+                boundary_root,
+            )
+        end
+    end
+end
+
 @testset "Pinned CORPSE adapter verifies bundle roles before execution" begin
     mktempdir() do root
         inputs = make_inputs(root)
@@ -165,10 +256,9 @@ end
                   joinpath(inputs.reference, "reduced_history.nc")
             @test bundle.reduced_history_manifest ==
                   joinpath(inputs.reference, "reduced_history.toml")
-            @test read(
+            @test TOML.parsefile(
                 joinpath(boundary_root, "reconstruction_report.toml"),
-                String,
-            ) == "reconstruction_report.toml"
+            )["status"] == "complete"
             @test workers == 2
             mkpath(output_root)
             report = write_toml(
