@@ -47,9 +47,24 @@ function write_payload_manifest(
     payload_text = kind,
 )
     mkpath(directory)
-    payload_name = kind == "forcing" ? "forcing.nc" : "oracle.toml"
-    payload_path = joinpath(directory, payload_name)
-    write(payload_path, payload_text)
+    payload = if kind == "forcing"
+        Dict("fixture_manifest" => "fixture.toml")
+    elseif model == "CORPSE"
+        Dict(
+            "boundaries" => "boundaries.nc",
+            "boundaries_manifest" => "boundaries.toml",
+            "reduced_history" => "reduced_history.nc",
+            "reduced_history_manifest" => "reduced_history.toml",
+        )
+    else
+        Dict("oracle" => "oracle.toml")
+    end
+    files = Dict{String, String}()
+    for relative_path in values(payload)
+        payload_path = joinpath(directory, relative_path)
+        write(payload_path, "$payload_text:$relative_path")
+        files[relative_path] = sha256sum(payload_path)
+    end
     document = Dict{String, Any}(
         "schema_version" => 1,
         "kind" => kind,
@@ -57,7 +72,8 @@ function write_payload_manifest(
         "generation" => generation,
         "outcome" => "passed",
         "canonical" => canonical,
-        "files" => Dict(payload_name => sha256sum(payload_path)),
+        "files" => files,
+        "payload" => payload,
         "provenance" => provenance(; forcing_sha256, canonical),
     )
     isnothing(model) || (document["model"] = model)
@@ -212,6 +228,23 @@ end
             @test expected["provenance"]["toolchain_identity"] ==
                   CANONICAL_TOOLCHAIN
             @test !isempty(expected["compatibility_identity"])
+            required_roles = if asset["binding"] == "representative_forcing"
+                Set(("fixture_manifest",))
+            elseif asset["binding"] == "representative_corpse_reference"
+                Set((
+                    "boundaries",
+                    "boundaries_manifest",
+                    "reduced_history",
+                    "reduced_history_manifest",
+                ))
+            else
+                Set(("oracle",))
+            end
+            @test issetequal(keys(expected["payload"]), required_roles)
+            @test all(
+                path -> haskey(expected["files"], path),
+                values(expected["payload"]),
+            )
         end
 
         @test_throws ReferencePublication.PublicationError ReferencePublication.stage_publication(
@@ -256,6 +289,23 @@ end
                 root
             end,
             "lacks compiler_identity",
+        ),
+        (
+            "incomplete payload roles",
+            root -> begin
+                make_candidate(root)
+                manifest_path = joinpath(
+                    root,
+                    "model-CORPSE",
+                    "reference",
+                    "manifest.toml",
+                )
+                manifest = TOML.parsefile(manifest_path)
+                delete!(manifest["payload"], "reduced_history")
+                write_publication_manifest(manifest_path, manifest)
+                root
+            end,
+            "incompatible payload roles",
         ),
     )
         mktempdir() do directory

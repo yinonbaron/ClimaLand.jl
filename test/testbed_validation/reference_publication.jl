@@ -16,6 +16,18 @@ const BINDINGS = Dict(
     "CASA-C" => "representative_casa_c_reference",
     "CASA-CN" => "representative_casa_cn_reference",
 )
+const REFERENCE_PAYLOAD_ROLES = Dict(
+    "CORPSE" => (
+        "boundaries",
+        "boundaries_manifest",
+        "reduced_history",
+        "reduced_history_manifest",
+    ),
+    "MIMICS-C" => ("oracle",),
+    "MIMICS-CN" => ("oracle",),
+    "CASA-C" => ("oracle",),
+    "CASA-CN" => ("oracle",),
+)
 
 struct PublicationError <: Exception
     message::String
@@ -166,6 +178,20 @@ function validate_payload(payload, kind, generation; model = nothing)
         get(manifest, "files", nothing),
         "$description manifest files",
     )
+    payload_roles = get(manifest, "payload", nothing)
+    payload_roles isa AbstractDict ||
+        fail("$description manifest lacks payload roles")
+    required_roles =
+        kind == "forcing" ? ("fixture_manifest",) :
+        REFERENCE_PAYLOAD_ROLES[model]
+    Set(String.(keys(payload_roles))) == Set(required_roles) ||
+        fail("$description manifest has incompatible payload roles")
+    all(
+        path -> path isa AbstractString && haskey(declared_files, path),
+        values(payload_roles),
+    ) || fail("$description payload roles must identify declared files")
+    length(unique(values(payload_roles))) == length(payload_roles) ||
+        fail("$description payload roles must identify distinct files")
     actual_files = setdiff(payload_files(payload), ["manifest.toml"])
     sort!(collect(keys(declared_files))) == actual_files ||
         fail("$description manifest does not declare the complete bundle")
@@ -181,6 +207,9 @@ function validate_payload(payload, kind, generation; model = nothing)
         Dict{String, Any}(String(key) => value for (key, value) in manifest)
     normalized["provenance"] = provenance
     normalized["files"] = declared_files
+    normalized["payload"] = Dict{String, String}(
+        String(role) => String(path) for (role, path) in payload_roles
+    )
     return (;
         payload,
         kind,
