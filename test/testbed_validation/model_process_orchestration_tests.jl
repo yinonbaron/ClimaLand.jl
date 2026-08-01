@@ -18,6 +18,7 @@ end
     mktempdir() do directory
         selected = ("CASA-CN", "CORPSE", "MIMICS-CN")
         delays = Dict(model => 0.05 for model in selected)
+        log_directory = joinpath(directory, "logs")
         result = ModelProcesses.run_model_workers(
             fake_worker_command(
                 directory,
@@ -26,8 +27,7 @@ end
             );
             models = join(selected, ","),
             workers = 2,
-            worker_stdout = devnull,
-            worker_stderr = devnull,
+            worker_log_directory = log_directory,
         )
 
         @test result.exitcode == 1
@@ -42,6 +42,10 @@ end
         @test isfile(joinpath(directory, "CORPSE.finished.toml"))
         @test !isfile(joinpath(directory, "MIMICS-CN.finished.toml"))
         @test isfile(joinpath(directory, "CASA-CN.finished.toml"))
+        @test readdir(log_directory) == ["MIMICS-CN.log"]
+        failure_log = read(joinpath(log_directory, "MIMICS-CN.log"), String)
+        @test occursin("MIMICS-CN stdout", failure_log)
+        @test occursin("MIMICS-CN stderr", failure_log)
     end
 end
 
@@ -87,7 +91,6 @@ end
               collect(ModelProcesses.MODELS)
         @test all(outcome -> outcome.outcome == "passed", result.outcomes)
         @test all(outcome -> outcome.seconds > 0, result.outcomes)
-
         records = Dict(
             model => TOML.parsefile(
                 joinpath(directory, "$model.finished.toml"),

@@ -461,6 +461,101 @@ end
     end
 end
 
+@testset "Validation Runner writes aggregate hard-timeout reports" begin
+    mktempdir() do output
+        args = [
+            "--scope",
+            "representative",
+            "--models",
+            "all",
+            "--output",
+            output,
+        ]
+        started_at = time()
+        configuration = VALIDATION_RUNNER_MODULE.parse_args(args)
+        scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+        completed = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
+            merge(configuration, (; models = ["CORPSE"])),
+            output,
+            scope,
+        )
+        completed["outcome"] = "passed"
+        only(completed["model"])["outcome"] = "passed"
+        completed_path =
+            joinpath(output, "models", "CORPSE", "validation_report.toml")
+        mkpath(dirname(completed_path))
+        open(completed_path, "w") do io
+            TOML.print(io, completed; sorted = true)
+        end
+        log_directory = joinpath(output, "logs")
+        mkpath(log_directory)
+        write(joinpath(log_directory, "CORPSE.log"), "passed")
+        write(joinpath(log_directory, "MIMICS-C.log"), "timed out")
+        VALIDATION_RUNNER_MODULE.write_timeout_report(
+            args,
+            output,
+            7200.0,
+            started_at,
+        )
+
+        report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test report["outcome"] == "timed_out"
+        @test report["timeout"]["expired"]
+        @test report["timeout"]["limit_seconds"] == 7200.0
+        @test getindex.(report["model"], "name") ==
+              collect(VALIDATION_RUNNER_MODULE.MODELS)
+        @test report["model"][1]["outcome"] == "passed"
+        @test all(
+            model -> model["outcome"] == "timed_out",
+            report["model"][2:end],
+        )
+        @test !isfile(joinpath(log_directory, "CORPSE.log"))
+        @test isfile(joinpath(log_directory, "MIMICS-C.log"))
+
+        VALIDATION_RUNNER_MODULE.write_timeout_report(
+            args,
+            output,
+            7200.0,
+            stat(completed_path).mtime + 1,
+        )
+        stale = TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test all(model -> model["outcome"] == "timed_out", stale["model"])
+    end
+end
+
+@testset "Validation Runner bounds process-tree termination" begin
+    if !Sys.iswindows()
+        mktempdir() do directory
+            ready = joinpath(directory, "ready")
+            script =
+                "trap 'exit 0' TERM; (trap '' TERM; sleep 30) & touch '$ready'; wait"
+            command = Cmd(`sh -c $script`; detach = true)
+            process = run(ignorestatus(command); wait = false)
+            @test timedwait(() -> isfile(ready), 2; pollint = 0.01) == :ok
+            process_group = Base.Libc.getpid(process)
+            started = time()
+            VALIDATION_RUNNER_MODULE.terminate_process_tree(
+                process;
+                grace_seconds = 0.05,
+            )
+            @test process_exited(process)
+            @test timedwait(
+                () ->
+                    ccall(
+                        :kill,
+                        Cint,
+                        (Cint, Cint),
+                        -process_group,
+                        0,
+                    ) != 0,
+                1;
+                pollint = 0.01,
+            ) == :ok
+            @test time() - started < 2
+        end
+    end
+end
+
 @testset "Validation Runner fails closed before CASA-C simulation" begin
     mktempdir() do directory
         policy_path = joinpath(directory, "comparison_policy.toml")

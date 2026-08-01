@@ -20,7 +20,8 @@ const REPRESENTATIVE_VALIDATION_WORKFLOW = normpath(
     @test !occursin("matrix:", workflow)
     @test occursin("runs-on: ubuntu-latest", workflow)
     @test occursin("version: '1.12'", workflow)
-    @test occursin("timeout-minutes: 120", workflow)
+    @test occursin("timeout-minutes: 180", workflow)
+    @test occursin("CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '7200'", workflow)
 
     cache = findfirst("Cache Julia depot and validation artifacts", workflow)
     stage = findfirst("Stage all pinned Representative artifacts", workflow)
@@ -49,6 +50,7 @@ const REPRESENTATIVE_VALIDATION_WORKFLOW = normpath(
     @test occursin("name: Upload compact validation report", workflow)
     @test occursin(r"if: always\(\)\s+uses: actions/upload-artifact@"s, workflow)
     @test occursin("name: Upload detailed failure logs", workflow)
+    @test occursin("path: validation-output/logs/", workflow)
     @test occursin(
         "if: steps.stage_artifacts.outcome != 'success' || steps.validation.outcome != 'success'",
         workflow,

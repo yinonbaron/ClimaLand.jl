@@ -2,6 +2,8 @@ import LinearAlgebra
 import TOML
 
 model, delay, behavior, directory = ARGS
+println("$model stdout")
+println(stderr, "$model stderr")
 started_ns = time_ns()
 open(joinpath(directory, "$model.started.toml"), "w") do io
     TOML.print(io, Dict("started_ns" => started_ns))

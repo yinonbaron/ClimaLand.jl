@@ -16,10 +16,11 @@ jobs:
   representative-validation:
     name: Representative scientific validation
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       JULIA_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
+      CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '7200'
       VALIDATION_OUTPUT: validation-output
     steps:
       - uses: actions/checkout@v7
@@ -131,7 +132,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: representative-validation-failure-logs
-          path: validation-output/logs/**/*.log
+          path: validation-output/logs/
           if-no-files-found: warn
           retention-days: 7
       - name: Enforce staging and scientific outcomes

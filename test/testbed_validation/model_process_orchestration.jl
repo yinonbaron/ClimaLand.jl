@@ -37,9 +37,11 @@ function run_model_workers(
     workers = default_worker_count(),
     worker_stdout = stdout,
     worker_stderr = stderr,
+    worker_log_directory = nothing,
 )
     selected = select_models(models)
     limit = worker_count(workers)
+    isnothing(worker_log_directory) || mkpath(worker_log_directory)
     pending = collect(selected)
     running = Dict{String, Any}()
     completed = Dict{String, Any}()
@@ -48,7 +50,14 @@ function run_model_workers(
         while !isempty(pending) && length(running) < limit
             model = popfirst!(pending)
             started_ns = time_ns()
+            worker_log = nothing
+            worker_log_path = nothing
             try
+                if !isnothing(worker_log_directory)
+                    worker_log_path =
+                        joinpath(worker_log_directory, "$model.log")
+                    worker_log = open(worker_log_path, "w")
+                end
                 command = addenv(
                     worker_command(model),
                     "JULIA_NUM_THREADS" => "1",
@@ -57,13 +66,17 @@ function run_model_workers(
                 process = run(
                     pipeline(
                         ignorestatus(command);
-                        stdout = worker_stdout,
-                        stderr = worker_stderr,
+                        stdout =
+                            isnothing(worker_log) ? worker_stdout : worker_log,
+                        stderr =
+                            isnothing(worker_log) ? worker_stderr : worker_log,
                     );
                     wait = false,
                 )
-                running[model] = (; process, started_ns)
+                running[model] =
+                    (; process, started_ns, worker_log, worker_log_path)
             catch error
+                isnothing(worker_log) || close(worker_log)
                 completed[model] = (;
                     model,
                     outcome = "crashed",
@@ -89,11 +102,15 @@ function run_model_workers(
         model = selected[index]
         worker = pop!(running, model)
         wait(worker.process)
+        isnothing(worker.worker_log) || close(worker.worker_log)
         code = worker.process.exitcode
         signal = worker.process.termsignal
+        passed = success(worker.process)
+        passed && !isnothing(worker.worker_log_path) &&
+            rm(worker.worker_log_path)
         completed[model] = (;
             model,
-            outcome = success(worker.process) ? "passed" : "failed",
+            outcome = passed ? "passed" : "failed",
             exitcode = code,
             signal,
             seconds = (time_ns() - worker.started_ns) / 1e9,

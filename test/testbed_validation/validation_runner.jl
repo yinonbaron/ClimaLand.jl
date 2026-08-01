@@ -771,7 +771,18 @@ function write_report(output_root, report)
 end
 
 function print_summary(io, report, report_path)
-    model = only(report["model"])
+    models = report["model"]
+    if length(models) > 1
+        println(
+            io,
+            "Validation: $(report["outcome"]) | scope=$(report["scope"]["name"]) " *
+            "| models=$(length(models)) | reference=$(report["reference_mode"]) " *
+            "| seconds=$(round(report["seconds"]; digits = 3))",
+        )
+        println(io, "Validation Report: $report_path")
+        return nothing
+    end
+    model = only(models)
     coverage = model["coverage"]
     println(
         io,
@@ -1474,16 +1485,12 @@ function run_multiple!(report, output_root, configuration, scope)
         `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) --scope $(configuration.scope) --models $model --reference pinned --workers 1 --output $(joinpath(model_root, model))`,
         CHILD_PROCESS => "1",
     )
-    log_path = joinpath(log_root, "model-workers.log")
-    workers_result = open(log_path, "w") do log
-        TestbedModelProcessOrchestration.run_model_workers(
-            command;
-            models = configuration.models,
-            workers = configuration.workers,
-            worker_stdout = log,
-            worker_stderr = log,
-        )
-    end
+    workers_result = TestbedModelProcessOrchestration.run_model_workers(
+        command;
+        models = configuration.models,
+        workers = configuration.workers,
+        worker_log_directory = log_root,
+    )
     model_reports = Dict{String, Any}()
     for model in configuration.models
         path = joinpath(model_root, model, REPORT_FILENAME)
@@ -1534,13 +1541,7 @@ function main(args = ARGS)
         try
             passed = run_multiple!(report, output_root, configuration, scope)
             report_path = write_report(output_root, report)
-            println(
-                stdout,
-                "Validation: $(report["outcome"]) | scope=$(scope.name) " *
-                "| models=$(length(report["model"])) | reference=$(configuration.reference_mode) " *
-                "| seconds=$(round(report["seconds"]; digits = 3))",
-            )
-            println(stdout, "Validation Report: $report_path")
+            print_summary(stdout, report, report_path)
             return passed ? 0 : 1
         catch error
             report["seconds"] = (time_ns() - started) / 1e9
@@ -1708,23 +1709,73 @@ function child_arguments(args)
     return collect(args), abspath(configuration.output)
 end
 
-function write_timeout_report(args, output_root, limit_seconds)
+function write_timeout_report(args, output_root, limit_seconds, started_at)
     configuration = parse_args(args)
     scope = load_scope_manifests(configuration.scope)
-    policy = comparison_policy(only(configuration.models))
-    report = initial_report(configuration, output_root, scope, policy)
+    report = empty_aggregate_report(configuration, output_root, scope)
     message = "hard timeout after $(round(limit_seconds; digits = 3)) seconds"
     report["outcome"] = "timed_out"
     report["seconds"] = limit_seconds
     report["error"] = message
     report["timeout"] =
         Dict("expired" => true, "limit_seconds" => limit_seconds)
-    model_report = only(report["model"])
-    model_report["outcome"] = "timed_out"
-    model_report["seconds"] = limit_seconds
+    for (index, model) in enumerate(configuration.models)
+        completed_path = joinpath(
+            output_root,
+            "models",
+            model,
+            REPORT_FILENAME,
+        )
+        completed = if isfile(completed_path) &&
+                       stat(completed_path).mtime >= started_at
+            try
+                candidate = only(TOML.parsefile(completed_path)["model"])
+                candidate["name"] == model ? candidate : nothing
+            catch
+                nothing
+            end
+        end
+        if isnothing(completed)
+            report["model"][index]["outcome"] = "timed_out"
+            report["model"][index]["seconds"] = limit_seconds
+        else
+            report["model"][index] = completed
+            if get(completed, "outcome", "failed") == "passed"
+                log_path = joinpath(output_root, "logs", "$model.log")
+                isfile(log_path) && rm(log_path)
+            end
+        end
+    end
     path = write_report(output_root, report)
     println(stderr, "Validation Runner: ", message)
     print_summary(stderr, report, path)
+    return nothing
+end
+
+function terminate_process_tree(process; grace_seconds = 10.0)
+    if Sys.iswindows()
+        kill(process, Base.SIGTERM)
+        status = timedwait(
+            () -> process_exited(process),
+            grace_seconds;
+            pollint = min(0.1, grace_seconds / 10),
+        )
+        status == :timed_out && kill(process, Base.SIGKILL)
+        wait(process)
+        return nothing
+    end
+    pid = Base.Libc.getpid(process)
+    signal_group(signal) =
+        ccall(:kill, Cint, (Cint, Cint), -pid, signal)
+    signal_group(Base.SIGTERM) == 0 || kill(process, Base.SIGTERM)
+    status = timedwait(
+        () -> signal_group(0) != 0,
+        grace_seconds;
+        pollint = min(0.1, grace_seconds / 10),
+    )
+    status == :timed_out && signal_group(Base.SIGKILL) != 0 &&
+        kill(process, Base.SIGKILL)
+    wait(process)
     return nothing
 end
 
@@ -1745,10 +1796,11 @@ function run_with_deadline(args = ARGS)
         return 2
     end
     project = dirname(Base.active_project())
-    command = addenv(
+    command = Cmd(addenv(
         `$(Base.julia_cmd()) --startup-file=no --project=$project $(@__FILE__) $child_args`,
         CHILD_PROCESS => "1",
-    )
+    ); detach = !Sys.iswindows())
+    started_at = time()
     process = run(pipeline(ignorestatus(command); stdout, stderr); wait = false)
     status = timedwait(
         () -> process_exited(process),
@@ -1756,10 +1808,14 @@ function run_with_deadline(args = ARGS)
         pollint = min(0.1, limit_seconds / 10),
     )
     if status == :timed_out
-        kill(process)
-        wait(process)
+        terminate_process_tree(process)
         try
-            write_timeout_report(child_args, output_root, limit_seconds)
+            write_timeout_report(
+                child_args,
+                output_root,
+                limit_seconds,
+                started_at,
+            )
         catch error
             println(
                 stderr,
