@@ -17,9 +17,8 @@ function write_contract_forcing_bundle(root)
                 "selection" => Dict(
                     "scope_manifest_sha256" =>
                         ContractRunner.sha256sum(CONTRACT_SCOPE_PATH),
-                    "representative_cell_ids" => Int.(
-                        TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],
-                    ),
+                    "representative_cell_ids" =>
+                        Int.(TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],),
                 ),
             );
             sorted = true,
@@ -29,9 +28,8 @@ function write_contract_forcing_bundle(root)
         "schema_version" => 1,
         "kind" => "forcing",
         "scope" => "representative",
-        "files" => Dict(
-            "fixture.toml" => ContractRunner.sha256sum(fixture_path),
-        ),
+        "files" =>
+            Dict("fixture.toml" => ContractRunner.sha256sum(fixture_path)),
         "payload" => Dict("fixture_manifest" => "fixture.toml"),
         "provenance" => Dict(
             "scope_manifest_sha256" =>
@@ -173,9 +171,7 @@ end
 @testset "Validation Runner accepts an explicit CORPSE forcing bundle" begin
     mktempdir() do directory
         forcing = write_contract_forcing_bundle(joinpath(directory, "forcing"))
-        withenv(
-            "CLIMALAND_VALIDATION_CORPSE_FORCING" => forcing,
-        ) do
+        withenv("CLIMALAND_VALIDATION_CORPSE_FORCING" => forcing) do
             root, artifact = ContractRunner.representative_forcing_directory()
             @test root == abspath(forcing)
             @test isnothing(artifact)
@@ -192,9 +188,7 @@ end
 @testset "Validation Runner rejects a missing CORPSE forcing override" begin
     mktempdir() do directory
         missing = joinpath(directory, "missing-forcing")
-        withenv(
-            "CLIMALAND_VALIDATION_CORPSE_FORCING" => missing,
-        ) do
+        withenv("CLIMALAND_VALIDATION_CORPSE_FORCING" => missing) do
             error = try
                 ContractRunner.representative_forcing_directory()
                 nothing
@@ -228,13 +222,12 @@ end
             scope,
         )
         worker_called = Ref(false)
-        worker_runner = function (command; models, workers, worker_log_directory)
-            worker_called[] = true
-            return (; outcomes = Any[])
-        end
-        withenv(
-            "CLIMALAND_VALIDATION_CORPSE_FORCING" => forcing,
-        ) do
+        worker_runner =
+            function (command; models, workers, worker_log_directory)
+                worker_called[] = true
+                return (; outcomes = Any[])
+            end
+        withenv("CLIMALAND_VALIDATION_CORPSE_FORCING" => forcing) do
             error = try
                 ContractRunner.run_multiple!(
                     report,
@@ -250,9 +243,55 @@ end
                 caught
             end
             @test error isa ContractRunner.RunnerError
-            @test occursin("differs from its manifest", sprint(showerror, error))
+            @test occursin(
+                "differs from its manifest",
+                sprint(showerror, error),
+            )
             @test !worker_called[]
         end
+    end
+end
+
+@testset "Validation Runner completes CORPSE compatibility before workers" begin
+    configuration = ContractRunner.parse_args([
+        "--scope",
+        "representative",
+        "--models",
+        "CORPSE,MIMICS-C",
+    ])
+    scope = ContractRunner.load_scope_manifests("representative")
+    mktempdir() do directory
+        forcing = write_contract_forcing_bundle(joinpath(directory, "forcing"))
+        report = ContractRunner.empty_aggregate_report(
+            configuration,
+            joinpath(directory, "output"),
+            scope,
+        )
+        worker_called = Ref(false)
+        worker_runner =
+            function (command; models, workers, worker_log_directory)
+                worker_called[] = true
+                return (; outcomes = Any[])
+            end
+        preflight = function (scope_path, forcing_root, reference_root)
+            @test scope_path == scope.path
+            @test forcing_root == forcing
+            @test reference_root == "CORPSE-reference"
+            throw(ContractRunner.RunnerError("mixed CORPSE compatibility set"))
+        end
+
+        @test_throws ContractRunner.RunnerError ContractRunner.run_multiple!(
+            report,
+            joinpath(directory, "output"),
+            configuration,
+            scope;
+            reference_resolver = (_, model) -> ("$model-reference", nothing),
+            fixture_resolver = (_, _) -> ("fixture", nothing),
+            corpse_forcing_resolver = () -> (forcing, nothing),
+            corpse_preflight = preflight,
+            worker_runner,
+        )
+        @test !worker_called[]
     end
 end
 
@@ -348,6 +387,7 @@ end
             fixture_resolver = (_, _) -> ("fixture", nothing),
             reference_resolver = (_, _) -> ("reference", nothing),
             corpse_forcing_resolver = () -> (forcing, repeat("c", 40)),
+            corpse_preflight = (_, _, _) -> nothing,
             worker_runner,
         )
         @test report["outcome"] == "failed"
@@ -439,8 +479,7 @@ end
               (model == "CORPSE" ? 2 : 0)
         @test haskey(result, "comparison_policy")
         if model == "CORPSE"
-            @test result["forcing"]["manifest_sha256"] ==
-                  forcing_manifest_sha
+            @test result["forcing"]["manifest_sha256"] == forcing_manifest_sha
             @test result["forcing"]["artifact"] == repeat("b", 40)
             @test result["forcing"]["provenance"]["comparison_schema"] ==
                   "reduced-comparison-oracle-v1"
@@ -450,5 +489,90 @@ end
         @test exitcode == 1
         @test report["outcome"] == "failed"
         @test only(report["model"])["outcome"] == "failed"
+    end
+end
+
+@testset "Validation Runner records explicit maintainer evidence retention" begin
+    defaults = ContractRunner.parse_args(String[])
+    @test defaults.retain_fresh_evidence === false
+    @test_throws ContractRunner.RunnerError ContractRunner.parse_args([
+        "--retain-fresh-evidence",
+    ])
+    @test_throws ContractRunner.RunnerError ContractRunner.parse_args([
+        "--reference",
+        "fresh",
+        "--retain-fresh-evidence",
+    ])
+
+    mktempdir() do output
+        configuration = ContractRunner.parse_args([
+            "--scope",
+            "representative",
+            "--models",
+            "CORPSE",
+            "--reference",
+            "fresh",
+            "--output",
+            output,
+            "--retain-fresh-evidence",
+        ])
+        scope = ContractRunner.load_scope_manifests("representative")
+        report =
+            ContractRunner.empty_aggregate_report(configuration, output, scope)
+        runner = function (
+            reference_mode,
+            build_command,
+            worker_command;
+            models,
+            workers,
+            temporary_parent,
+            retain_success,
+            scope_manifest_sha256,
+            preflight,
+        )
+            @test retain_success
+            @test scope_manifest_sha256 == ContractRunner.sha256sum(scope.path)
+            evidence = joinpath(output, "fresh-reference-evidence")
+            mkpath(evidence)
+            build = (;
+                outcome = "passed",
+                seconds = 0.1,
+                exitcode = 0,
+                signal = 0,
+                error = nothing,
+            )
+            outcome = merge(build, (; model = "CORPSE"))
+            comparison = Dict(
+                "outcome" => "passed",
+                "coverage" => Dict(
+                    "scope_cells" => 80,
+                    "eligible_cells" => 78,
+                    "compared_cells" => 78,
+                ),
+            )
+            return (;
+                outcome = "passed",
+                exitcode = 0,
+                build,
+                outcomes = [outcome],
+                comparisons = Dict("CORPSE" => comparison),
+                run_root = evidence,
+                preserved = true,
+                retention_mode = "maintainer",
+                proposal_paths = Dict{String, String}(),
+            )
+        end
+
+        @test ContractRunner.run_fresh!(
+            report,
+            output,
+            configuration;
+            commands = (build = nothing, worker = nothing),
+            runner,
+        )
+        @test report["fresh_reference"]["retention_mode"] == "maintainer"
+        @test report["fresh_reference"]["retained_on_success"] === true
+        @test report["fresh_reference"]["ephemeral"] === false
+        @test isdir(report["fresh_reference"]["evidence_root"])
     end
 end

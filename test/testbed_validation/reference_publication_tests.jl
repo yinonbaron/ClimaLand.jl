@@ -61,8 +61,7 @@ function write_build_receipt(
             "toolchain_identity" => CANONICAL_TOOLCHAIN,
             "compiler_identity" => compiler_identity,
             "verification" => Dict(
-                "source_commit" =>
-                    "0123456789abcdef0123456789abcdef01234567",
+                "source_commit" => "0123456789abcdef0123456789abcdef01234567",
                 "source_code_clean" => true,
                 "executable_sha256" => HEX_A,
             ),
@@ -199,18 +198,19 @@ function write_payload_manifest(
                 "eligible_cells" => expected_eligible,
                 "compared_cells" => expected_eligible,
             ),
+            "shared_executable_sha256" => HEX_A,
+            "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
         )
         if model == "CORPSE"
             source_comparison["stage"] = Dict(
                 "historical" => Dict(
-                    "comparison" => Dict(
-                        "state" => Dict("all_match" => true),
-                    ),
+                    "comparison" =>
+                        Dict("state" => Dict("all_match" => true)),
                 ),
             )
             source_comparison["reduced_historical"] = Dict(
-                name => Dict("state" => Dict("all_match" => true)) for name in
-                (
+                name => Dict("state" => Dict("all_match" => true)) for
+                name in (
                     "annual_summaries",
                     "end_of_year",
                     "annual_budgets",
@@ -226,11 +226,24 @@ function write_payload_manifest(
                 "fixed_daily_samples" => Dict("all_match" => true),
             )
             source_comparison["carbon_budget"] = Dict("all_close" => true)
-            model in ("MIMICS-CN", "CASA-CN") &&
-                (source_comparison["nitrogen_budget"] =
-                    Dict("all_close" => true))
+            model in ("MIMICS-CN", "CASA-CN") && (
+                source_comparison["nitrogen_budget"] =
+                    Dict("all_close" => true)
+            )
         end
         write_publication_manifest(source_comparison_path, source_comparison)
+        source_fortran_path =
+            joinpath(dirname(directory), "source_fortran_output.toml")
+        write_publication_manifest(
+            source_fortran_path,
+            Dict(
+                "schema_version" => 1,
+                "model" => model,
+                "scope" => "representative",
+                "shared_executable_sha256" => HEX_A,
+                "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
+            ),
+        )
         write_publication_manifest(
             comparison_path,
             Dict(
@@ -241,8 +254,9 @@ function write_payload_manifest(
                 "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
                 "build_receipt_sha256" => build_receipt_sha256,
                 "outcome" => "passed",
-                "source_comparison_sha256" =>
-                    sha256sum(source_comparison_path),
+                "source_comparison_sha256" => sha256sum(source_comparison_path),
+                "source_fortran_output_sha256" =>
+                    sha256sum(source_fortran_path),
                 "coverage" => Dict(
                     "scope_cells" => 80,
                     "eligible_cells" => expected_eligible,
@@ -359,7 +373,8 @@ function make_canonical_fresh_run(root, candidate)
         mkpath(model_root)
         payload = joinpath(candidate, "model-$model", "reference")
         role = model == "CORPSE" ? "reduced_history" : "oracle"
-        relative = TOML.parsefile(joinpath(payload, "manifest.toml"))["payload"][role]
+        relative =
+            TOML.parsefile(joinpath(payload, "manifest.toml"))["payload"][role]
         reference = joinpath(model_root, basename(relative))
         cp(joinpath(payload, relative), reference)
         if model == "CORPSE"
@@ -385,19 +400,20 @@ function make_canonical_fresh_run(root, candidate)
                 "sha256" => sha256sum(reference),
                 "kind" => "fresh_reduced_oracle",
             ),
+            "shared_executable_sha256" => sha256sum(executable),
+            "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
         )
         if model == "CORPSE"
             report["stage"] = Dict(
                 stage => Dict(
-                    "comparison" => Dict(
-                        "state" => Dict("all_match" => true),
-                    ),
+                    "comparison" =>
+                        Dict("state" => Dict("all_match" => true)),
                 ) for stage in
                 ("prespin", "spin", "spin_continuation", "historical")
             )
             report["reduced_historical"] = Dict(
-                name => Dict("state" => Dict("all_match" => true)) for name in
-                (
+                name => Dict("state" => Dict("all_match" => true)) for
+                name in (
                     "annual_summaries",
                     "end_of_year",
                     "annual_budgets",
@@ -406,15 +422,27 @@ function make_canonical_fresh_run(root, candidate)
             )
             report["budget"] = Dict("verified" => true)
         else
-            report["boundary_comparison"] = Dict(
-                "historical" => Dict("all_match" => true),
-            )
+            report["boundary_comparison"] =
+                Dict("historical" => Dict("all_match" => true))
             report["historical_comparison"] = historical
             report["carbon_budget"] = Dict("all_close" => true)
             model in ("MIMICS-CN", "CASA-CN") &&
                 (report["nitrogen_budget"] = Dict("all_close" => true))
         end
-        write_publication_manifest(joinpath(model_root, "comparison.toml"), report)
+        write_publication_manifest(
+            joinpath(model_root, "comparison.toml"),
+            report,
+        )
+        write_publication_manifest(
+            joinpath(model_root, "fortran_output.toml"),
+            Dict(
+                "schema_version" => 1,
+                "model" => model,
+                "scope" => "representative",
+                "shared_executable_sha256" => sha256sum(executable),
+                "scope_manifest_sha256" => sha256sum(PUBLICATION_SCOPE_PATH),
+            ),
+        )
     end
     return root
 end
@@ -476,7 +504,8 @@ end
 @testset "Reference Publication bridges validated fresh evidence" begin
     mktempdir() do directory
         candidate = make_candidate(joinpath(directory, "candidate"))
-        fresh = make_canonical_fresh_run(joinpath(directory, "fresh"), candidate)
+        fresh =
+            make_canonical_fresh_run(joinpath(directory, "fresh"), candidate)
         rm(joinpath(candidate, "canonical_build_receipt.toml"))
         rm(joinpath(candidate, "build_metadata.toml"))
         for model in PUBLICATION_MODELS
@@ -516,7 +545,9 @@ end
             tampered_fresh,
             tampered,
             joinpath(directory, "tampered-publication"),
-            empty_artifacts_toml(joinpath(directory, "tampered-Artifacts.toml")),
+            empty_artifacts_toml(
+                joinpath(directory, "tampered-Artifacts.toml"),
+            ),
             RELEASE_URL,
         )
 
@@ -534,9 +565,52 @@ end
             incomplete_fresh,
             incomplete,
             joinpath(directory, "incomplete-publication"),
-            empty_artifacts_toml(joinpath(directory, "incomplete-Artifacts.toml")),
+            empty_artifacts_toml(
+                joinpath(directory, "incomplete-Artifacts.toml"),
+            ),
             RELEASE_URL,
         )
+
+        for (description, field) in (
+            ("mixed build", "shared_executable_sha256"),
+            ("mixed scope", "scope_manifest_sha256"),
+        )
+            mixed = make_candidate(
+                joinpath(directory, replace(description, ' ' => '-')),
+            )
+            mixed_fresh = make_canonical_fresh_run(
+                joinpath(
+                    directory,
+                    "$(replace(description, ' ' => '-'))-fresh",
+                ),
+                mixed,
+            )
+            comparison =
+                joinpath(mixed_fresh, "model-CASA-C", "comparison.toml")
+            fortran =
+                joinpath(mixed_fresh, "model-CASA-C", "fortran_output.toml")
+            report = TOML.parsefile(comparison)
+            output = TOML.parsefile(fortran)
+            report[field] = repeat("f", 64)
+            output[field] = repeat("f", 64)
+            write_publication_manifest(comparison, report)
+            write_publication_manifest(fortran, output)
+            @test_throws ReferencePublication.PublicationError ReferencePublication.stage_publication(
+                mixed_fresh,
+                mixed,
+                joinpath(
+                    directory,
+                    "$(replace(description, ' ' => '-'))-publication",
+                ),
+                empty_artifacts_toml(
+                    joinpath(
+                        directory,
+                        "$(replace(description, ' ' => '-'))-Artifacts.toml",
+                    ),
+                ),
+                RELEASE_URL,
+            )
+        end
     end
 end
 
@@ -584,7 +658,13 @@ end
             "canonical_build_receipt.toml",
             "build_metadata.toml",
             ("$model-comparison.toml" for model in PUBLICATION_MODELS)...,
-            ("$model-source-comparison.toml" for model in PUBLICATION_MODELS)...,
+            (
+                "$model-source-comparison.toml" for model in PUBLICATION_MODELS
+            )...,
+            (
+                "$model-source-fortran-output.toml" for
+                model in PUBLICATION_MODELS
+            )...,
         ))
         build_receipt_sha256 =
             sha256sum(joinpath(evidence, "canonical_build_receipt.toml"))

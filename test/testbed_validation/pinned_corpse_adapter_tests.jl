@@ -387,6 +387,28 @@ end
     end
 end
 
+@testset "Pinned CORPSE preflight validates the complete compatibility set" begin
+    mktempdir() do root
+        inputs = make_inputs(root)
+        verified = PinnedCORPSE.preflight_inputs(
+            inputs.scope,
+            inputs.forcing,
+            inputs.reference,
+        )
+        @test verified.scope.cell_ids == collect(1:80)
+
+        manifest_path = joinpath(inputs.reference, "manifest.toml")
+        manifest = TOML.parsefile(manifest_path)
+        manifest["provenance"]["comparison_schema"] = "other-schema"
+        write_toml(manifest_path, manifest)
+        @test_throws PinnedCORPSE.AdapterError PinnedCORPSE.preflight_inputs(
+            inputs.scope,
+            inputs.forcing,
+            inputs.reference,
+        )
+    end
+end
+
 @testset "Pinned CORPSE adapter preserves scientific failure" begin
     mktempdir() do root
         inputs = make_inputs(root)

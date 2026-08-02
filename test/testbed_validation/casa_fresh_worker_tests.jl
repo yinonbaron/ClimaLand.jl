@@ -57,7 +57,8 @@ function stub_casa_workflow(configuration, _, collection, run_root)
     mkpath(controls)
     stages = Dict{String, Any}[]
     for stage in ("prespin", "accelerated_spin", "normal_spin", "historical")
-        control = TestbedReferenceHarness.write_smoke_control(controls; points = 80)
+        control =
+            TestbedReferenceHarness.write_smoke_control(controls; points = 80)
         destination = joinpath(controls, "$stage.lst")
         mv(control, destination; force = true)
         push!(
@@ -102,8 +103,12 @@ function synthetic_finish(passed)
             "schema_version" => 1,
             "initialization_comparison" => Dict("all_match" => true),
             "boundary_comparison" => Dict(
-                stage => Dict("all_match" => true) for stage in
-                ("prespin", "accelerated_spin", "normal_spin", "historical")
+                stage => Dict("all_match" => true) for stage in (
+                    "prespin",
+                    "accelerated_spin",
+                    "normal_spin",
+                    "historical",
+                )
             ),
             "historical_comparison" => Dict("all_match" => true),
             "passive_restoration" => Dict(
@@ -185,8 +190,17 @@ end
         @test CASAFreshWorker.worker_exit_code(passed) == 0
         @test isfile(joinpath(directory, "passed", "fortran_output.toml"))
         @test isfile(joinpath(directory, "passed", "julia_output.toml"))
-        @test TOML.parsefile(joinpath(directory, "passed", "comparison.toml"))["outcome"] ==
-              "passed"
+        comparison =
+            TOML.parsefile(joinpath(directory, "passed", "comparison.toml"))
+        fortran =
+            TOML.parsefile(joinpath(directory, "passed", "fortran_output.toml"))
+        @test comparison["outcome"] == "passed"
+        @test comparison["shared_executable_sha256"] ==
+              fortran["shared_executable_sha256"]
+        @test comparison["scope_manifest_sha256"] ==
+              fortran["scope_manifest_sha256"]
+        @test comparison["scope_manifest_sha256"] ==
+              TestbedNativeWorkflow.sha256sum(fixture.scope_path)
 
         failed = CASAFreshWorker.run_worker(
             "CASA-C",
@@ -201,8 +215,9 @@ end
         )
         @test !failed.comparison.passed
         @test CASAFreshWorker.worker_exit_code(failed) == 1
-        @test TOML.parsefile(joinpath(directory, "failed", "comparison.toml"))["outcome"] ==
-              "failed"
+        @test TOML.parsefile(
+            joinpath(directory, "failed", "comparison.toml"),
+        )["outcome"] == "failed"
     end
 end
 
@@ -239,10 +254,8 @@ end
     @test_throws ArgumentError CASAFreshWorker.model_configuration("MIMICS-C")
     @test CASAFreshWorker.main(
         fill("argument", 6);
-        runner = (args...) -> (;
-            nonfinite = Dict{String, Any}[],
-            comparison = (; passed = true),
-        ),
+        runner = (args...) ->
+            (; nonfinite = Dict{String, Any}[], comparison = (; passed = true)),
     ) == 0
     @test CASAFreshWorker.main(
         fill("argument", 6);

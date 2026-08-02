@@ -26,8 +26,7 @@ const Generator = parentmodule(@__MODULE__)
 const PINNED_SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
 const REPRESENTATIVE_SCOPE =
     joinpath(@__DIR__, "validation", "scopes", "representative.toml")
-const ACCELERATED_PARAMETERS_SHA256 =
-    "9dac2d263b43eb5a2df71ed7dbef398bc58ae55421829af8db97018fa93509e2"
+const ACCELERATED_PARAMETERS_SHA256 = "9dac2d263b43eb5a2df71ed7dbef398bc58ae55421829af8db97018fa93509e2"
 const ANNUAL_FILENAME = "ann_casaclm_pool_flux_1901_2014.nc"
 const RETAINED_DAILY_YEARS = Set((1901, 2014))
 
@@ -126,11 +125,8 @@ function prepare_inputs(configuration, source_root, collection, run_root)
             selected_year = year,
         )
     end
-    accelerated = joinpath(
-        source_root,
-        "GRID_CN",
-        "pftlookup_igbp_updated4_exud0AD.csv",
-    )
+    accelerated =
+        joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4_exud0AD.csv")
     isfile(accelerated) || error("accelerated CASA parameters are missing")
     Generator.TestbedNativeWorkflow.sha256sum(accelerated) ==
     ACCELERATED_PARAMETERS_SHA256 ||
@@ -181,8 +177,7 @@ function stage_inputs(prepared, stage, parameters, configuration)
             "historical" => "normal_spin",
         )[stage.name]
         transform = if stage.name == "normal_spin"
-            configuration == :carbon_only ?
-            "casa_passive_carbon_x10" :
+            configuration == :carbon_only ? "casa_passive_carbon_x10" :
             "casa_passive_carbon_nitrogen_x10"
         else
             "none"
@@ -256,7 +251,8 @@ function write_annual_year!(annual_path, daily_path, year)
             for (reference_name, _) in
                 Generator.NativeCASACN.historical_variables()
                 reference_name == "nLitInptStruc" && continue
-                values = Float64.(coalesce.(daily[reference_name][:, :, :], NaN))
+                values =
+                    Float64.(coalesce.(daily[reference_name][:, :, :], NaN))
                 annual[reference_name][:, :, index] =
                     dropdims(sum(values; dims = 3) ./ 365; dims = 3)
             end
@@ -286,7 +282,8 @@ function stream_historical!(stage_dir, annual_path, finished, completed)
             end
             isfile(next_path) || return nothing
         end
-        daily_file_complete(path) || error("incomplete CASA-CN daily output: $path")
+        daily_file_complete(path) ||
+            error("incomplete CASA-CN daily output: $path")
         write_annual_year!(annual_path, path, year)
         push!(completed, year)
         year in RETAINED_DAILY_YEARS || rm(path; force = true)
@@ -418,19 +415,19 @@ function write_nonfinite_results(run_root, model, records)
 end
 
 function scientific_pass(report, configuration)
-    initialization = get(
-        report,
-        "initialization_comparison",
-        Dict{String, Any}(),
-    )
+    initialization =
+        get(report, "initialization_comparison", Dict{String, Any}())
     boundaries = get(report, "boundary_comparison", Dict{String, Any}())
     historical = get(report, "historical_comparison", Dict{String, Any}())
     passive = get(report, "passive_restoration", Dict{String, Any}())
     carbon = get(report, "carbon_budget", Dict{String, Any}())
     passed =
         get(initialization, "all_match", false) &&
-        Set(keys(boundaries)) == Set(getproperty.(stage_specs(configuration), :name)) &&
-        all(get(boundary, "all_match", false) for boundary in values(boundaries)) &&
+        Set(keys(boundaries)) ==
+        Set(getproperty.(stage_specs(configuration), :name)) &&
+        all(
+            get(boundary, "all_match", false) for boundary in values(boundaries)
+        ) &&
         get(historical, "all_match", false) &&
         get(passive, "verified", false) &&
         get(passive, "unaffected_verified", false) &&
@@ -443,7 +440,15 @@ function scientific_pass(report, configuration)
     return passed
 end
 
-function write_comparison(run_root, model, configuration, report_path, oracle_path)
+function write_comparison(
+    run_root,
+    model,
+    configuration,
+    report_path,
+    oracle_path,
+    executable_sha256,
+    scope_manifest_sha256,
+)
     report = TOML.parsefile(report_path)
     passed = scientific_pass(report, configuration)
     report["model"] = model
@@ -454,6 +459,8 @@ function write_comparison(run_root, model, configuration, report_path, oracle_pa
         "eligible_cells" => 80,
         "compared_cells" => 80,
     )
+    report["shared_executable_sha256"] = executable_sha256
+    report["scope_manifest_sha256"] = scope_manifest_sha256
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => Generator.TestbedNativeWorkflow.sha256sum(oracle_path),
@@ -506,6 +513,8 @@ function run_worker(
             "scope" => "representative",
             "shared_executable_sha256" =>
                 Generator.TestbedNativeWorkflow.sha256sum(executable),
+            "scope_manifest_sha256" =>
+                Generator.TestbedNativeWorkflow.sha256sum(scope_manifest_path),
             "workflow" => prepared.workflow_path,
             "stages" => length(stages),
         ),
@@ -535,6 +544,8 @@ function run_worker(
         configuration,
         finished.report_path,
         finished.oracle_path,
+        Generator.TestbedNativeWorkflow.sha256sum(executable),
+        Generator.TestbedNativeWorkflow.sha256sum(scope_manifest_path),
     )
     Harness.write_toml_atomic(
         joinpath(run_root, "julia_output.toml"),
@@ -559,7 +570,8 @@ function run_worker(
 end
 
 worker_exit_code(result) =
-    !isempty(result.nonfinite) || isnothing(result.comparison) ||
+    !isempty(result.nonfinite) ||
+    isnothing(result.comparison) ||
     !result.comparison.passed ? 1 : 0
 
 function main(args = ARGS; runner = run_worker)

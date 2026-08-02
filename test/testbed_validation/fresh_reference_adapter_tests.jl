@@ -93,19 +93,13 @@ end
     @test "/tmp/casa-forcing" in casa_c.exec
     @test "/tmp/casa-c-reference-template" in casa_c.exec
     @test !("/tmp/casa-cn-reference-template" in casa_c.exec)
-    casa_cn = configured.worker(
-        "CASA-CN",
-        "/tmp/fresh-casa-cn",
-        "/tmp/fresh-build",
-    )
+    casa_cn =
+        configured.worker("CASA-CN", "/tmp/fresh-casa-cn", "/tmp/fresh-build")
     @test "/tmp/casa-forcing" in casa_cn.exec
     @test "/tmp/casa-cn-reference-template" in casa_cn.exec
     @test !("/tmp/casa-c-reference-template" in casa_cn.exec)
-    mimics_c = configured.worker(
-        "MIMICS-C",
-        "/tmp/fresh-mimics-c",
-        "/tmp/fresh-build",
-    )
+    mimics_c =
+        configured.worker("MIMICS-C", "/tmp/fresh-mimics-c", "/tmp/fresh-build")
     @test "worker" in mimics_c.exec
     @test "/tmp/forcing" in mimics_c.exec
     mimics_cn = configured.worker(
@@ -116,11 +110,8 @@ end
     @test "worker" in mimics_cn.exec
     @test "/tmp/forcing" in mimics_cn.exec
     @test "/tmp/reference-template" in mimics_cn.exec
-    corpse = configured.worker(
-        "CORPSE",
-        "/tmp/fresh-corpse",
-        "/tmp/fresh-build",
-    )
+    corpse =
+        configured.worker("CORPSE", "/tmp/fresh-corpse", "/tmp/fresh-build")
     @test "worker" in corpse.exec
     @test "/tmp/corpse-forcing" in corpse.exec
 end
@@ -188,10 +179,12 @@ end
     )
     @test result.status == :passed
     @test captured[].fixture_manifest == "/tmp/corpse-forcing/fixture.toml"
-    @test captured[].scope_manifest == FreshReferenceAdapter.REPRESENTATIVE_SCOPE
+    @test captured[].scope_manifest ==
+          FreshReferenceAdapter.REPRESENTATIVE_SCOPE
     @test captured[].calibration_manifest ==
           FreshReferenceAdapter.CORPSE_CALIBRATION
-    @test captured[].executable_resolver === FreshReferenceAdapter.verified_executable
+    @test captured[].executable_resolver ===
+          FreshReferenceAdapter.verified_executable
     @test captured[].fortran_runner isa Function
     @test captured[].reference_reducer isa Function
     @test captured[].payload_builder isa Function
@@ -219,10 +212,8 @@ end
                 io,
                 Dict(
                     "schema_version" => 1,
-                    "coverage" => Dict(
-                        "scope_cells" => 80,
-                        "compared_cells" => 80,
-                    ),
+                    "coverage" =>
+                        Dict("scope_cells" => 80, "compared_cells" => 80),
                     "boundary_comparison" => Dict(
                         stage => Dict("all_match" => true) for
                         stage in ("prespin", "spin", "historical")
@@ -237,17 +228,20 @@ end
             directory,
             scientific,
             oracle,
+            repeat("a", 64),
+            repeat("b", 64),
         )
         @test comparison.passed
         report = TOML.parsefile(comparison.path)
         @test report["model"] == "MIMICS-C"
         @test report["outcome"] == "passed"
+        @test report["shared_executable_sha256"] == repeat("a", 64)
+        @test report["scope_manifest_sha256"] == repeat("b", 64)
 
         boundaries = Dict(
             "prespin" => Dict("casa_plant.c_leaf" => [1.0, 2.0]),
             "spin" => Dict("casa_plant.c_leaf" => [Inf, 2.0]),
-            "historical" =>
-                Dict("mimics_soil.c_microbe_r" => [Inf, -Inf]),
+            "historical" => Dict("mimics_soil.c_microbe_r" => [Inf, -Inf]),
         )
         boundary = FreshReferenceAdapter.first_mimics_c_boundary_nonfinites(
             boundaries,
@@ -261,12 +255,11 @@ end
             year == 1901 && (values[2, 60] = Inf)
             Dict("diagnostic.cnpp" => values)
         end
-        historical =
-            FreshReferenceAdapter.first_mimics_c_historical_nonfinites(
-                1901:1901,
-                [51, 3442],
-                read_year,
-            )
+        historical = FreshReferenceAdapter.first_mimics_c_historical_nonfinites(
+            1901:1901,
+            [51, 3442],
+            read_year,
+        )
         @test only(historical)["first_nonfinite_date"] == "1901-03-01"
         earliest = FreshReferenceAdapter.earliest_mimics_c_nonfinites(
             boundary,
@@ -276,13 +269,14 @@ end
 
         observer =
             FreshReferenceAdapter.mimics_c_julia_nonfinite_observer([51, 3442])
-        runner = (; nonfinite_observer) -> nonfinite_observer(
-            (; name = :historical),
-            365 + 60,
-            (; mimics_soil = (; c_microbe_r = [1.0, Inf])),
-            nothing,
-            (),
-        )
+        runner =
+            (; nonfinite_observer) -> nonfinite_observer(
+                (; name = :historical),
+                365 + 60,
+                (; mimics_soil = (; c_microbe_r = [1.0, Inf])),
+                nothing,
+                (),
+            )
         result = FreshReferenceAdapter.run_mimics_c_julia(
             directory,
             runner;
@@ -291,9 +285,8 @@ end
         @test isnothing(result.julia)
         @test only(result.nonfinite)["evidence_side"] == "julia"
         @test only(result.nonfinite)["first_nonfinite_date"] == "1902-03-01"
-        proposal_input = TOML.parsefile(
-            joinpath(directory, "nonfinite_results.toml"),
-        )
+        proposal_input =
+            TOML.parsefile(joinpath(directory, "nonfinite_results.toml"))
         @test proposal_input["model"] == "MIMICS-C"
         @test only(proposal_input["nonfinite"])["cell_id"] == 3442
     end
@@ -309,13 +302,15 @@ end
                 io,
                 Dict(
                     "schema_version" => 1,
-                    "coverage" => Dict(
-                        "scope_cells" => 80,
-                        "compared_cells" => 80,
-                    ),
+                    "coverage" =>
+                        Dict("scope_cells" => 80, "compared_cells" => 80),
                     "boundary_comparison" => Dict(
-                        stage => Dict("all_match" => true) for stage in
-                        ("prespin", "spin", "spin_continuation", "historical")
+                        stage => Dict("all_match" => true) for stage in (
+                            "prespin",
+                            "spin",
+                            "spin_continuation",
+                            "historical",
+                        )
                     ),
                     "historical_comparison" => Dict("all_match" => true),
                     "carbon_budget" => Dict("all_close" => true),
@@ -329,6 +324,8 @@ end
             directory,
             scientific,
             oracle,
+            repeat("a", 64),
+            repeat("b", 64),
         )
 
         @test comparison.passed
@@ -337,6 +334,8 @@ end
         @test report["model"] == "MIMICS-CN"
         @test report["scope"] == "representative"
         @test report["outcome"] == "passed"
+        @test report["shared_executable_sha256"] == repeat("a", 64)
+        @test report["scope_manifest_sha256"] == repeat("b", 64)
         @test report["reference"]["sha256"] ==
               FreshReferenceAdapter.sha256sum(oracle)
         @test report["boundary_comparison"]["historical"]["all_match"]
@@ -350,6 +349,8 @@ end
             directory,
             scientific,
             oracle,
+            repeat("a", 64),
+            repeat("b", 64),
         ).passed
 
         delete!(failed["boundary_comparison"], "historical")
@@ -360,6 +361,8 @@ end
             directory,
             scientific,
             oracle,
+            repeat("a", 64),
+            repeat("b", 64),
         )
     end
 end
@@ -390,8 +393,7 @@ end
     @test getindex.(records, "first_nonfinite_date") ==
           ["1920-12-31", "1920-12-31"]
     @test getindex.(records, "evidence_side") == ["fortran", "fortran"]
-    @test records[2]["first_nonfinite_variable"] ==
-          "mimics_soil.n_mineral"
+    @test records[2]["first_nonfinite_variable"] == "mimics_soil.n_mineral"
 
     mktempdir() do directory
         path = FreshReferenceAdapter.write_mimics_cn_nonfinite_results(
@@ -407,27 +409,27 @@ end
 
 @testset "Fresh MIMICS-CN historical and Julia nonfinites retain exact evidence" begin
     calls = Int[]
-    read_year = year -> begin
-        push!(calls, year)
-        first_variable = zeros(2, 365)
-        second_variable = zeros(2, 365)
-        if year == 1901
-            first_variable[1, 91] = Inf
-            second_variable[1, 90] = -Inf
-        elseif year == 1902
-            first_variable[2, 365] = NaN
+    read_year =
+        year -> begin
+            push!(calls, year)
+            first_variable = zeros(2, 365)
+            second_variable = zeros(2, 365)
+            if year == 1901
+                first_variable[1, 91] = Inf
+                second_variable[1, 90] = -Inf
+            elseif year == 1902
+                first_variable[2, 365] = NaN
+            end
+            Dict(
+                "diagnostic.alpha" => first_variable,
+                "diagnostic.zeta" => second_variable,
+            )
         end
-        Dict(
-            "diagnostic.alpha" => first_variable,
-            "diagnostic.zeta" => second_variable,
-        )
-    end
-    historical =
-        FreshReferenceAdapter.first_mimics_cn_historical_nonfinites(
-            1901:2014,
-            [51, 3442],
-            read_year,
-        )
+    historical = FreshReferenceAdapter.first_mimics_cn_historical_nonfinites(
+        1901:2014,
+        [51, 3442],
+        read_year,
+    )
     @test calls == [1901, 1902]
     @test getindex.(historical, "cell_id") == [51, 3442]
     @test getindex.(historical, "first_nonfinite_date") ==
@@ -465,14 +467,9 @@ end
         observer(
             (; name = :historical, write_output = true),
             365 + 60,
-            (;
-                mimics_soil = (; c_microbe_r = [1.0, Inf]),
-            ),
+            (; mimics_soil = (; c_microbe_r = [1.0, Inf]),),
             nothing,
-            ((;
-                name = "diagnostic__cnpp",
-                compute = (_, _) -> [2.0, 3.0],
-            ),),
+            ((; name = "diagnostic__cnpp", compute = (_, _) -> [2.0, 3.0]),),
         )
         nothing
     catch caught
@@ -494,27 +491,25 @@ end
         @test success.julia == :completed
         @test isempty(success.nonfinite)
 
-        runner = (; nonfinite_observer) -> nonfinite_observer(
-            (; name = :spin_continuation, write_output = false),
-            365,
-            (; casa_plant = (; c_leaf = [Inf, 1.0])),
-            nothing,
-            (),
-        )
+        runner =
+            (; nonfinite_observer) -> nonfinite_observer(
+                (; name = :spin_continuation, write_output = false),
+                365,
+                (; casa_plant = (; c_leaf = [Inf, 1.0])),
+                nothing,
+                (),
+            )
         result = FreshReferenceAdapter.run_mimics_cn_julia(
             directory,
             runner;
-            nonfinite_observer =
-                FreshReferenceAdapter.mimics_cn_julia_nonfinite_observer([
-                    51,
-                    3442,
-                ]),
+            nonfinite_observer = FreshReferenceAdapter.mimics_cn_julia_nonfinite_observer([
+                51,
+                3442,
+            ]),
         )
         @test isnothing(result.julia)
         @test only(result.nonfinite)["cell_id"] == 51
-        document = TOML.parsefile(
-            joinpath(directory, "nonfinite_results.toml"),
-        )
+        document = TOML.parsefile(joinpath(directory, "nonfinite_results.toml"))
         @test only(document["nonfinite"])["first_nonfinite_stage"] ==
               "spin_continuation"
     end
@@ -525,10 +520,8 @@ end
         casa_plant = (; c_leaf = fill(1.0, 80)),
         mimics_soil = (; c_microbe_r = fill(2.0, 80)),
     )
-    diagnostics = ((;
-        name = "diagnostic__cnpp",
-        compute = (Y, _) -> Y.casa_plant.c_leaf,
-    ),)
+    diagnostics =
+        ((; name = "diagnostic__cnpp", compute = (Y, _) -> Y.casa_plant.c_leaf),)
     stage = (; name = :historical, write_output = true)
     for factory in (
         FreshReferenceAdapter.mimics_c_julia_nonfinite_observer,

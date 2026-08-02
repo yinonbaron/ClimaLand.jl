@@ -10,10 +10,11 @@ end
 const FreshReferenceOrchestration = TestbedFreshReferenceOrchestration
 
 const MODELS = ("CORPSE", "MIMICS-C", "MIMICS-CN", "CASA-C", "CASA-CN")
-const CANONICAL_TOOLCHAIN_IDENTITY = "climaland-biogeochem-reference-linux-gfortran-v1"
+const CANONICAL_TOOLCHAIN_IDENTITY =
+    FreshReferenceOrchestration.CANONICAL_TOOLCHAIN_IDENTITY
 const CANONICAL_BUILD_PLATFORM = "x86_64-linux-gnu"
 const PINNED_FORTRAN_SOURCE_COMMIT =
-    "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+    FreshReferenceOrchestration.PINNED_FORTRAN_SOURCE_COMMIT
 const DEFAULT_ARTIFACTS_TOML =
     joinpath(@__DIR__, "validation", "Artifacts.toml")
 const REPRESENTATIVE_SCOPE_MANIFEST =
@@ -41,6 +42,10 @@ const REFERENCE_PAYLOAD_ROLES = Dict(
 struct PublicationError <: Exception
     message::String
 end
+
+# ============================================================================
+# Validation Utilities
+# ============================================================================
 
 Base.showerror(io::IO, error::PublicationError) = print(io, error.message)
 
@@ -111,6 +116,10 @@ function compatibility_identity(provenance)
     TOML.print(io, compatibility_document(provenance); sorted = true)
     return bytes2hex(SHA.sha256(take!(io)))
 end
+
+# ============================================================================
+# Canonical Fresh Evidence
+# ============================================================================
 
 function representative_scope()
     manifest = parse_toml(
@@ -191,7 +200,8 @@ function canonical_build_receipt(fresh_root, candidate_root)
 end
 
 all_match(records) =
-    records isa AbstractDict && !isempty(records) &&
+    records isa AbstractDict &&
+    !isempty(records) &&
     all(get(record, "all_match", false) === true for record in values(records))
 
 is_true(record, key) =
@@ -200,37 +210,56 @@ is_true(record, key) =
 function scientific_checks(model, report)
     if model == "CORPSE"
         stages = get(report, "stage", nothing)
-        boundaries = stages isa AbstractDict && !isempty(stages) && all(
-            all_match(get(stage, "comparison", nothing)) for stage in
-            values(stages)
-        )
+        boundaries =
+            stages isa AbstractDict &&
+            !isempty(stages) &&
+            all(
+                all_match(get(stage, "comparison", nothing)) for
+                stage in values(stages)
+            )
         historical = get(report, "reduced_historical", nothing)
-        annual = historical isa AbstractDict && all(
-            haskey(historical, name) && all_match(historical[name]) for name in
-            ("annual_summaries", "end_of_year", "annual_budgets")
-        )
-        daily = historical isa AbstractDict &&
-                haskey(historical, "fixed_daily_samples") &&
-                all_match(historical["fixed_daily_samples"])
-        budget = get(get(report, "budget", Dict{String, Any}()), "verified", false)
+        annual =
+            historical isa AbstractDict && all(
+                haskey(historical, name) && all_match(historical[name]) for
+                name in ("annual_summaries", "end_of_year", "annual_budgets")
+            )
+        daily =
+            historical isa AbstractDict &&
+            haskey(historical, "fixed_daily_samples") &&
+            all_match(historical["fixed_daily_samples"])
+        budget =
+            get(get(report, "budget", Dict{String, Any}()), "verified", false)
         checks = (boundaries, annual, budget, daily)
     else
         boundaries = all_match(get(report, "boundary_comparison", nothing))
         historical = get(report, "historical_comparison", nothing)
-        annual = historical isa AbstractDict &&
-                 is_true(get(historical, "annual", nothing), "all_match")
-        daily_record = historical isa AbstractDict ? get(
-            historical,
-            "fixed_daily_samples",
-            get(historical, "selected_dates", get(historical, "daily", nothing)),
-        ) : nothing
+        annual =
+            historical isa AbstractDict &&
+            is_true(get(historical, "annual", nothing), "all_match")
+        daily_record =
+            historical isa AbstractDict ?
+            get(
+                historical,
+                "fixed_daily_samples",
+                get(
+                    historical,
+                    "selected_dates",
+                    get(historical, "daily", nothing),
+                ),
+            ) : nothing
         daily = is_true(daily_record, "all_match")
-        carbon = get(get(report, "carbon_budget", Dict{String, Any}()), "all_close", false)
-        nitrogen = model in ("MIMICS-CN", "CASA-CN") ? get(
-            get(report, "nitrogen_budget", Dict{String, Any}()),
+        carbon = get(
+            get(report, "carbon_budget", Dict{String, Any}()),
             "all_close",
             false,
-        ) : true
+        )
+        nitrogen =
+            model in ("MIMICS-CN", "CASA-CN") ?
+            get(
+                get(report, "nitrogen_budget", Dict{String, Any}()),
+                "all_close",
+                false,
+            ) : true
         checks = (boundaries, annual, carbon && nitrogen, daily)
     end
     names = (
@@ -248,8 +277,15 @@ end
 function comparison_receipt(fresh_root, candidate_root, model, build, scope)
     fresh_model = joinpath(fresh_root, "model-$model")
     source_path = joinpath(fresh_model, "comparison.toml")
+    source_fortran_path = joinpath(fresh_model, "fortran_output.toml")
     report = try
-        FreshReferenceOrchestration.validated_comparison(model, source_path)
+        FreshReferenceOrchestration.validated_comparison(
+            model,
+            source_path;
+            expected_executable_sha256 = build.receipt["verification"]["executable_sha256"],
+            expected_scope_manifest_sha256 = scope.sha256,
+            fortran_path = source_fortran_path,
+        )
     catch error
         fail(sprint(showerror, error))
     end
@@ -259,7 +295,8 @@ function comparison_receipt(fresh_root, candidate_root, model, build, scope)
     source_reference = get(reference, "path", nothing)
     source_reference isa AbstractString ||
         fail("$model fresh comparison lacks its reduced oracle path")
-    relative_reference = relpath(abspath(source_reference), abspath(fresh_model))
+    relative_reference =
+        relpath(abspath(source_reference), abspath(fresh_model))
     startswith(relative_reference, "..") &&
         fail("$model fresh comparison references an oracle outside its run")
     isfile(source_reference) || fail("$model fresh reduced oracle is missing")
@@ -270,9 +307,7 @@ function comparison_receipt(fresh_root, candidate_root, model, build, scope)
     bundle = validate_payload(
         payload_root,
         "reference",
-        TOML.parsefile(joinpath(candidate_root, "publication_candidate.toml"))[
-            "generation"
-        ];
+        TOML.parsefile(joinpath(candidate_root, "publication_candidate.toml"))["generation"];
         model,
     )
     role = model == "CORPSE" ? "reduced_history" : "oracle"
@@ -294,7 +329,9 @@ function comparison_receipt(fresh_root, candidate_root, model, build, scope)
     checks = scientific_checks(model, report)
     destination = joinpath(candidate_root, "model-$model")
     source_copy = joinpath(destination, "source_comparison.toml")
+    source_fortran_copy = joinpath(destination, "source_fortran_output.toml")
     cp(source_path, source_copy; force = true)
+    cp(source_fortran_path, source_fortran_copy; force = true)
     receipt = Dict(
         "schema_version" => 1,
         "kind" => "reference_comparison_receipt",
@@ -303,6 +340,7 @@ function comparison_receipt(fresh_root, candidate_root, model, build, scope)
         "scope_manifest_sha256" => scope.sha256,
         "build_receipt_sha256" => build.sha256,
         "source_comparison_sha256" => sha256sum(source_copy),
+        "source_fortran_output_sha256" => sha256sum(source_fortran_copy),
         "outcome" => "passed",
         "coverage" => report["coverage"],
         "check" => checks,
@@ -337,11 +375,12 @@ function bind_canonical_evidence!(fresh_root, candidate_root)
         ) for model in models
     )
     bundle_paths = [
-        joinpath(candidate_root, "model-$model", "reference", "manifest.toml") for
-        model in models
+        joinpath(candidate_root, "model-$model", "reference", "manifest.toml") for model in models
     ]
-    get(candidate, "change_kind", nothing) == "shared" &&
-        push!(bundle_paths, joinpath(candidate_root, "forcing", "manifest.toml"))
+    get(candidate, "change_kind", nothing) == "shared" && push!(
+        bundle_paths,
+        joinpath(candidate_root, "forcing", "manifest.toml"),
+    )
     for path in bundle_paths
         manifest = parse_toml(path, "publication bundle manifest")
         provenance = manifest["provenance"]
@@ -359,6 +398,10 @@ function bind_canonical_evidence!(fresh_root, candidate_root)
     end
     return candidate_root
 end
+
+# ============================================================================
+# Publication Candidate Validation
+# ============================================================================
 
 function validate_build_receipt(candidate_root)
     path = joinpath(candidate_root, "canonical_build_receipt.toml")
@@ -391,8 +434,7 @@ function validate_build_receipt(candidate_root)
     get(receipt, "source_build_metadata_sha256", nothing) ==
     sha256sum(metadata_path) ||
         fail("canonical build receipt differs from its source build metadata")
-    metadata_verification =
-        get(metadata, "verification", Dict{String, Any}())
+    metadata_verification = get(metadata, "verification", Dict{String, Any}())
     get(metadata, "build_platform", nothing) == receipt["build_platform"] &&
         get(metadata, "toolchain_identity", nothing) ==
         receipt["toolchain_identity"] &&
@@ -510,13 +552,28 @@ function validate_comparison_receipt(candidate_root, bundle, build, scope)
         "model-$(bundle.model)",
         "source_comparison.toml",
     )
+    source_fortran_path = joinpath(
+        candidate_root,
+        "model-$(bundle.model)",
+        "source_fortran_output.toml",
+    )
     source = try
-        FreshReferenceOrchestration.validated_comparison(bundle.model, source_path)
+        FreshReferenceOrchestration.validated_comparison(
+            bundle.model,
+            source_path;
+            expected_executable_sha256 = build.receipt["verification"]["executable_sha256"],
+            expected_scope_manifest_sha256 = scope.sha256,
+            fortran_path = source_fortran_path,
+        )
     catch error
         fail(sprint(showerror, error))
     end
-    get(report, "source_comparison_sha256", nothing) == sha256sum(source_path) ||
+    get(report, "source_comparison_sha256", nothing) ==
+    sha256sum(source_path) ||
         fail("$(bundle.model) receipt differs from its source comparison")
+    get(report, "source_fortran_output_sha256", nothing) ==
+    sha256sum(source_fortran_path) ||
+        fail("$(bundle.model) receipt differs from its source Fortran evidence")
     scientific_checks(bundle.model, source) == checks ||
         fail("$(bundle.model) receipt differs from its scientific comparison")
     provenance = bundle.manifest["provenance"]
@@ -764,6 +821,10 @@ function validate_candidate(candidate_root)
     )
 end
 
+# ============================================================================
+# Existing Publication Compatibility
+# ============================================================================
+
 function validate_expected_manifest(
     manifest,
     binding,
@@ -950,6 +1011,10 @@ function write_expected_manifest(path, bundle, archive, release_base_url)
     return manifest
 end
 
+# ============================================================================
+# Atomic Publication Staging
+# ============================================================================
+
 """
     _stage_prepared_publication(candidate_root, output, artifacts_toml,
                                 release_base_url;
@@ -1021,13 +1086,27 @@ function _stage_prepared_publication(
             cp(source, destination)
             chmod(destination, 0o444)
             evidence_records[name] = sha256sum(destination)
-            source_comparison =
-                joinpath(candidate_root, "model-$model", "source_comparison.toml")
+            source_comparison = joinpath(
+                candidate_root,
+                "model-$model",
+                "source_comparison.toml",
+            )
             source_name = "$model-source-comparison.toml"
             source_destination = joinpath(evidence, source_name)
             cp(source_comparison, source_destination)
             chmod(source_destination, 0o444)
             evidence_records[source_name] = sha256sum(source_destination)
+            source_fortran = joinpath(
+                candidate_root,
+                "model-$model",
+                "source_fortran_output.toml",
+            )
+            source_fortran_name = "$model-source-fortran-output.toml"
+            source_fortran_destination = joinpath(evidence, source_fortran_name)
+            cp(source_fortran, source_fortran_destination)
+            chmod(source_fortran_destination, 0o444)
+            evidence_records[source_fortran_name] =
+                sha256sum(source_fortran_destination)
         end
         staged_artifacts = joinpath(staging, "Artifacts.toml")
         cp(artifacts_toml, staged_artifacts; force = true)
@@ -1093,7 +1172,7 @@ function _stage_prepared_publication(
     )
 end
 
-function stage_fresh_publication(
+function stage_publication(
     fresh_root,
     candidate_root,
     output,
@@ -1110,9 +1189,6 @@ function stage_fresh_publication(
         expected_manifest_directory,
     )
 end
-
-stage_publication(args...; kwargs...) =
-    stage_fresh_publication(args...; kwargs...)
 
 """
     main(args = ARGS)

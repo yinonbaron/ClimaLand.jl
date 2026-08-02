@@ -4,10 +4,7 @@ import SHA
 import TOML
 
 export NonfiniteError,
-    TrajectoryObserver,
-    WorkerError,
-    representative_scope,
-    run_worker
+    TrajectoryObserver, WorkerError, representative_scope, run_worker
 
 const MODEL = "CORPSE"
 const STAGES = ("prespin", "spin", "spin_continuation", "historical")
@@ -29,9 +26,10 @@ Base.showerror(io::IO, error::NonfiniteError) = print(
     "CORPSE trajectory became nonfinite for $(length(error.records)) cell(s)",
 )
 
-sha256sum(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256sum(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function write_toml(path, document)
     mkpath(dirname(path))
@@ -116,15 +114,19 @@ function TrajectoryObserver(evidence_side, cell_ids, eligible_cell_ids)
 end
 
 function (observer::TrajectoryObserver)(stage, step, date, values)
-    stage_rank = stage isa Symbol ? findfirst(==(stage), STAGE_SYMBOLS) :
-                 findfirst(==(stage), STAGES)
+    stage_rank =
+        stage isa Symbol ? findfirst(==(stage), STAGE_SYMBOLS) :
+        findfirst(==(stage), STAGES)
     isnothing(stage_rank) && throw(WorkerError("unknown CORPSE stage $stage"))
     step isa Integer && step > 0 ||
         throw(WorkerError("CORPSE trajectory step must be positive"))
     stage_rank >= observer.last_stage_rank ||
         throw(WorkerError("CORPSE trajectory observations are out of order"))
-    stage_rank == observer.last_stage_rank && step <= observer.last_step &&
-        throw(WorkerError("CORPSE trajectory steps are not strictly increasing"))
+    stage_rank == observer.last_stage_rank &&
+        step <= observer.last_step &&
+        throw(
+            WorkerError("CORPSE trajectory steps are not strictly increasing"),
+        )
     observer.last_stage_rank = stage_rank
     observer.last_step = step
     isempty(values) && return nothing
@@ -159,8 +161,7 @@ function (observer::TrajectoryObserver)(stage, step, date, values)
                 "first_nonfinite_step" => Int(step),
                 "first_nonfinite_date" => String(date),
                 "first_nonfinite_variable" => variable,
-                "reason" =>
-                    "fresh $(observer.evidence_side) CORPSE trajectory became nonfinite",
+                "reason" => "fresh $(observer.evidence_side) CORPSE trajectory became nonfinite",
             ),
         )
     end
@@ -215,21 +216,29 @@ function result_field(result, name)
     return getproperty(result, name)
 end
 
-function write_comparison(run_root, scientific_path, oracle_path)
+function write_comparison(
+    run_root,
+    scientific_path,
+    oracle_path,
+    executable_sha256,
+    scope_manifest_sha256,
+)
     report = TOML.parsefile(scientific_path)
     get(report, "schema_version", nothing) == 1 ||
         throw(WorkerError("CORPSE comparison report schema is incompatible"))
     coverage = get(report, "coverage", Dict{String, Any}())
     get(coverage, "scope_cells", nothing) == 80 &&
         get(coverage, "eligible_cells", nothing) == 78 &&
-        get(coverage, "compared_cells", nothing) == 78 || throw(
-        WorkerError("CORPSE comparison report is not Representative-80"),
-    )
+        get(coverage, "compared_cells", nothing) == 78 ||
+        throw(WorkerError("CORPSE comparison report is not Representative-80"))
     outcome = get(report, "outcome", nothing)
-    outcome in ("passed", "failed") ||
-        throw(WorkerError("CORPSE comparison report lacks a scientific outcome"))
+    outcome in ("passed", "failed") || throw(
+        WorkerError("CORPSE comparison report lacks a scientific outcome"),
+    )
     report["model"] = MODEL
     report["scope"] = "representative"
+    report["shared_executable_sha256"] = executable_sha256
+    report["scope_manifest_sha256"] = scope_manifest_sha256
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => sha256sum(oracle_path),
@@ -267,9 +276,11 @@ function run_worker(
     build_directory = abspath(build_directory)
     require_empty_directory(run_root)
     scope = representative_scope(scope_manifest)
-    immutable = immutable_snapshot(
-        (scope_manifest, calibration_manifest, fixture_manifest),
-    )
+    immutable = immutable_snapshot((
+        scope_manifest,
+        calibration_manifest,
+        fixture_manifest,
+    ),)
     try
         executable = executable_resolver(build_directory)
         isfile(executable) ||
@@ -305,13 +316,10 @@ function run_worker(
         boundary_root = abspath(result_field(fortran, :boundary_root))
         historical_root = abspath(result_field(fortran, :historical_root))
         oracle_path = joinpath(oracle_root, "reduced_history.nc")
-        reduced = reference_reducer(
-            scope.path,
-            historical_root,
-            oracle_path,
+        reduced = reference_reducer(scope.path, historical_root, oracle_path)
+        result_field(reduced, :reference) == oracle_path || throw(
+            WorkerError("CORPSE reducer wrote outside the ephemeral oracle"),
         )
-        result_field(reduced, :reference) == oracle_path ||
-            throw(WorkerError("CORPSE reducer wrote outside the ephemeral oracle"))
         isfile(oracle_path) ||
             throw(WorkerError("CORPSE reducer did not create the fresh oracle"))
         bundle = payload_builder(boundary_root, oracle_path, payload_root)
@@ -324,16 +332,14 @@ function run_worker(
                 "scope_cells" => 80,
                 "eligible_cells" => 78,
                 "shared_executable_sha256" => sha256sum(executable),
+                "scope_manifest_sha256" => sha256sum(scope.path),
                 "fresh_oracle" => abspath(oracle_path),
                 "fresh_oracle_sha256" => sha256sum(oracle_path),
             ),
         )
 
-        julia_observer = TrajectoryObserver(
-            "julia",
-            scope.cell_ids,
-            scope.eligible_cell_ids,
-        )
+        julia_observer =
+            TrajectoryObserver("julia", scope.cell_ids, scope.eligible_cell_ids)
         julia = try
             julia_runner(;
                 output_root = julia_root,
@@ -351,7 +357,13 @@ function run_worker(
             return (; status = :nonfinite, evidence, side = :julia)
         end
         scientific_path = abspath(result_field(julia, :report))
-        comparison = write_comparison(run_root, scientific_path, oracle_path)
+        comparison = write_comparison(
+            run_root,
+            scientific_path,
+            oracle_path,
+            sha256sum(executable),
+            sha256sum(scope.path),
+        )
         write_toml(
             joinpath(run_root, "julia_output.toml"),
             Dict(

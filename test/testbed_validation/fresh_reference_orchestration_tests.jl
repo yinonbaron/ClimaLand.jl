@@ -11,10 +11,12 @@ function fake_fresh_commands(
 )
     project = dirname(Base.active_project())
     script = joinpath(@__DIR__, "fake_fresh_reference_process.jl")
-    build = build_directory ->
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory $build_behavior`
-    worker = (model, run_directory, build_directory) ->
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory $(get(worker_behaviors, model, "pass"))`
+    build =
+        build_directory ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory $build_behavior`
+    worker =
+        (model, run_directory, build_directory) ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory $(get(worker_behaviors, model, "pass"))`
     return (; build, worker)
 end
 
@@ -47,8 +49,7 @@ end
         temporary = joinpath(directory, "temporary")
         mkpath(audit)
         mkpath(temporary)
-        commands =
-            fake_fresh_commands(audit; build_behavior = "unverified")
+        commands = fake_fresh_commands(audit; build_behavior = "unverified")
 
         result = FreshReferences.run_fresh_reference(
             "fresh",
@@ -151,10 +152,8 @@ end
         @test result.outcome == "failed"
         @test result.preserved
         @test isdir(result.run_root)
-        @test getproperty.(result.outcomes, :model) ==
-              ["CORPSE", "MIMICS-C"]
-        @test getproperty.(result.outcomes, :outcome) ==
-              ["passed", "failed"]
+        @test getproperty.(result.outcomes, :model) == ["CORPSE", "MIMICS-C"]
+        @test getproperty.(result.outcomes, :outcome) == ["passed", "failed"]
         for model in ("CORPSE", "MIMICS-C")
             record = TOML.parsefile(joinpath(audit, "$model.toml"))
             @test isdir(record["run_directory"])
@@ -178,6 +177,9 @@ end
         "wrong-scope-count",
         "wrong-eligible-count",
         "partial-comparison",
+        "missing-evidence-binding",
+        "mixed-build-binding",
+        "mixed-scope-binding",
     )
         mktempdir() do directory
             audit = joinpath(directory, "audit")
@@ -270,14 +272,41 @@ end
             model in ("CORPSE", "MIMICS-CN", "CASA-CN")
         ]
         @test all(
-            record -> startswith(
-                record["run_directory"],
-                result.run_root,
-            ),
+            record -> startswith(record["run_directory"], result.run_root),
             records,
         )
         @test readdir(audit) ==
               ["CASA-CN.toml", "CORPSE.toml", "MIMICS-CN.toml", "build.toml"]
+    end
+end
+
+@testset "Canonical fresh evidence is retained only when explicitly requested" begin
+    mktempdir() do directory
+        audit = joinpath(directory, "audit")
+        temporary = joinpath(directory, "temporary")
+        mkpath(audit)
+        mkpath(temporary)
+        commands = fake_fresh_commands(audit)
+
+        result = FreshReferences.run_fresh_reference(
+            "fresh",
+            commands.build,
+            commands.worker;
+            models = "CORPSE",
+            temporary_parent = temporary,
+            retain_success = true,
+            worker_stdout = devnull,
+            worker_stderr = devnull,
+        )
+
+        @test result.exitcode == 0
+        @test result.preserved
+        @test result.retention_mode == "maintainer"
+        @test isdir(result.run_root)
+        @test isfile(joinpath(result.run_root, "build", "build_metadata.toml"))
+        @test isfile(
+            joinpath(result.run_root, "model-CORPSE", "comparison.toml"),
+        )
     end
 end
 
@@ -287,8 +316,7 @@ end
         temporary = joinpath(directory, "temporary")
         mkpath(audit)
         mkpath(temporary)
-        commands =
-            fake_fresh_commands(audit; build_behavior = "missing")
+        commands = fake_fresh_commands(audit; build_behavior = "missing")
 
         result = FreshReferences.run_fresh_reference(
             "fresh",
@@ -314,8 +342,7 @@ end
         temporary = joinpath(directory, "temporary")
         mkpath(audit)
         mkpath(temporary)
-        commands =
-            fake_fresh_commands(audit; build_behavior = "fail")
+        commands = fake_fresh_commands(audit; build_behavior = "fail")
 
         result = FreshReferences.run_fresh_reference(
             "fresh",
@@ -333,13 +360,17 @@ end
         @test result.preserved
         @test isdir(result.run_root)
         @test isfile(joinpath(audit, "build.toml"))
-        @test isempty(filter(name -> endswith(name, ".toml"), setdiff(
-            readdir(audit),
-            ["build.toml"],
-        )))
-        @test isempty(filter(
-            name -> startswith(name, "model-"),
-            readdir(result.run_root),
-        ))
+        @test isempty(
+            filter(
+                name -> endswith(name, ".toml"),
+                setdiff(readdir(audit), ["build.toml"]),
+            ),
+        )
+        @test isempty(
+            filter(
+                name -> startswith(name, "model-"),
+                readdir(result.run_root),
+            ),
+        )
     end
 end

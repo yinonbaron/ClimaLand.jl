@@ -137,6 +137,8 @@ function usage(io = stdout)
           --reference MODE   pinned|fresh
           --workers N        positive model-worker limit
           --output PATH      report and model-output directory
+          --retain-fresh-evidence
+                              retain a successful fresh run for publication review
           --help             show this help
 
         Defaults: representative scope, all models, pinned references, automatic
@@ -170,11 +172,16 @@ function parse_args(args)
     reference_mode = "pinned"
     workers = min(length(MODELS), Sys.CPU_THREADS)
     output = nothing
+    retain_fresh_evidence = false
     index = 1
     while index <= length(args)
         option = args[index]
         option == "--help" && return (; help = true)
-        if option == "--scope"
+        if option == "--retain-fresh-evidence"
+            retain_fresh_evidence = true
+            index += 1
+            continue
+        elseif option == "--scope"
             scope = option_value(args, index, option)
         elseif option == "--models"
             models = parse_models(option_value(args, index, option))
@@ -207,7 +214,25 @@ function parse_args(args)
             "reference mode must be one of $(join(REFERENCE_MODES, ", "))",
         ),
     )
-    return (; help = false, scope, models, reference_mode, workers, output)
+    retain_fresh_evidence &&
+        reference_mode != "fresh" &&
+        throw(RunnerError("--retain-fresh-evidence requires --reference fresh"))
+    retain_fresh_evidence &&
+        isnothing(output) &&
+        throw(
+            RunnerError(
+                "--retain-fresh-evidence requires an explicit --output path",
+            ),
+        )
+    return (;
+        help = false,
+        scope,
+        models,
+        reference_mode,
+        workers,
+        output,
+        retain_fresh_evidence,
+    )
 end
 
 # ============================================================================
@@ -967,6 +992,20 @@ function corpse_forcing_metadata(root, artifact)
     return metadata
 end
 
+function preflight_corpse_inputs(scope_path, forcing_root, reference_root)
+    try
+        TestbedPinnedCORPSEAdapter.preflight_inputs(
+            scope_path,
+            forcing_root,
+            reference_root,
+        )
+    catch error
+        error isa TestbedPinnedCORPSEAdapter.AdapterError || rethrow()
+        throw(RunnerError(sprint(showerror, error)))
+    end
+    return nothing
+end
+
 function validate_fixture_scope_provenance(path, scope)
     scope.name == "representative" || return nothing
     fixture = parse_toml(path, "Representative forcing manifest")
@@ -1619,6 +1658,13 @@ function run_fresh!(
         models = configuration.models,
         workers = configuration.workers,
         temporary_parent = output_root,
+        retain_success = configuration.retain_fresh_evidence,
+        scope_manifest_sha256 = sha256sum(
+            joinpath(
+                DEFAULT_SCOPE_MANIFEST_DIRECTORY,
+                "$(configuration.scope).toml",
+            ),
+        ),
         preflight = get(selected_commands, :preflight, _ -> nothing),
     )
     seconds = (time_ns() - started) / 1e9
@@ -1651,9 +1697,13 @@ function run_fresh!(
     build = fresh_outcome_record(result.build)
     report["fresh_reference"] = Dict(
         "shared_build" => build,
-        "ephemeral" => true,
+        "retention_mode" => result.retention_mode,
+        "ephemeral" => result.retention_mode == "ephemeral",
         "cleaned_up" => !result.preserved,
-        "preserved_on_failure" => result.preserved,
+        "preserved_on_failure" =>
+            result.preserved && result.outcome != "passed",
+        "retained_on_success" =>
+            result.preserved && result.outcome == "passed",
         "model_process" => Dict(
             outcome.model => fresh_outcome_record(outcome) for
             outcome in result.outcomes
@@ -1675,6 +1725,7 @@ function run_multiple!(
     reference_resolver = reference_path,
     fixture_resolver = fixture_manifest_path,
     corpse_forcing_resolver = representative_forcing_directory,
+    corpse_preflight = preflight_corpse_inputs,
     worker_runner = TestbedModelProcessOrchestration.run_model_workers,
 )
     configuration.reference_mode == "pinned" || throw(
@@ -1683,15 +1734,16 @@ function run_multiple!(
         ),
     )
     fixture_resolver(configuration.scope, first(configuration.models))
-    for model in configuration.models
-        reference_resolver(configuration.scope, model)
-    end
+    references = Dict(
+        model => reference_resolver(configuration.scope, model) for
+        model in configuration.models
+    )
     if "CORPSE" in configuration.models
         forcing_root, forcing_artifact = corpse_forcing_resolver()
+        corpse_preflight(scope.path, forcing_root, first(references["CORPSE"]))
         forcing = corpse_forcing_metadata(forcing_root, forcing_artifact)
-        only(filter(model -> model["name"] == "CORPSE", report["model"]))[
-            "forcing"
-        ] = forcing
+        only(filter(model -> model["name"] == "CORPSE", report["model"]))["forcing"] =
+            forcing
     end
     started = time_ns()
     model_root = joinpath(output_root, "models")

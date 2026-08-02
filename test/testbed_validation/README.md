@@ -699,6 +699,12 @@ reference publication is a separate maintainer-reviewed operation. Known
 Fortran nonfinites appear only as reviewed, model-specific Eligibility Gaps in
 the Scope Manifest. Eligible nonfinites fail validation.
 
+Canonical maintainers may add `--retain-fresh-evidence` to an explicit
+`--reference fresh --output PATH` run. Successful evidence is then retained
+under `PATH` and identified by `fresh_reference.evidence_root` and
+`fresh_reference.retention_mode = "maintainer"` in the Validation Report.
+Without that flag, successful fresh evidence remains ephemeral and is deleted.
+
 For a local CORPSE proof run, `CLIMALAND_VALIDATION_CORPSE_FORCING` may point
 to an explicit Representative forcing bundle. The runner validates that bundle
 before starting any model worker and records its manifest checksum and
@@ -718,7 +724,9 @@ exact canonical Fresh Fortran Reference run directory, verifies its shared
 executable against `build/build_metadata.toml`, and generates the candidate's
 hashed `canonical_build_receipt.toml`. It validates each strict
 `model-MODEL/comparison.toml` and derives the corresponding publication
-receipt; maintainers do not author these evidence files. Every comparison
+receipt; the comparison and its `fortran_output.toml` must both identify the
+same shared executable and exact Scope Manifest. Maintainers do not author
+these evidence files. Every comparison
 receipt must cover the exact current
 Representative Scope Manifest and all eligible cells, pass boundary, annual,
 budget, and fixed-daily checks, and identify the exact files being published.

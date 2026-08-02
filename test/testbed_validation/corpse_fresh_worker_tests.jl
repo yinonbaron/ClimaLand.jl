@@ -79,17 +79,22 @@ function successful_bridges(data, calls)
         mkpath(historical_root)
         (; cell_ids = copy(cell_ids), boundary_root, historical_root)
     end
-    reference_reducer = (scope, historical, output) -> begin
-        push!(calls, (:reduce, scope, historical, output))
-        write(output, "fresh oracle")
-        write(output * ".toml", "schema_version = 1\n")
-        (; reference = output, manifest = output * ".toml")
-    end
-    payload_builder = (boundaries, oracle, destination) -> begin
-        push!(calls, (:payload, boundaries, oracle, destination))
-        write(joinpath(destination, "boundaries.tar"), "fresh boundaries")
-        (; reduced_history = oracle, archive = joinpath(destination, "boundaries.tar"))
-    end
+    reference_reducer =
+        (scope, historical, output) -> begin
+            push!(calls, (:reduce, scope, historical, output))
+            write(output, "fresh oracle")
+            write(output * ".toml", "schema_version = 1\n")
+            (; reference = output, manifest = output * ".toml")
+        end
+    payload_builder =
+        (boundaries, oracle, destination) -> begin
+            push!(calls, (:payload, boundaries, oracle, destination))
+            write(joinpath(destination, "boundaries.tar"), "fresh boundaries")
+            (;
+                reduced_history = oracle,
+                archive = joinpath(destination, "boundaries.tar"),
+            )
+        end
     julia_runner = function (;
         output_root,
         bundle,
@@ -153,7 +158,11 @@ end
     mktempdir() do root
         data = fixture(root)
         calls = Any[]
-        result = run_test_worker(data, joinpath(root, "run"), successful_bridges(data, calls))
+        result = run_test_worker(
+            data,
+            joinpath(root, "run"),
+            successful_bridges(data, calls),
+        )
         @test result.status == :passed
         @test isfile(result.oracle)
         @test basename(result.comparison) == "comparison.toml"
@@ -161,10 +170,16 @@ end
         @test comparison["model"] == "CORPSE"
         @test comparison["scope"] == "representative"
         @test comparison["reference"]["kind"] == "fresh_reduced_oracle"
-        @test TOML.parsefile(joinpath(root, "run", "fortran_output.toml"))["scope_cells"] == 80
+        fortran = TOML.parsefile(joinpath(root, "run", "fortran_output.toml"))
+        @test fortran["scope_cells"] == 80
+        @test comparison["shared_executable_sha256"] ==
+              fortran["shared_executable_sha256"]
+        @test comparison["scope_manifest_sha256"] ==
+              fortran["scope_manifest_sha256"]
+        @test comparison["scope_manifest_sha256"] ==
+              TestbedCORPSEFreshWorker.sha256sum(data.scope)
         @test isfile(joinpath(root, "run", "julia_output.toml"))
-        @test [call[1] for call in calls] ==
-              [:resolve, :fortran, :reduce, :payload, :julia]
+        @test [call[1] for call in calls] == [:resolve, :fortran, :reduce, :payload, :julia]
         @test calls[2][3] == data.cells
         @test calls[5][3] == data.cells
         @test read(data.calibration, String) == "calibration_id = \"frozen\"\n"
@@ -183,7 +198,12 @@ end
             values[3] = Inf
             other = zeros(80)
             other[3] = NaN
-            observer("prespin", 42, "1901-02-11", Dict("z" => values, "a" => other))
+            observer(
+                "prespin",
+                42,
+                "1901-02-11",
+                Dict("z" => values, "a" => other),
+            )
             error("unreachable")
         end
         result = run_test_worker(
@@ -214,10 +234,20 @@ end
             gap_values = zeros(80)
             gap_values[1] = Inf
             gap_values[2] = NaN
-            observer("historical", 9, "1901-01-09", Dict("state.c" => gap_values))
+            observer(
+                "historical",
+                9,
+                "1901-01-09",
+                Dict("state.c" => gap_values),
+            )
             values = zeros(80)
             values[4] = Inf
-            observer("historical", 10, "1901-01-10", Dict("diagnostic.r" => values))
+            observer(
+                "historical",
+                10,
+                "1901-01-10",
+                Dict("diagnostic.r" => values),
+            )
             error("unreachable")
         end
         result = run_test_worker(
@@ -237,11 +267,26 @@ end
 @testset "CORPSE observer rejects incomplete and unordered evidence" begin
     cells = [51, 3442, collect(100:177)...]
     observer = TrajectoryObserver("julia", cells, cells[3:end])
-    @test_throws WorkerError observer("spin", 1, "1901-01-01", Dict("x" => zeros(79)))
+    @test_throws WorkerError observer(
+        "spin",
+        1,
+        "1901-01-01",
+        Dict("x" => zeros(79)),
+    )
     observer = TrajectoryObserver("julia", cells, cells[3:end])
     observer("spin", 2, "1901-01-02", Dict("x" => zeros(80)))
-    @test_throws WorkerError observer("spin", 2, "1901-01-02", Dict("x" => zeros(80)))
-    @test_throws WorkerError observer("prespin", 3, "1901-01-03", Dict("x" => zeros(80)))
+    @test_throws WorkerError observer(
+        "spin",
+        2,
+        "1901-01-02",
+        Dict("x" => zeros(80)),
+    )
+    @test_throws WorkerError observer(
+        "prespin",
+        3,
+        "1901-01-03",
+        Dict("x" => zeros(80)),
+    )
 end
 
 @testset "CORPSE fresh worker preserves immutable inputs and rethrows errors" begin

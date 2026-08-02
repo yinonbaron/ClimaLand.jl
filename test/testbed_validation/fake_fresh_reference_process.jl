@@ -5,8 +5,7 @@ if mode == "build"
     _, build_directory, audit_directory, behavior = ARGS
     audit_path = joinpath(audit_directory, "build.toml")
     invocations =
-        isfile(audit_path) ?
-        TOML.parsefile(audit_path)["invocations"] + 1 : 1
+        isfile(audit_path) ? TOML.parsefile(audit_path)["invocations"] + 1 : 1
     open(audit_path, "w") do io
         TOML.print(
             io,
@@ -22,7 +21,11 @@ if mode == "build"
         open(joinpath(build_directory, "build_metadata.toml"), "w") do io
             TOML.print(
                 io,
-                Dict("verified" => behavior != "unverified"),
+                Dict(
+                    "verified" => behavior != "unverified",
+                    "verification" =>
+                        Dict("executable_sha256" => repeat("a", 64)),
+                ),
             )
         end
     end
@@ -40,10 +43,18 @@ elseif mode == "worker"
             ),
         )
     end
-    for name in ("fortran_output", "julia_output")
-        open(joinpath(run_directory, "$name.toml"), "w") do io
-            TOML.print(io, Dict("model" => model))
-        end
+    open(joinpath(run_directory, "fortran_output.toml"), "w") do io
+        TOML.print(
+            io,
+            Dict(
+                "model" => model,
+                "shared_executable_sha256" => repeat("a", 64),
+                "scope_manifest_sha256" => repeat("c", 64),
+            ),
+        )
+    end
+    open(joinpath(run_directory, "julia_output.toml"), "w") do io
+        TOML.print(io, Dict("model" => model))
     end
     if behavior != "missing-comparison"
         comparison_path = joinpath(run_directory, "comparison.toml")
@@ -63,12 +74,22 @@ elseif mode == "worker"
                 "coverage" => Dict(
                     "scope_cells" =>
                         behavior == "wrong-scope-count" ? 79 : 80,
-                    "eligible_cells" => behavior == "wrong-eligible-count" ?
-                                        expected - 1 : expected,
-                    "compared_cells" => behavior == "partial-comparison" ?
-                                        expected - 1 : expected,
+                    "eligible_cells" =>
+                        behavior == "wrong-eligible-count" ?
+                        expected - 1 : expected,
+                    "compared_cells" =>
+                        behavior == "partial-comparison" ?
+                        expected - 1 : expected,
                 ),
+                "shared_executable_sha256" =>
+                    behavior == "mixed-build-binding" ? repeat("b", 64) :
+                    repeat("a", 64),
+                "scope_manifest_sha256" =>
+                    behavior == "mixed-scope-binding" ? repeat("d", 64) :
+                    repeat("c", 64),
             )
+            behavior == "missing-evidence-binding" &&
+                delete!(comparison, "shared_executable_sha256")
             open(comparison_path, "w") do io
                 TOML.print(io, comparison; sorted = true)
             end

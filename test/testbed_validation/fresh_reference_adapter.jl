@@ -7,6 +7,9 @@ end
 if !isdefined(@__MODULE__, :TestbedNetCDFCompare)
     include(joinpath(@__DIR__, "netcdf_compare.jl"))
 end
+if !isdefined(@__MODULE__, :TestbedFreshReferenceOrchestration)
+    include(joinpath(@__DIR__, "fresh_reference_orchestration.jl"))
+end
 
 module TestbedFreshReferenceAdapter
 
@@ -16,12 +19,14 @@ import TOML
 const ModelProcesses =
     getfield(parentmodule(@__MODULE__), :TestbedModelProcessOrchestration)
 const Harness = getfield(parentmodule(@__MODULE__), :TestbedReferenceHarness)
-const NetCDFCompare =
-    getfield(parentmodule(@__MODULE__), :TestbedNetCDFCompare)
+const NetCDFCompare = getfield(parentmodule(@__MODULE__), :TestbedNetCDFCompare)
+const FreshReferenceOrchestration =
+    getfield(parentmodule(@__MODULE__), :TestbedFreshReferenceOrchestration)
 const SCRIPT_PATH = @__FILE__
-const PINNED_SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+const PINNED_SOURCE_COMMIT =
+    FreshReferenceOrchestration.PINNED_FORTRAN_SOURCE_COMMIT
 const CANONICAL_TOOLCHAIN_IDENTITY =
-    "climaland-biogeochem-reference-linux-gfortran-v1"
+    FreshReferenceOrchestration.CANONICAL_TOOLCHAIN_IDENTITY
 const CASA_C_TRACER_MODEL = "CASA-C"
 const CASA_C_TRACER_SCOPE = "one-cell-boundary"
 const CASA_C_TRACER_CONTRACT = "fortran-archive-integrity-tracer"
@@ -245,75 +250,77 @@ function commands(
     build =
         build_directory ->
             `$(Base.julia_cmd()) --startup-file=no $SCRIPT_PATH build $source_root $build_directory`
-    worker = (model, run_directory, build_directory) -> begin
-        arguments = String[
-            "worker",
-            model,
-            run_directory,
-            build_directory,
-            source_root,
-        ]
-        if model in ("CASA-C", "CASA-CN")
-            reference_template =
-                model == "CASA-C" ? casa_c_reference_template :
-                casa_cn_reference_template
-            isnothing(casa_forcing_root) ||
-                push!(arguments, abspath(casa_forcing_root))
-            isnothing(reference_template) ||
-                push!(arguments, abspath(reference_template))
-        elseif model == "CORPSE"
-            isnothing(corpse_forcing_root) ||
-                push!(arguments, abspath(corpse_forcing_root))
-        elseif model == "MIMICS-C"
-            isnothing(mimics_c_forcing_root) ||
-                push!(arguments, abspath(mimics_c_forcing_root))
-        elseif model == "MIMICS-CN"
-            isnothing(mimics_cn_forcing_root) ||
-                push!(arguments, abspath(mimics_cn_forcing_root))
-            isnothing(mimics_cn_reference_template) ||
-                push!(arguments, abspath(mimics_cn_reference_template))
+    worker =
+        (model, run_directory, build_directory) -> begin
+            arguments = String[
+                "worker",
+                model,
+                run_directory,
+                build_directory,
+                source_root,
+            ]
+            if model in ("CASA-C", "CASA-CN")
+                reference_template =
+                    model == "CASA-C" ? casa_c_reference_template :
+                    casa_cn_reference_template
+                isnothing(casa_forcing_root) ||
+                    push!(arguments, abspath(casa_forcing_root))
+                isnothing(reference_template) ||
+                    push!(arguments, abspath(reference_template))
+            elseif model == "CORPSE"
+                isnothing(corpse_forcing_root) ||
+                    push!(arguments, abspath(corpse_forcing_root))
+            elseif model == "MIMICS-C"
+                isnothing(mimics_c_forcing_root) ||
+                    push!(arguments, abspath(mimics_c_forcing_root))
+            elseif model == "MIMICS-CN"
+                isnothing(mimics_cn_forcing_root) ||
+                    push!(arguments, abspath(mimics_cn_forcing_root))
+                isnothing(mimics_cn_reference_template) ||
+                    push!(arguments, abspath(mimics_cn_reference_template))
+            end
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH $arguments`
         end
-        `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH $arguments`
-    end
-    preflight = models -> begin
-        selected = ModelProcesses.select_models(models)
-        foreach(require_model_command, selected)
-        for (model, reference_template) in (
-            "CASA-C" => casa_c_reference_template,
-            "CASA-CN" => casa_cn_reference_template,
-        )
-            model in selected || continue
-            !isnothing(casa_forcing_root) &&
-                !isnothing(reference_template) || throw(
-                AdapterError(
-                    "$model Representative fresh worker requires forcing and reference-template paths",
-                ),
+    preflight =
+        models -> begin
+            selected = ModelProcesses.select_models(models)
+            foreach(require_model_command, selected)
+            for (model, reference_template) in (
+                "CASA-C" => casa_c_reference_template,
+                "CASA-CN" => casa_cn_reference_template,
             )
+                model in selected || continue
+                !isnothing(casa_forcing_root) &&
+                    !isnothing(reference_template) || throw(
+                    AdapterError(
+                        "$model Representative fresh worker requires forcing and reference-template paths",
+                    ),
+                )
+            end
+            if "CORPSE" in selected
+                !isnothing(corpse_forcing_root) || throw(
+                    AdapterError(
+                        "CORPSE Representative fresh worker requires a forcing-fixture path",
+                    ),
+                )
+            end
+            if "MIMICS-C" in selected
+                !isnothing(mimics_c_forcing_root) || throw(
+                    AdapterError(
+                        "MIMICS-C Representative fresh worker requires a forcing path",
+                    ),
+                )
+            end
+            if "MIMICS-CN" in selected
+                !isnothing(mimics_cn_forcing_root) &&
+                    !isnothing(mimics_cn_reference_template) || throw(
+                    AdapterError(
+                        "MIMICS-CN Representative fresh worker requires forcing and reference-template paths",
+                    ),
+                )
+            end
+            nothing
         end
-        if "CORPSE" in selected
-            !isnothing(corpse_forcing_root) || throw(
-                AdapterError(
-                    "CORPSE Representative fresh worker requires a forcing-fixture path",
-                ),
-            )
-        end
-        if "MIMICS-C" in selected
-            !isnothing(mimics_c_forcing_root) || throw(
-                AdapterError(
-                    "MIMICS-C Representative fresh worker requires a forcing path",
-                ),
-            )
-        end
-        if "MIMICS-CN" in selected
-            !isnothing(mimics_cn_forcing_root) &&
-                !isnothing(mimics_cn_reference_template) || throw(
-                AdapterError(
-                    "MIMICS-CN Representative fresh worker requires forcing and reference-template paths",
-                ),
-            )
-        end
-        nothing
-    end
     mimics_cn =
         (forcing_root, reference_template, run_directory, build_directory) ->
             `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH run-mimics-cn-80 $source_root $forcing_root $reference_template $run_directory $build_directory`
@@ -328,10 +335,8 @@ end
 
 function casa_modules()
     parent = parentmodule(@__MODULE__)
-    isdefined(parent, :TestbedCASAFreshWorker) || Base.include(
-        parent,
-        joinpath(@__DIR__, "casa_fresh_worker.jl"),
-    )
+    isdefined(parent, :TestbedCASAFreshWorker) ||
+        Base.include(parent, joinpath(@__DIR__, "casa_fresh_worker.jl"))
     return Base.invokelatest(getproperty, parent, :TestbedCASAFreshWorker)
 end
 
@@ -360,15 +365,13 @@ function corpse_modules()
     parent = parentmodule(@__MODULE__)
     for (name, file) in (
         :TestbedCORPSEFreshWorker => "corpse_fresh_worker.jl",
-        :TestbedRepresentativeCORPSEFortran =>
-            "representative_corpse_fortran.jl",
-        :GenerateRepresentativeCORPSEReference =>
-            "generate_representative_corpse_reference.jl",
+        :TestbedRepresentativeCORPSEFortran => "representative_corpse_fortran.jl",
+        :GenerateRepresentativeCORPSEReference => "generate_representative_corpse_reference.jl",
         :GeneratePinnedCORPSEPayload => "generate_pinned_corpse_payload.jl",
-        :TestbedCORPSEFreshJuliaExecutor =>
-            "corpse_fresh_julia_executor.jl",
+        :TestbedCORPSEFreshJuliaExecutor => "corpse_fresh_julia_executor.jl",
     )
-        isdefined(parent, name) || Base.include(parent, joinpath(@__DIR__, file))
+        isdefined(parent, name) ||
+            Base.include(parent, joinpath(@__DIR__, file))
     end
     return (;
         worker = Base.invokelatest(
@@ -426,19 +429,21 @@ function run_corpse_80(
         Base.invokelatest(getproperty, modules.worker, :run_worker) :
         worker_runner
     fixture_manifest = joinpath(abspath(forcing_root), "fixture.toml")
-    fortran_runner = (; kwargs...) ->
-        Base.invokelatest(
+    fortran_runner =
+        (; kwargs...) -> Base.invokelatest(
             Base.invokelatest(getproperty, modules.fortran, :run);
             kwargs...,
         )
-    reference_reducer = (scope, historical, output) -> Base.invokelatest(
-        Base.invokelatest(getproperty, modules.reducer, :generate),
-        scope,
-        historical,
-        output,
-    )
-    payload_builder = (boundaries, oracle, destination) ->
-        build_corpse_fresh_payload(modules, boundaries, oracle, destination)
+    reference_reducer =
+        (scope, historical, output) -> Base.invokelatest(
+            Base.invokelatest(getproperty, modules.reducer, :generate),
+            scope,
+            historical,
+            output,
+        )
+    payload_builder =
+        (boundaries, oracle, destination) ->
+            build_corpse_fresh_payload(modules, boundaries, oracle, destination)
     julia_runner = function (;
         output_root,
         bundle,
@@ -584,8 +589,7 @@ function first_mimics_cn_boundary_nonfinites(boundaries, cell_ids)
                             MIMICS_CN_STAGE_END_DATES[stage],
                         "first_nonfinite_stage" => stage,
                         "first_nonfinite_variable" => variable,
-                        "reason" =>
-                            "fresh Fortran MIMICS-CN boundary became nonfinite",
+                        "reason" => "fresh Fortran MIMICS-CN boundary became nonfinite",
                     ),
                 )
                 push!(seen, cell_id)
@@ -611,11 +615,13 @@ function earliest_mimics_cn_nonfinites(record_groups...)
             record["first_nonfinite_variable"],
         )
         previous = get(earliest, cell_id, nothing)
-        previous_key = isnothing(previous) ? nothing : (
-            stage_rank[previous["first_nonfinite_stage"]],
-            previous["first_nonfinite_date"],
-            previous["first_nonfinite_variable"],
-        )
+        previous_key =
+            isnothing(previous) ? nothing :
+            (
+                stage_rank[previous["first_nonfinite_stage"]],
+                previous["first_nonfinite_date"],
+                previous["first_nonfinite_variable"],
+            )
         if isnothing(previous_key) || candidate_key < previous_key
             earliest[cell_id] = record
         end
@@ -720,19 +726,15 @@ function initialize!(observer::MIMICSJuliaNonfiniteObserver, Y, diagnostics)
         end
     end
     for diagnostic in diagnostics
-        push!(
-            observer.diagnostic_names,
-            replace(diagnostic.name, "__" => "."),
-        )
+        push!(observer.diagnostic_names, replace(diagnostic.name, "__" => "."))
     end
     observer.initialized = true
     return observer
 end
 
 @inline function all_finite(values, expected_length)
-    length(values) == expected_length || throw(
-        AdapterError("MIMICS trajectory has incompatible values"),
-    )
+    length(values) == expected_length ||
+        throw(AdapterError("MIMICS trajectory has incompatible values"))
     for value in values
         value isa Real && isfinite(value) || return false
     end
@@ -760,13 +762,12 @@ end
             AdapterError("MIMICS trajectory component layout is unsupported"),
         ))
         component_value = :(getfield($root, $(QuoteNode(component))))
-        component_storage = component_type <: NamedTuple ? component_value :
-                            :(getfield($component_value, :values))
+        component_storage =
+            component_type <: NamedTuple ? component_value :
+            :(getfield($component_value, :values))
         for variable in fieldnames(component_storage_type)
-            values = :(parent(getfield(
-                $component_storage,
-                $(QuoteNode(variable)),
-            )))
+            values =
+                :(parent(getfield($component_storage, $(QuoteNode(variable)))))
             push!(checks, :(all_finite($values, cell_count) || return false))
         end
     end
@@ -802,16 +803,16 @@ function (observer::MIMICSJuliaNonfiniteObserver)(
     diagnostics,
 )
     observer.initialized || initialize!(observer, Y, diagnostics)
-    finite_mimics_state(Y, length(observer.cell_ids)) &&
-        return nothing
+    finite_mimics_state(Y, length(observer.cell_ids)) && return nothing
     values = nonfinite_mimics_values(observer, Y, p, diagnostics)
     model = observer.model
     stage_name = String(stage.name)
-    date = model == :c ? mimics_c_stage_date(stage, step) :
-           mimics_cn_stage_date(stage, step)
-    reason = model == :c ?
-             "fresh Julia MIMICS-C trajectory became nonfinite" :
-             "fresh Julia MIMICS-CN trajectory became nonfinite"
+    date =
+        model == :c ? mimics_c_stage_date(stage, step) :
+        mimics_cn_stage_date(stage, step)
+    reason =
+        model == :c ? "fresh Julia MIMICS-C trajectory became nonfinite" :
+        "fresh Julia MIMICS-CN trajectory became nonfinite"
     records = mimics_cn_nonfinite_records(
         values,
         observer.cell_ids;
@@ -827,20 +828,15 @@ function (observer::MIMICSJuliaNonfiniteObserver)(
     end
 end
 
-mimics_cn_julia_nonfinite_observer(cell_ids) =
-    MIMICSJuliaNonfiniteObserver(
-        :cn,
-        Int.(cell_ids),
-        MIMICSStateVariable[],
-        String[],
-        false,
-    )
-
-function first_mimics_cn_historical_nonfinites(
-    years,
-    cell_ids,
-    read_year,
+mimics_cn_julia_nonfinite_observer(cell_ids) = MIMICSJuliaNonfiniteObserver(
+    :cn,
+    Int.(cell_ids),
+    MIMICSStateVariable[],
+    String[],
+    false,
 )
+
+function first_mimics_cn_historical_nonfinites(years, cell_ids, read_year)
     records = Dict{String, Any}[]
     seen = Set{Int}()
     for year in years
@@ -850,7 +846,8 @@ function first_mimics_cn_historical_nonfinites(
         first_variables = fill("", length(cell_ids))
         for variable in variables
             matrix = values[variable]
-            matrix isa AbstractMatrix && size(matrix, 1) == length(cell_ids) &&
+            matrix isa AbstractMatrix &&
+                size(matrix, 1) == length(cell_ids) &&
                 size(matrix, 2) == 365 || throw(
                 AdapterError(
                     "MIMICS-CN historical trajectory has incompatible $variable values",
@@ -880,8 +877,7 @@ function first_mimics_cn_historical_nonfinites(
                         noleap_date(year, first_days[position]),
                     "first_nonfinite_stage" => "historical",
                     "first_nonfinite_variable" => first_variables[position],
-                    "reason" =>
-                        "fresh Fortran MIMICS-CN historical trajectory became nonfinite",
+                    "reason" => "fresh Fortran MIMICS-CN historical trajectory became nonfinite",
                 ),
             )
             push!(seen, cell_ids[position])
@@ -913,9 +909,10 @@ function mimics_cn_boundary_values(selected, run_directory, cell_ids)
     return Dict(
         stage => begin
             root = joinpath(run_directory, "stages", directory)
-            casa_columns, casa_rows = native.native_mimics().read_boundary_csv(
-                joinpath(root, "casa_final.csv"),
-            )
+            casa_columns, casa_rows =
+                native.native_mimics().read_boundary_csv(
+                    joinpath(root, "casa_final.csv"),
+                )
             mimics_columns, mimics_rows =
                 native.native_mimics().read_boundary_csv(
                     joinpath(root, "mimics_final.csv"),
@@ -926,8 +923,7 @@ function mimics_cn_boundary_values(selected, run_directory, cell_ids)
                         source == :casa ? (casa_columns, casa_rows) :
                         (mimics_columns, mimics_rows)
                     [
-                        parse(Float64, rows[index][columns[fortran_name]]) for
-                        index in indices
+                        parse(Float64, rows[index][columns[fortran_name]]) for index in indices
                     ]
                 end for (fortran_name, source, component, variable) in
                 native.BOUNDARY_VARIABLES
@@ -949,27 +945,32 @@ function first_mimics_cn_fortran_historical_nonfinites(
             lat_index = point.latitude_index,
         ) for point in grid
     ]
-    read_year = year -> begin
-        paths = Dict(
-            source => generator.reference_dataset(run_directory, source, year) for
-            source in (:casa, :mimics)
-        )
-        generator.NCDatasets.NCDataset(paths[:casa]) do casa
-            generator.NCDatasets.NCDataset(paths[:mimics]) do mimics
-                return Dict(
-                    replace(native_name, "__" => ".") => begin
-                        dataset = source == :casa ? casa : mimics
-                        selected = generator.Fixtures.selected_values(
-                            dataset[fortran_name],
-                            locations,
-                        )
-                        permutedims(Float64.(selected))
-                    end for (fortran_name, source, native_name, _) in
-                    generator.Native.HISTORICAL_VARIABLES
-                )
+    read_year =
+        year -> begin
+            paths = Dict(
+                source => generator.reference_dataset(
+                    run_directory,
+                    source,
+                    year,
+                ) for source in (:casa, :mimics)
+            )
+            generator.NCDatasets.NCDataset(paths[:casa]) do casa
+                generator.NCDatasets.NCDataset(paths[:mimics]) do mimics
+                    return Dict(
+                        replace(native_name, "__" => ".") => begin
+                            dataset = source == :casa ? casa : mimics
+                            selected =
+                                generator.Fixtures.selected_values(
+                                    dataset[fortran_name],
+                                    locations,
+                                )
+                            permutedims(Float64.(selected))
+                        end for (fortran_name, source, native_name, _) in
+                        generator.Native.HISTORICAL_VARIABLES
+                    )
+                end
             end
         end
-    end
     return first_mimics_cn_historical_nonfinites(
         generator.Workflow.HISTORICAL_YEARS,
         cell_ids,
@@ -1003,10 +1004,17 @@ function run_mimics_cn_julia(run_directory, runner; kwargs...)
     end
 end
 
-function write_mimics_cn_comparison(run_directory, scientific_path, oracle_path)
+function write_mimics_cn_comparison(
+    run_directory,
+    scientific_path,
+    oracle_path,
+    executable_sha256,
+    scope_manifest_sha256,
+)
     report = TOML.parsefile(scientific_path)
-    get(report, "schema_version", nothing) == 1 ||
-        throw(AdapterError("MIMICS-CN comparison report schema is incompatible"))
+    get(report, "schema_version", nothing) == 1 || throw(
+        AdapterError("MIMICS-CN comparison report schema is incompatible"),
+    )
     coverage = get(report, "coverage", Dict{String, Any}())
     get(coverage, "scope_cells", nothing) == 80 &&
         get(coverage, "compared_cells", nothing) == 80 ||
@@ -1020,7 +1028,9 @@ function write_mimics_cn_comparison(run_directory, scientific_path, oracle_path)
     carbon = get(report, "carbon_budget", Dict{String, Any}())
     nitrogen = get(report, "nitrogen_budget", Dict{String, Any}())
     passed =
-        all(get(boundary, "all_match", false) for boundary in values(boundaries)) &&
+        all(
+            get(boundary, "all_match", false) for boundary in values(boundaries)
+        ) &&
         get(historical, "all_match", false) &&
         get(carbon, "all_close", false) &&
         get(nitrogen, "all_close", false)
@@ -1028,6 +1038,8 @@ function write_mimics_cn_comparison(run_directory, scientific_path, oracle_path)
     report["scope"] = "representative"
     report["outcome"] = passed ? "passed" : "failed"
     report["coverage"]["eligible_cells"] = 80
+    report["shared_executable_sha256"] = executable_sha256
+    report["scope_manifest_sha256"] = scope_manifest_sha256
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => sha256sum(oracle_path),
@@ -1084,8 +1096,7 @@ function first_mimics_c_boundary_nonfinites(boundaries, cell_ids)
                             MIMICS_C_STAGE_END_DATES[stage],
                         "first_nonfinite_stage" => stage,
                         "first_nonfinite_variable" => variable,
-                        "reason" =>
-                            "fresh Fortran MIMICS-C boundary became nonfinite",
+                        "reason" => "fresh Fortran MIMICS-C boundary became nonfinite",
                     ),
                 )
                 push!(seen, cell_id)
@@ -1115,14 +1126,13 @@ function mimics_c_stage_date(stage, step)
     )
 end
 
-mimics_c_julia_nonfinite_observer(cell_ids) =
-    MIMICSJuliaNonfiniteObserver(
-        :c,
-        Int.(cell_ids),
-        MIMICSStateVariable[],
-        String[],
-        false,
-    )
+mimics_c_julia_nonfinite_observer(cell_ids) = MIMICSJuliaNonfiniteObserver(
+    :c,
+    Int.(cell_ids),
+    MIMICSStateVariable[],
+    String[],
+    false,
+)
 
 function first_mimics_c_historical_nonfinites(years, cell_ids, read_year)
     records = Dict{String, Any}[]
@@ -1133,12 +1143,12 @@ function first_mimics_c_historical_nonfinites(years, cell_ids, read_year)
         first_variables = fill("", length(cell_ids))
         for variable in sort!(String.(collect(keys(values))))
             matrix = values[variable]
-            matrix isa AbstractMatrix && size(matrix) == (length(cell_ids), 365) ||
-                throw(
-                    AdapterError(
-                        "MIMICS-C historical trajectory has incompatible $variable values",
-                    ),
-                )
+            matrix isa AbstractMatrix &&
+                size(matrix) == (length(cell_ids), 365) || throw(
+                AdapterError(
+                    "MIMICS-C historical trajectory has incompatible $variable values",
+                ),
+            )
             for position in eachindex(cell_ids)
                 cell_ids[position] in seen && continue
                 day = findfirst(
@@ -1163,8 +1173,7 @@ function first_mimics_c_historical_nonfinites(years, cell_ids, read_year)
                         noleap_date(year, first_days[position]),
                     "first_nonfinite_stage" => "historical",
                     "first_nonfinite_variable" => first_variables[position],
-                    "reason" =>
-                        "fresh Fortran MIMICS-C historical trajectory became nonfinite",
+                    "reason" => "fresh Fortran MIMICS-C historical trajectory became nonfinite",
                 ),
             )
             push!(seen, cell_ids[position])
@@ -1182,16 +1191,16 @@ function mimics_c_boundary_values(generator, run_directory, cell_ids)
             root = joinpath(run_directory, "stages", directory)
             casa_columns, casa_rows =
                 native.read_boundary_csv(joinpath(root, "casa_final.csv"))
-            mimics_columns, mimics_rows =
-                native.read_boundary_csv(joinpath(root, "mimics_final.csv"))
+            mimics_columns, mimics_rows = native.read_boundary_csv(
+                joinpath(root, "mimics_final.csv"),
+            )
             Dict(
                 "$(component).$(variable)" => begin
-                    columns, rows = source == :casa ?
-                                    (casa_columns, casa_rows) :
-                                    (mimics_columns, mimics_rows)
+                    columns, rows =
+                        source == :casa ? (casa_columns, casa_rows) :
+                        (mimics_columns, mimics_rows)
                     [
-                        parse(Float64, rows[index][columns[fortran_name]]) for
-                        index in indices
+                        parse(Float64, rows[index][columns[fortran_name]]) for index in indices
                     ]
                 end for (fortran_name, source, component, variable) in
                 native.BOUNDARY_VARIABLES
@@ -1213,27 +1222,32 @@ function first_mimics_c_fortran_historical_nonfinites(
             lat_index = point.latitude_index,
         ) for point in grid
     ]
-    read_year = year -> begin
-        paths = Dict(
-            source => generator.reference_dataset(run_directory, source, year) for
-            source in (:casa, :mimics)
-        )
-        generator.NCDatasets.NCDataset(paths[:casa]) do casa
-            generator.NCDatasets.NCDataset(paths[:mimics]) do mimics
-                return Dict(
-                    replace(native_name, "__" => ".") => begin
-                        dataset = source == :casa ? casa : mimics
-                        selected = generator.Fixtures.selected_values(
-                            dataset[fortran_name],
-                            locations,
-                        )
-                        permutedims(Float64.(selected))
-                    end for (fortran_name, source, native_name, _) in
-                    generator.Native.HISTORICAL_VARIABLES
-                )
+    read_year =
+        year -> begin
+            paths = Dict(
+                source => generator.reference_dataset(
+                    run_directory,
+                    source,
+                    year,
+                ) for source in (:casa, :mimics)
+            )
+            generator.NCDatasets.NCDataset(paths[:casa]) do casa
+                generator.NCDatasets.NCDataset(paths[:mimics]) do mimics
+                    return Dict(
+                        replace(native_name, "__" => ".") => begin
+                            dataset = source == :casa ? casa : mimics
+                            selected =
+                                generator.Fixtures.selected_values(
+                                    dataset[fortran_name],
+                                    locations,
+                                )
+                            permutedims(Float64.(selected))
+                        end for (fortran_name, source, native_name, _) in
+                        generator.Native.HISTORICAL_VARIABLES
+                    )
+                end
             end
         end
-    end
     return first_mimics_c_historical_nonfinites(
         generator.Workflow.HISTORICAL_YEARS,
         cell_ids,
@@ -1254,11 +1268,13 @@ function earliest_mimics_c_nonfinites(record_groups...)
             record["first_nonfinite_variable"],
         )
         previous = get(earliest, record["cell_id"], nothing)
-        previous_key = isnothing(previous) ? nothing : (
-            stage_rank[previous["first_nonfinite_stage"]],
-            previous["first_nonfinite_date"],
-            previous["first_nonfinite_variable"],
-        )
+        previous_key =
+            isnothing(previous) ? nothing :
+            (
+                stage_rank[previous["first_nonfinite_stage"]],
+                previous["first_nonfinite_date"],
+                previous["first_nonfinite_variable"],
+            )
         if isnothing(previous_key) || key < previous_key
             earliest[record["cell_id"]] = record
         end
@@ -1267,7 +1283,8 @@ function earliest_mimics_c_nonfinites(record_groups...)
 end
 
 function write_mimics_c_nonfinite_results(run_directory, records)
-    isempty(records) && throw(AdapterError("MIMICS-C nonfinite results are empty"))
+    isempty(records) &&
+        throw(AdapterError("MIMICS-C nonfinite results are empty"))
     path = joinpath(run_directory, "nonfinite_results.toml")
     Harness.write_toml_atomic(
         path,
@@ -1291,7 +1308,13 @@ function run_mimics_c_julia(run_directory, runner; kwargs...)
     end
 end
 
-function write_mimics_c_comparison(run_directory, scientific_path, oracle_path)
+function write_mimics_c_comparison(
+    run_directory,
+    scientific_path,
+    oracle_path,
+    executable_sha256,
+    scope_manifest_sha256,
+)
     report = TOML.parsefile(scientific_path)
     get(report, "schema_version", nothing) == 1 ||
         throw(AdapterError("MIMICS-C comparison report schema is incompatible"))
@@ -1305,13 +1328,17 @@ function write_mimics_c_comparison(run_directory, scientific_path, oracle_path)
     historical = get(report, "historical_comparison", Dict{String, Any}())
     carbon = get(report, "carbon_budget", Dict{String, Any}())
     passed =
-        all(get(boundary, "all_match", false) for boundary in values(boundaries)) &&
+        all(
+            get(boundary, "all_match", false) for boundary in values(boundaries)
+        ) &&
         get(historical, "all_match", false) &&
         get(carbon, "all_close", false)
     report["model"] = "MIMICS-C"
     report["scope"] = "representative"
     report["outcome"] = passed ? "passed" : "failed"
     report["coverage"]["eligible_cells"] = 80
+    report["shared_executable_sha256"] = executable_sha256
+    report["scope_manifest_sha256"] = scope_manifest_sha256
     report["reference"] = Dict(
         "path" => abspath(oracle_path),
         "sha256" => sha256sum(oracle_path),
@@ -1355,12 +1382,8 @@ function _run_mimics_c_80(
     isempty(Harness.source_code_status(source_root)) ||
         throw(AdapterError("MIMICS-C SOURCE_CODE has local modifications"))
     fixture_manifest = joinpath(forcing_root, "fixture.toml")
-    scope_manifest = joinpath(
-        @__DIR__,
-        "validation",
-        "scopes",
-        "representative.toml",
-    )
+    scope_manifest =
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml")
     fixture = TOML.parsefile(fixture_manifest)
     scope = TOML.parsefile(scope_manifest)
     fixture_ids = Int.(fixture["selection"]["representative_cell_ids"])
@@ -1378,11 +1401,8 @@ function _run_mimics_c_80(
         points = 80,
         source_commit = PINNED_SOURCE_COMMIT,
     )
-    stages = selected.run_fortran(
-        executable,
-        prepared.workflow_path,
-        run_directory,
-    )
+    stages =
+        selected.run_fortran(executable, prepared.workflow_path, run_directory)
     Harness.write_toml_atomic(
         joinpath(run_directory, "fortran_output.toml"),
         Dict(
@@ -1390,6 +1410,7 @@ function _run_mimics_c_80(
             "model" => "MIMICS-C",
             "scope" => "representative",
             "shared_executable_sha256" => sha256sum(executable),
+            "scope_manifest_sha256" => sha256sum(scope_manifest),
             "workflow" => prepared.workflow_path,
             "stages" => length(stages),
         ),
@@ -1413,10 +1434,8 @@ function _run_mimics_c_80(
         grid,
         fixture_ids,
     )
-    fortran_nonfinite = earliest_mimics_c_nonfinites(
-        boundary_nonfinite,
-        historical_nonfinite,
-    )
+    fortran_nonfinite =
+        earliest_mimics_c_nonfinites(boundary_nonfinite, historical_nonfinite)
     if !isempty(fortran_nonfinite)
         write_mimics_c_nonfinite_results(run_directory, fortran_nonfinite)
         return (;
@@ -1474,6 +1493,8 @@ function _run_mimics_c_80(
         run_directory,
         julia.report,
         oracle_path,
+        sha256sum(executable),
+        sha256sum(scope_manifest),
     )
     Harness.write_toml_atomic(
         joinpath(run_directory, "julia_output.toml"),
@@ -1487,12 +1508,7 @@ function _run_mimics_c_80(
             "reduced_oracle_sha256" => sha256sum(oracle_path),
         ),
     )
-    return (;
-        stages,
-        julia,
-        comparison,
-        nonfinite = Dict{String, Any}[],
-    )
+    return (; stages, julia, comparison, nonfinite = Dict{String, Any}[])
 end
 
 function _run_mimics_cn_80(
@@ -1507,19 +1523,13 @@ function _run_mimics_cn_80(
     reference_template = abspath(reference_template)
     run_directory = abspath(run_directory)
     executable = verified_executable(build_directory)
-    Harness.source_commit(source_root) == PINNED_SOURCE_COMMIT || throw(
-        AdapterError("MIMICS-CN source is not pinned"),
-    )
-    isempty(Harness.source_code_status(source_root)) || throw(
-        AdapterError("MIMICS-CN SOURCE_CODE has local modifications"),
-    )
+    Harness.source_commit(source_root) == PINNED_SOURCE_COMMIT ||
+        throw(AdapterError("MIMICS-CN source is not pinned"))
+    isempty(Harness.source_code_status(source_root)) ||
+        throw(AdapterError("MIMICS-CN SOURCE_CODE has local modifications"))
     fixture_manifest = joinpath(forcing_root, "fixture.toml")
-    scope_manifest = joinpath(
-        @__DIR__,
-        "validation",
-        "scopes",
-        "representative.toml",
-    )
+    scope_manifest =
+        joinpath(@__DIR__, "validation", "scopes", "representative.toml")
     fixture = TOML.parsefile(fixture_manifest)
     scope = TOML.parsefile(scope_manifest)
     fixture_ids = Int.(fixture["selection"]["representative_cell_ids"])
@@ -1540,11 +1550,8 @@ function _run_mimics_cn_80(
         points = 80,
     )
     pin_workflow_source!(prepared.workflow_path)
-    stages = selected.run_fortran(
-        executable,
-        prepared.workflow_path,
-        run_directory,
-    )
+    stages =
+        selected.run_fortran(executable, prepared.workflow_path, run_directory)
     Harness.write_toml_atomic(
         joinpath(run_directory, "fortran_output.toml"),
         Dict(
@@ -1552,6 +1559,7 @@ function _run_mimics_cn_80(
             "model" => "MIMICS-CN",
             "scope" => "representative",
             "shared_executable_sha256" => sha256sum(executable),
+            "scope_manifest_sha256" => sha256sum(scope_manifest),
             "workflow" => prepared.workflow_path,
             "stages" => length(stages),
         ),
@@ -1570,22 +1578,16 @@ function _run_mimics_cn_80(
         collection.files["grid"],
         fixture_ids,
     )
-    historical_nonfinite =
-        first_mimics_cn_fortran_historical_nonfinites(
-            generator,
-            run_directory,
-            generator.reference_grid(run_directory, selected_grid),
-            fixture_ids,
-        )
-    fortran_nonfinite = earliest_mimics_cn_nonfinites(
-        boundary_nonfinite,
-        historical_nonfinite,
+    historical_nonfinite = first_mimics_cn_fortran_historical_nonfinites(
+        generator,
+        run_directory,
+        generator.reference_grid(run_directory, selected_grid),
+        fixture_ids,
     )
+    fortran_nonfinite =
+        earliest_mimics_cn_nonfinites(boundary_nonfinite, historical_nonfinite)
     if !isempty(fortran_nonfinite)
-        write_mimics_cn_nonfinite_results(
-            run_directory,
-            fortran_nonfinite,
-        )
+        write_mimics_cn_nonfinite_results(run_directory, fortran_nonfinite)
         return (;
             stages,
             julia = nothing,
@@ -1607,12 +1609,7 @@ function _run_mimics_cn_80(
     )
     julia_result = run_mimics_cn_julia(
         run_directory,
-        (;
-            collection,
-            reference_path,
-            comparison_policy,
-            nonfinite_observer,
-        ) -> generator.Workflow.run_selected_case(
+        (; collection, reference_path, comparison_policy, nonfinite_observer) -> generator.Workflow.run_selected_case(
             joinpath(run_directory, "julia");
             collection,
             reference_path,
@@ -1637,6 +1634,8 @@ function _run_mimics_cn_80(
         run_directory,
         julia.report,
         oracle_path,
+        sha256sum(executable),
+        sha256sum(scope_manifest),
     )
     Harness.write_toml_atomic(
         joinpath(run_directory, "julia_output.toml"),
@@ -1650,12 +1649,7 @@ function _run_mimics_cn_80(
             "reduced_oracle_sha256" => sha256sum(oracle_path),
         ),
     )
-    return (;
-        stages,
-        julia,
-        comparison,
-        nonfinite = Dict{String, Any}[],
-    )
+    return (; stages, julia, comparison, nonfinite = Dict{String, Any}[])
 end
 
 function verify_fixture(fixture_directory, manifest)
@@ -1681,9 +1675,8 @@ function tracer_comparison_window(manifest)
         throw(AdapterError("CASA-C tracer fixture lacks comparison settings"))
     integer(key) = begin
         value = get(comparison, key, nothing)
-        value isa Integer && !(value isa Bool) || throw(
-            AdapterError("CASA-C tracer $key must be an Integer"),
-        )
+        value isa Integer && !(value isa Bool) ||
+        throw(AdapterError("CASA-C tracer $key must be an Integer"))
         Int(value)
     end
     start = integer("reference_time_start")
@@ -1693,9 +1686,8 @@ function tracer_comparison_window(manifest)
         AdapterError("CASA-C tracer reference_time_start is out of range"),
     )
     start <= stop <= MAX_TRACER_TIME_INDEX &&
-        stop - start + 1 <= MAX_TRACER_WINDOW_DAYS || throw(
-        AdapterError("CASA-C tracer reference time range is invalid"),
-    )
+        stop - start + 1 <= MAX_TRACER_WINDOW_DAYS ||
+        throw(AdapterError("CASA-C tracer reference time range is invalid"))
     -MAX_TRACER_TIME_INDEX <= offset <= MAX_TRACER_TIME_INDEX || throw(
         AdapterError("CASA-C tracer candidate_time_offset is out of range"),
     )
@@ -1706,7 +1698,7 @@ function compare_casa_c_tracer(reference, candidate, report, window)
     result = NetCDFCompare.compare_netcdf(
         reference,
         candidate;
-        reference_selectors = Dict("time" => window.start:window.stop),
+        reference_selectors = Dict("time" => (window.start):(window.stop)),
         candidate_offsets = Dict("time" => window.offset),
     )
     Harness.write_toml_atomic(
@@ -1822,12 +1814,11 @@ function run_casa_c_tracer(
 end
 
 function main(args = ARGS)
-    isempty(args) &&
-        throw(
-            AdapterError(
-                "expected build, worker, status, trace-casa-c, run-mimics-c-80, or run-mimics-cn-80",
-            ),
-        )
+    isempty(args) && throw(
+        AdapterError(
+            "expected build, worker, status, trace-casa-c, run-mimics-c-80, or run-mimics-cn-80",
+        ),
+    )
     mode = first(args)
     if mode == "build"
         length(args) == 3 || throw(
@@ -1851,14 +1842,8 @@ function main(args = ARGS)
                     "$model Representative fresh worker requires forcing and reference-template paths",
                 ),
             )
-            result = run_casa_80(
-                model,
-                args[5],
-                args[6],
-                args[7],
-                args[3],
-                args[4],
-            )
+            result =
+                run_casa_80(model, args[5], args[6], args[7], args[3], args[4])
             worker = casa_modules()
             worker_exit_code =
                 Base.invokelatest(getproperty, worker, :worker_exit_code)
@@ -1878,21 +1863,18 @@ function main(args = ARGS)
                 ),
             )
             result = run_mimics_c_80(args[5], args[6], args[3], args[4])
-            return isnothing(result.comparison) || result.comparison.passed ? 0 : 1
+            return isnothing(result.comparison) || result.comparison.passed ?
+                   0 : 1
         elseif model == "MIMICS-CN"
             length(args) == 7 || throw(
                 AdapterError(
                     "MIMICS-CN Representative fresh worker requires forcing and reference-template paths",
                 ),
             )
-            result = run_mimics_cn_80(
-                args[5],
-                args[6],
-                args[7],
-                args[3],
-                args[4],
-            )
-            return isnothing(result.comparison) || result.comparison.passed ? 0 : 1
+            result =
+                run_mimics_cn_80(args[5], args[6], args[7], args[3], args[4])
+            return isnothing(result.comparison) || result.comparison.passed ?
+                   0 : 1
         end
         verified_executable(args[4])
     elseif mode == "trace-casa-c"
