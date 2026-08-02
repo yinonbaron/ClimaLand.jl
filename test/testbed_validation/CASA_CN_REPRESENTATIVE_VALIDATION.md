@@ -18,6 +18,10 @@ retained requested samples in 1901 and 2014 over all 4,263 cells. Its archive
 does not retain 1957 daily states; those 28 samples are explicitly native-only
 under the reviewed `fresh_fortran_fixed_daily` time-window gap until the fresh
 mode runs statefully through 1957 and replaces the pinned oracle.
+Native-Julia boundary, annual, and daily comparisons remain in every report as
+diagnostic regression evidence, but only the fresh-Fortran comparisons and the
+required initialization, checkpoint, restoration, and budget invariants
+determine the scientific outcome.
 
 The shared carbon/nitrogen conservation threshold is `rtol = 1.2e-11`. This
 is the rounded-up 5% safety envelope over the maximum `1.1113125709336959e-11`

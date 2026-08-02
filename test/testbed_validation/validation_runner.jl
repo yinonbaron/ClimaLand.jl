@@ -1202,7 +1202,12 @@ function validate_eligible_reference_values(reference, scope, model = "CASA-C")
     return nothing
 end
 
-function scientific_outcome(report, result, model = "CASA-C")
+function scientific_outcome(
+    report,
+    result,
+    model = "CASA-C";
+    fresh_fortran_daily = Dict{String, Any}(),
+)
     initialization =
         get(report, "initialization_comparison", Dict{String, Any}())
     boundaries = get(report, "boundary_comparison", Dict{String, Any}())
@@ -1234,9 +1239,16 @@ function scientific_outcome(report, result, model = "CASA-C")
     if model == "CASA-CN"
         nitrogen_budget = get(report, "nitrogen_budget", Dict{String, Any}())
         historical = get(report, "historical_comparison", Dict{String, Any}())
+        annual = get(historical, "annual", Dict{String, Any}())
+        annual_sources = get(annual, "source", Dict{String, Any}())
+        fresh_fortran_annual =
+            get(annual_sources, "fresh_fortran", Dict{String, Any}())
+        daily_match = get(fresh_fortran_daily, "all_match", false)
         checks["nitrogen_budget"] = get(nitrogen_budget, "all_close", false)
         checks["annual_reducers_and_daily_samples"] =
-            get(historical, "all_match", false)
+            get(fresh_fortran_annual, "all_match", false) &&
+            daily_match
+        checks["fresh_fortran_daily"] = daily_match
     end
     return (; passed = all(values(checks)), checks)
 end
@@ -1351,7 +1363,6 @@ function run_casa!(
     )
     seconds = (time_ns() - started) / 1e9
     scientific_report = TOML.parsefile(result.report)
-    outcome = scientific_outcome(scientific_report, result, model)
     fresh_daily = Dict{String, Any}()
     if model == "CASA-CN"
         fresh_daily = compare_fresh_fortran_daily(
@@ -1367,11 +1378,13 @@ function run_casa!(
             policy.tolerance["fresh_fortran_historical"],
             configuration.workers,
         )
-        checks = copy(outcome.checks)
-        checks["fresh_fortran_daily"] = fresh_daily["all_match"]
-        outcome =
-            (; passed = outcome.passed && fresh_daily["all_match"], checks)
     end
+    outcome = scientific_outcome(
+        scientific_report,
+        result,
+        model;
+        fresh_fortran_daily = fresh_daily,
+    )
     model_report = only(report["model"])
     model_report["coverage"]["compared_cells"] =
         model_report["coverage"]["eligible_cells"]

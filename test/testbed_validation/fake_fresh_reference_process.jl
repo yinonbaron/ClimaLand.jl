@@ -30,7 +30,10 @@ if mode == "build"
         end
     end
 elseif mode == "worker"
-    _, model, run_directory, build_directory, audit_directory, behavior = ARGS
+    _, model, run_directory, build_directory, audit_directory, behavior =
+        ARGS[1:6]
+    scope_manifest_sha256 =
+        length(ARGS) == 7 ? ARGS[7] : repeat("c", 64)
     isfile(joinpath(build_directory, "build_metadata.toml")) ||
         error("fake worker started before the shared build")
     open(joinpath(audit_directory, "$model.toml"), "w") do io
@@ -49,7 +52,7 @@ elseif mode == "worker"
             Dict(
                 "model" => model,
                 "shared_executable_sha256" => repeat("a", 64),
-                "scope_manifest_sha256" => repeat("c", 64),
+                "scope_manifest_sha256" => scope_manifest_sha256,
             ),
         )
     end
@@ -86,7 +89,7 @@ elseif mode == "worker"
                     repeat("a", 64),
                 "scope_manifest_sha256" =>
                     behavior == "mixed-scope-binding" ? repeat("d", 64) :
-                    repeat("c", 64),
+                    scope_manifest_sha256,
             )
             behavior == "missing-evidence-binding" &&
                 delete!(comparison, "shared_executable_sha256")

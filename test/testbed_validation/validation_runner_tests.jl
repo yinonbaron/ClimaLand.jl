@@ -31,12 +31,17 @@ end
 function fake_validation_fresh_commands(audit_directory)
     project = dirname(Base.active_project())
     script = joinpath(@__DIR__, "fake_fresh_reference_process.jl")
+    scope_sha256 = bytes2hex(
+        SHA.sha256(
+            read(joinpath(VALIDATION_SCOPE_MANIFESTS, "representative.toml")),
+        ),
+    )
     build =
         build_directory ->
             `$(Base.julia_cmd()) --startup-file=no --project=$project $script build $build_directory $audit_directory pass`
     worker =
         (model, run_directory, build_directory) ->
-            `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory pass`
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $script worker $model $run_directory $build_directory $audit_directory pass $scope_sha256`
     return (; build, worker, preflight = _ -> nothing)
 end
 
@@ -53,6 +58,82 @@ function write_smoke_scope_manifests(directory, eligibility_gaps)
         TOML.print(io, smoke; sorted = true)
     end
     return manifests
+end
+
+@testset "CASA-CN scientific outcome gates on Fortran evidence" begin
+    report = Dict(
+        "initialization_comparison" => Dict("all_match" => true),
+        "boundary_comparison" => Dict(
+            "prespin" => Dict(
+                "source" => Dict(
+                    "fresh_fortran" => Dict("all_match" => true),
+                    "native_julia" => Dict("all_match" => false),
+                ),
+            ),
+        ),
+        "carbon_budget" => Dict("all_close" => true),
+        "nitrogen_budget" => Dict("all_close" => true),
+        "passive_restoration" => Dict(
+            "verified" => true,
+            "unaffected_verified" => true,
+            "checkpoint_roundtrip_verified" => true,
+        ),
+        "historical_comparison" => Dict(
+            "all_match" => false,
+            "annual" => Dict(
+                "all_match" => false,
+                "source" => Dict(
+                    "fresh_fortran" => Dict("all_match" => true),
+                    "native_julia" => Dict("all_match" => false),
+                ),
+            ),
+            "fixed_daily_samples" => Dict("all_match" => false),
+            "fresh_fortran_daily" => Dict("all_match" => true),
+        ),
+    )
+    result = (; stages = [(; checkpoint_roundtrip_verified = true)])
+    fresh_fortran_daily =
+        report["historical_comparison"]["fresh_fortran_daily"]
+
+    native_only_failure =
+        VALIDATION_RUNNER_MODULE.scientific_outcome(
+            report,
+            result,
+            "CASA-CN";
+            fresh_fortran_daily,
+        )
+    @test native_only_failure.passed
+    @test native_only_failure.checks["annual_reducers_and_daily_samples"]
+    @test native_only_failure.checks["fresh_fortran_daily"]
+    @test !report["historical_comparison"]["all_match"]
+    @test !report["historical_comparison"]["fixed_daily_samples"]["all_match"]
+
+    report["historical_comparison"]["annual"]["source"]["fresh_fortran"]["all_match"] =
+        false
+    failed_annual =
+        VALIDATION_RUNNER_MODULE.scientific_outcome(
+            report,
+            result,
+            "CASA-CN";
+            fresh_fortran_daily,
+        )
+    @test !failed_annual.passed
+    @test !failed_annual.checks["annual_reducers_and_daily_samples"]
+
+    report["historical_comparison"]["annual"]["source"]["fresh_fortran"]["all_match"] =
+        true
+    report["historical_comparison"]["fresh_fortran_daily"]["all_match"] =
+        false
+    failed_daily =
+        VALIDATION_RUNNER_MODULE.scientific_outcome(
+            report,
+            result,
+            "CASA-CN";
+            fresh_fortran_daily,
+        )
+    @test !failed_daily.passed
+    @test !failed_daily.checks["annual_reducers_and_daily_samples"]
+    @test !failed_daily.checks["fresh_fortran_daily"]
 end
 
 @testset "Validation Runner reports reviewed Eligibility Gaps" begin
