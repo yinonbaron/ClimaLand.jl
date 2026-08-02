@@ -1211,22 +1211,26 @@ function scientific_outcome(
     initialization =
         get(report, "initialization_comparison", Dict{String, Any}())
     boundaries = get(report, "boundary_comparison", Dict{String, Any}())
+    boundary_stages =
+        Set(("prespin", "accelerated_spin", "normal_spin", "historical"))
     carbon_budget = get(report, "carbon_budget", Dict{String, Any}())
     passive = get(report, "passive_restoration", Dict{String, Any}())
     passive_carbon = get(passive, "carbon", Dict{String, Any}())
     checks = Dict(
         "initialization" => get(initialization, "all_match", false),
-        "fresh_fortran_boundaries" => all(
-            get(
+        "fresh_fortran_boundaries" =>
+            Set(keys(boundaries)) == boundary_stages &&
+            all(
                 get(
-                    get(value, "source", Dict{String, Any}()),
-                    "fresh_fortran",
-                    Dict{String, Any}(),
-                ),
-                "all_match",
-                false,
-            ) for value in values(boundaries)
-        ),
+                    get(
+                        get(boundaries[stage], "source", Dict{String, Any}()),
+                        "fresh_fortran",
+                        Dict{String, Any}(),
+                    ),
+                    "all_match",
+                    false,
+                ) for stage in boundary_stages
+            ),
         "carbon_budget" => get(carbon_budget, "all_close", false),
         "passive_restoration" =>
             get(passive, "verified", get(passive_carbon, "verified", false)) &&

@@ -61,16 +61,18 @@ function write_smoke_scope_manifests(directory, eligibility_gaps)
 end
 
 @testset "CASA-CN scientific outcome gates on Fortran evidence" begin
+    boundary_comparison = Dict(
+        stage => Dict(
+            "source" => Dict(
+                "fresh_fortran" => Dict("all_match" => true),
+                "native_julia" => Dict("all_match" => false),
+            ),
+        ) for stage in
+        ("prespin", "accelerated_spin", "normal_spin", "historical")
+    )
     report = Dict(
         "initialization_comparison" => Dict("all_match" => true),
-        "boundary_comparison" => Dict(
-            "prespin" => Dict(
-                "source" => Dict(
-                    "fresh_fortran" => Dict("all_match" => true),
-                    "native_julia" => Dict("all_match" => false),
-                ),
-            ),
-        ),
+        "boundary_comparison" => boundary_comparison,
         "carbon_budget" => Dict("all_close" => true),
         "nitrogen_budget" => Dict("all_close" => true),
         "passive_restoration" => Dict(
@@ -134,6 +136,24 @@ end
     @test !failed_daily.passed
     @test !failed_daily.checks["annual_reducers_and_daily_samples"]
     @test !failed_daily.checks["fresh_fortran_daily"]
+
+    fresh_fortran_daily["all_match"] = true
+    for malformed in (
+        Dict{String, Any}(),
+        Dict("prespin" => boundary_comparison["prespin"]),
+        Dict("unexpected" => boundary_comparison["prespin"]),
+    )
+        report["boundary_comparison"] = malformed
+        incomplete_boundaries =
+            VALIDATION_RUNNER_MODULE.scientific_outcome(
+                report,
+                result,
+                "CASA-CN";
+                fresh_fortran_daily,
+            )
+        @test !incomplete_boundaries.passed
+        @test !incomplete_boundaries.checks["fresh_fortran_boundaries"]
+    end
 end
 
 @testset "Validation Runner reports reviewed Eligibility Gaps" begin
