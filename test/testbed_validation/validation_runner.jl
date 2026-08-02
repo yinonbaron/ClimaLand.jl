@@ -100,6 +100,7 @@ const REFERENCE_BINDING = Dict(
 )
 const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
 const FRESH_SOURCE_OVERRIDE = "CLIMALAND_VALIDATION_FORTRAN_SOURCE"
+const CORPSE_FORCING_OVERRIDE = "CLIMALAND_VALIDATION_CORPSE_FORCING"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
 const PERFORMANCE_BUDGET_SECONDS = 3600.0
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
@@ -929,10 +930,41 @@ function fixture_manifest_path(scope, model = "CASA-C")
 end
 
 function representative_forcing_directory()
+    if haskey(ENV, CORPSE_FORCING_OVERRIDE)
+        configured = strip(ENV[CORPSE_FORCING_OVERRIDE])
+        isempty(configured) && throw(
+            RunnerError(
+                "$CORPSE_FORCING_OVERRIDE must point to a Representative CORPSE forcing bundle",
+            ),
+        )
+        root = abspath(configured)
+        try
+            TestbedPinnedCORPSEAdapter.forcing_bundle(root)
+        catch error
+            error isa TestbedPinnedCORPSEAdapter.AdapterError || rethrow()
+            throw(
+                RunnerError(
+                    "$CORPSE_FORCING_OVERRIDE at $root is invalid: $(sprint(showerror, error))",
+                ),
+            )
+        end
+        return root, nothing
+    end
     return artifact_directory(
         "representative_forcing",
         "Representative forcing",
     )
+end
+
+function corpse_forcing_metadata(root, artifact)
+    bundle = TestbedPinnedCORPSEAdapter.forcing_bundle(root)
+    metadata = Dict{String, Any}(
+        "path" => abspath(root),
+        "manifest_sha256" => sha256sum(joinpath(root, "manifest.toml")),
+        "provenance" => bundle.provenance,
+    )
+    isnothing(artifact) || (metadata["artifact"] = artifact)
+    return metadata
 end
 
 function validate_fixture_scope_provenance(path, scope)
@@ -1642,6 +1674,7 @@ function run_multiple!(
     scope;
     reference_resolver = reference_path,
     fixture_resolver = fixture_manifest_path,
+    corpse_forcing_resolver = representative_forcing_directory,
     worker_runner = TestbedModelProcessOrchestration.run_model_workers,
 )
     configuration.reference_mode == "pinned" || throw(
@@ -1652,6 +1685,13 @@ function run_multiple!(
     fixture_resolver(configuration.scope, first(configuration.models))
     for model in configuration.models
         reference_resolver(configuration.scope, model)
+    end
+    if "CORPSE" in configuration.models
+        forcing_root, forcing_artifact = corpse_forcing_resolver()
+        forcing = corpse_forcing_metadata(forcing_root, forcing_artifact)
+        only(filter(model -> model["name"] == "CORPSE", report["model"]))[
+            "forcing"
+        ] = forcing
     end
     started = time_ns()
     model_root = joinpath(output_root, "models")
@@ -1752,6 +1792,7 @@ function main(
                 scope;
                 reference_resolver,
                 fixture_resolver,
+                corpse_forcing_resolver,
             )
             report_path = write_report(output_root, report)
             print_summary(stdout, report, report_path)
@@ -1802,14 +1843,12 @@ function main(
                 "carbon_budget" => scientific["budget"]["verified"],
             )
             model_report["budget"] = scientific["budget"]
-            model_report["reference"] = Dict(
-                "path" => abspath(reference_root),
-                "artifact" => reference_artifact,
-            )
-            model_report["forcing"] = Dict(
-                "path" => abspath(forcing_root),
-                "artifact" => forcing_artifact,
-            )
+            model_report["reference"] =
+                Dict{String, Any}("path" => abspath(reference_root))
+            isnothing(reference_artifact) ||
+                (model_report["reference"]["artifact"] = reference_artifact)
+            model_report["forcing"] =
+                corpse_forcing_metadata(forcing_root, forcing_artifact)
             report["outcome"] = model_report["outcome"]
             report["seconds"] = result.seconds
             report_path = write_report(output_root, report)

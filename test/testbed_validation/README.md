@@ -699,6 +699,12 @@ reference publication is a separate maintainer-reviewed operation. Known
 Fortran nonfinites appear only as reviewed, model-specific Eligibility Gaps in
 the Scope Manifest. Eligible nonfinites fail validation.
 
+For a local CORPSE proof run, `CLIMALAND_VALIDATION_CORPSE_FORCING` may point
+to an explicit Representative forcing bundle. The runner validates that bundle
+before starting any model worker and records its manifest checksum and
+provenance in the report. Without the override, pinned mode continues to use
+the bound forcing artifact.
+
 ### Reference publication
 
 `reference_publication.jl` is the explicit staging operation for a successful
