@@ -43,10 +43,9 @@ Base.showerror(io::IO, error::AdapterError) = print(io, error.message)
 
 fail(message) = throw(AdapterError(message))
 
-sha256sum(path) =
-    open(path) do io
-        bytes2hex(SHA.sha256(io))
-    end
+sha256sum(path) = open(path) do io
+    bytes2hex(SHA.sha256(io))
+end
 
 function parse_toml(path, description)
     isfile(path) || fail("$description is missing at $path")
@@ -165,18 +164,18 @@ end
 
 function validate_boundary_manifest(manifest)
     get(manifest, "schema_version", nothing) == 1 &&
-        get(manifest, "schema", nothing) == "corpse-boundary-archive-v1" &&
-        get(manifest, "model", nothing) == "CORPSE" &&
-        get(manifest, "scope", nothing) == "representative" &&
-        get(manifest, "scope_cell_count", nothing) == 80 &&
-        get(manifest, "eligible_cell_count", nothing) == 78 &&
-        get(manifest, "archive_format", nothing) == "tar" ||
+    get(manifest, "schema", nothing) == "corpse-boundary-archive-v1" &&
+    get(manifest, "model", nothing) == "CORPSE" &&
+    get(manifest, "scope", nothing) == "representative" &&
+    get(manifest, "scope_cell_count", nothing) == 80 &&
+    get(manifest, "eligible_cell_count", nothing) == 78 &&
+    get(manifest, "archive_format", nothing) == "tar" ||
         fail("CORPSE boundaries_manifest payload has an incompatible schema")
     get(manifest, "stage", nothing) == CORPSE_STAGES ||
         fail("CORPSE boundary stages are incompatible")
     members = get(manifest, "members", nothing)
     members isa AbstractDict &&
-        Set(String.(keys(members))) == EXPECTED_BOUNDARY_MEMBERS ||
+    Set(String.(keys(members))) == EXPECTED_BOUNDARY_MEMBERS ||
         fail("CORPSE boundary archive declares incompatible members")
     all(valid_sha256, values(members)) ||
         fail("CORPSE boundary archive declares an invalid SHA-256")
@@ -185,11 +184,11 @@ end
 
 function validate_reduced_manifest(manifest, reduced_history)
     get(manifest, "schema_version", nothing) == 1 &&
-        get(manifest, "reference_id", nothing) ==
-        "corpse-c-representative-fortran-reduced-v1" &&
-        get(manifest, "scope", nothing) == "representative" &&
-        get(manifest, "scope_cell_count", nothing) == 80 &&
-        get(manifest, "eligible_cell_count", nothing) == 78 || fail(
+    get(manifest, "reference_id", nothing) ==
+    "corpse-c-representative-fortran-reduced-v1" &&
+    get(manifest, "scope", nothing) == "representative" &&
+    get(manifest, "scope_cell_count", nothing) == 80 &&
+    get(manifest, "eligible_cell_count", nothing) == 78 || fail(
         "CORPSE reduced_history_manifest payload has an incompatible schema",
     )
     reducers = get(manifest, "reducers", nothing)
@@ -197,8 +196,8 @@ function validate_reduced_manifest(manifest, reduced_history)
         fail("CORPSE reduced history declares incompatible reducers")
     artifact = get(manifest, "artifact", nothing)
     artifact isa AbstractDict &&
-        get(artifact, "sha256", nothing) == sha256sum(reduced_history) &&
-        get(artifact, "bytes", nothing) == filesize(reduced_history) ||
+    get(artifact, "sha256", nothing) == sha256sum(reduced_history) &&
+    get(artifact, "bytes", nothing) == filesize(reduced_history) ||
         fail("CORPSE reduced history differs from its companion manifest")
     return nothing
 end
@@ -221,9 +220,9 @@ function materialize_boundaries(callback, bundle)
     all(
         header ->
             header.type in (:file, :directory) &&
-                isempty(header.link) &&
-                !isabspath(header.path) &&
-                all(part -> part ∉ (".", ".."), splitpath(header.path)),
+            isempty(header.link) &&
+            !isabspath(header.path) &&
+            all(part -> part ∉ (".", ".."), splitpath(header.path)),
         headers,
     ) || fail("CORPSE boundary archive contains an unsafe member")
     return mktempdir() do root
@@ -233,20 +232,23 @@ function materialize_boundaries(callback, bundle)
             sha256sum(path) == expected ||
                 fail("CORPSE boundary member differs from its manifest")
         end
-        validate_boundary_documents(root)
+        validate_boundary_documents(
+            root,
+            bundle.boundary_manifest["scope_cell_count"],
+        )
         callback(root)
     end
 end
 
-function validate_boundary_documents(root)
+function validate_boundary_documents(root, expected_points)
     report = parse_toml(
         joinpath(root, "reconstruction_report.toml"),
         "CORPSE reconstruction report",
     )
     get(report, "schema_version", nothing) == 1 &&
-        get(report, "status", nothing) == "complete" &&
-        get(report, "points", nothing) == 4263 &&
-        get(report, "source_commit", nothing) == FORTRAN_SOURCE_COMMIT ||
+    get(report, "status", nothing) == "complete" &&
+    get(report, "points", nothing) == expected_points &&
+    get(report, "source_commit", nothing) == FORTRAN_SOURCE_COMMIT ||
         fail("CORPSE reconstruction report has incompatible provenance")
     for (name, directory) in CORPSE_STAGES
         stage_root = joinpath(root, "stages", directory)
@@ -256,17 +258,17 @@ function validate_boundary_documents(root)
         )
         outputs = get(metadata, "outputs", nothing)
         get(metadata, "schema_version", nothing) == 1 &&
-            get(metadata, "name", nothing) == name &&
-            get(metadata, "status", nothing) == "complete" &&
-            get(metadata, "elapsed_seconds", nothing) isa Real &&
-            get(metadata, "elapsed_seconds", -1) >= 0 &&
-            get(metadata, "control", nothing) isa AbstractDict &&
-            get(metadata, "inputs", nothing) isa AbstractVector &&
-            outputs isa AbstractDict &&
-            all(
-                haskey(outputs, file) for
-                file in ("casa_final.csv", "corpse_final.csv")
-            ) || fail("CORPSE $name stage metadata has an incompatible schema")
+        get(metadata, "name", nothing) == name &&
+        get(metadata, "status", nothing) == "complete" &&
+        get(metadata, "elapsed_seconds", nothing) isa Real &&
+        get(metadata, "elapsed_seconds", -1) >= 0 &&
+        get(metadata, "control", nothing) isa AbstractDict &&
+        get(metadata, "inputs", nothing) isa AbstractVector &&
+        outputs isa AbstractDict &&
+        all(
+            haskey(outputs, file) for
+            file in ("casa_final.csv", "corpse_final.csv")
+        ) || fail("CORPSE $name stage metadata has an incompatible schema")
         grid_lines = readlines(joinpath(stage_root, "grid.csv"))
         isempty(grid_lines) && fail("CORPSE $name boundary grid is empty")
         header = strip.(split(first(grid_lines), ','))
@@ -293,8 +295,8 @@ function verify_calibrated_boundaries(calibration, reference_root)
             record = get(records, key, Dict{String, Any}())
             id = "fortran/$directory/$filename"
             get(record, "id", nothing) == id &&
-                get(record, "sha256", nothing) ==
-                sha256sum(joinpath(stage_root, filename)) ||
+            get(record, "sha256", nothing) ==
+            sha256sum(joinpath(stage_root, filename)) ||
                 fail("calibrated CORPSE boundary differs for $id")
         end
     end
@@ -339,9 +341,9 @@ function representative_scope(path)
         fail("Representative Scope Manifest has invalid cell IDs")
     end
     get(manifest, "schema_version", nothing) == 1 &&
-        get(manifest, "name", nothing) == "representative" &&
-        length(cell_ids) == 80 &&
-        cell_ids == sort(unique(cell_ids)) ||
+    get(manifest, "name", nothing) == "representative" &&
+    length(cell_ids) == 80 &&
+    cell_ids == sort(unique(cell_ids)) ||
         fail("CORPSE requires the immutable 80-cell Representative Scope")
     return (; path, manifest, cell_ids, sha256 = sha256sum(path))
 end
@@ -397,15 +399,14 @@ function validate_result(result)
     result.report isa AbstractString && isfile(result.report) ||
         fail("CORPSE executor did not produce its report")
     result.seconds isa Real &&
-        isfinite(result.seconds) &&
-        result.seconds >= 0 ||
-        fail("CORPSE executor returned an invalid duration")
+    isfinite(result.seconds) &&
+    result.seconds >= 0 || fail("CORPSE executor returned an invalid duration")
     coverage = result.coverage
     coverage isa AbstractDict ||
         fail("CORPSE executor returned invalid coverage")
     get(coverage, "scope_cells", nothing) == 80 &&
-        get(coverage, "eligible_cells", nothing) == 78 &&
-        get(coverage, "compared_cells", nothing) == 78 || fail(
+    get(coverage, "eligible_cells", nothing) == 78 &&
+    get(coverage, "compared_cells", nothing) == 78 || fail(
         "CORPSE executor did not compare every eligible Representative cell",
     )
     gaps = get(coverage, "eligibility_gaps", nothing)
@@ -415,7 +416,7 @@ function validate_result(result)
     gap_ids = Set(
         Int(get(gap, "cell_id", 0)) for
         gap in gaps if get(gap, "model", nothing) == "CORPSE" &&
-        get(gap, "reviewed", false) === true
+            get(gap, "reviewed", false) === true
     )
     gap_ids == Set((51, 3442)) ||
         fail("CORPSE executor did not report the reviewed Representative gaps")

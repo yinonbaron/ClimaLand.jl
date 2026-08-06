@@ -63,7 +63,7 @@ function write_bundle(root, kind, scope_sha256; model = nothing)
                     Dict(
                         "schema_version" => 1,
                         "status" => "complete",
-                        "points" => 4263,
+                        "points" => 80,
                         "source_commit" => PinnedCORPSE.FORTRAN_SOURCE_COMMIT,
                     ),
                 )
@@ -212,7 +212,7 @@ end
                 ),
             )
             @test isnothing(
-                PinnedCORPSE.validate_boundary_documents(boundary_root),
+                PinnedCORPSE.validate_boundary_documents(boundary_root, 80),
             )
             write(
                 joinpath(

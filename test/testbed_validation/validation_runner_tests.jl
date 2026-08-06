@@ -1,4 +1,5 @@
 using Test
+import Pkg
 import SHA
 import TOML
 
@@ -94,16 +95,14 @@ end
         ),
     )
     result = (; stages = [(; checkpoint_roundtrip_verified = true)])
-    fresh_fortran_daily =
-        report["historical_comparison"]["fresh_fortran_daily"]
+    fresh_fortran_daily = report["historical_comparison"]["fresh_fortran_daily"]
 
-    native_only_failure =
-        VALIDATION_RUNNER_MODULE.scientific_outcome(
-            report,
-            result,
-            "CASA-CN";
-            fresh_fortran_daily,
-        )
+    native_only_failure = VALIDATION_RUNNER_MODULE.scientific_outcome(
+        report,
+        result,
+        "CASA-CN";
+        fresh_fortran_daily,
+    )
     @test native_only_failure.passed
     @test native_only_failure.checks["annual_reducers_and_daily_samples"]
     @test native_only_failure.checks["fresh_fortran_daily"]
@@ -112,27 +111,24 @@ end
 
     report["historical_comparison"]["annual"]["source"]["fresh_fortran"]["all_match"] =
         false
-    failed_annual =
-        VALIDATION_RUNNER_MODULE.scientific_outcome(
-            report,
-            result,
-            "CASA-CN";
-            fresh_fortran_daily,
-        )
+    failed_annual = VALIDATION_RUNNER_MODULE.scientific_outcome(
+        report,
+        result,
+        "CASA-CN";
+        fresh_fortran_daily,
+    )
     @test !failed_annual.passed
     @test !failed_annual.checks["annual_reducers_and_daily_samples"]
 
     report["historical_comparison"]["annual"]["source"]["fresh_fortran"]["all_match"] =
         true
-    report["historical_comparison"]["fresh_fortran_daily"]["all_match"] =
-        false
-    failed_daily =
-        VALIDATION_RUNNER_MODULE.scientific_outcome(
-            report,
-            result,
-            "CASA-CN";
-            fresh_fortran_daily,
-        )
+    report["historical_comparison"]["fresh_fortran_daily"]["all_match"] = false
+    failed_daily = VALIDATION_RUNNER_MODULE.scientific_outcome(
+        report,
+        result,
+        "CASA-CN";
+        fresh_fortran_daily,
+    )
     @test !failed_daily.passed
     @test !failed_daily.checks["annual_reducers_and_daily_samples"]
     @test !failed_daily.checks["fresh_fortran_daily"]
@@ -144,13 +140,12 @@ end
         Dict("unexpected" => boundary_comparison["prespin"]),
     )
         report["boundary_comparison"] = malformed
-        incomplete_boundaries =
-            VALIDATION_RUNNER_MODULE.scientific_outcome(
-                report,
-                result,
-                "CASA-CN";
-                fresh_fortran_daily,
-            )
+        incomplete_boundaries = VALIDATION_RUNNER_MODULE.scientific_outcome(
+            report,
+            result,
+            "CASA-CN";
+            fresh_fortran_daily,
+        )
         @test !incomplete_boundaries.passed
         @test !incomplete_boundaries.checks["fresh_fortran_boundaries"]
     end
@@ -612,10 +607,14 @@ end
             "--reference",
             "pinned",
             "--output",
-            output,
+            output;
+            environment = Dict(
+                VALIDATION_RUNNER_MODULE.REFERENCE_OVERRIDE["CORPSE"] =>
+                    joinpath(output, "missing-reference"),
+            ),
         )
         @test result.exitcode == 2
-        @test occursin("Representative CORPSE reference", result.stderr)
+        @test occursin("reference bundle is missing", result.stderr)
         @test isfile(joinpath(output, "validation_report.toml"))
     end
 end
@@ -961,6 +960,39 @@ end
     end
 end
 
+@testset "Validation Runner accepts repackaged Representative forcing" begin
+    mktempdir() do forcing_root
+        forcing_path = joinpath(forcing_root, "forcing.nc")
+        write(forcing_path, "representative forcing")
+        source_tree = bytes2hex(Pkg.GitTools.tree_hash(forcing_root))
+        manifest = Dict(
+            "files" => Dict(
+                "forcing.nc" => bytes2hex(SHA.sha256(read(forcing_path))),
+            ),
+        )
+        open(joinpath(forcing_root, "manifest.toml"), "w") do io
+            TOML.print(io, manifest; sorted = true)
+        end
+        reference = Dict(
+            "configuration" => Dict(
+                "carbon_nitrogen" => Dict(
+                    "provenance" => Dict(
+                        "forcing_artifact_git_tree_sha1" => source_tree,
+                    ),
+                ),
+            ),
+        )
+        @test isnothing(
+            VALIDATION_RUNNER_MODULE.validate_reference_forcing_artifact(
+                reference,
+                forcing_root,
+                "CASA-CN",
+                (; name = "representative"),
+            ),
+        )
+    end
+end
+
 if get(ENV, "CLIMALAND_RUN_MIMICS_CN_REPRESENTATIVE_VALIDATION", "false") ==
    "true"
     @testset "Validation Runner completes pinned Representative MIMICS-CN" begin
@@ -1157,12 +1189,17 @@ if get(ENV, "CLIMALAND_RUN_REPRESENTATIVE_VALIDATION", "false") == "true"
         end
         @test provenance_error isa VALIDATION_RUNNER_MODULE.RunnerError
         @test occursin("daily provenance", provenance_error.message)
+        fixture_manifest, _ = VALIDATION_RUNNER_MODULE.fixture_manifest_path(
+            "representative",
+            "CASA-CN",
+        )
+        forcing_root = dirname(fixture_manifest)
         invalid_forcing = deepcopy(reference)
         invalid_forcing["configuration"]["carbon_nitrogen"]["provenance"]["forcing_artifact_git_tree_sha1"] = "0000000000000000000000000000000000000000"
         forcing_error = try
             VALIDATION_RUNNER_MODULE.validate_reference_forcing_artifact(
                 invalid_forcing,
-                "836b4cda5912f1bea5f27abd326789285b02ed46",
+                forcing_root,
                 "CASA-CN",
                 scope,
             )

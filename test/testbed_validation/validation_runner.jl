@@ -242,10 +242,9 @@ end
 # Validation Report
 # ============================================================================
 
-sha256sum(path) =
-    open(path) do io
-        bytes2hex(SHA.sha256(io))
-    end
+sha256sum(path) = open(path) do io
+    bytes2hex(SHA.sha256(io))
+end
 
 function parse_toml(path, description)
     isfile(path) || throw(RunnerError("$description is missing at $path"))
@@ -365,7 +364,7 @@ function load_scope_manifests(scope)
     )
     representative_ids = manifests["representative"].cell_ids
     all(id -> id in representative_ids, smoke_ids) &&
-        smoke_ids != representative_ids || throw(
+    smoke_ids != representative_ids || throw(
         RunnerError(
             "Nested Validation Scopes require Smoke to be a strict subset of Representative",
         ),
@@ -383,8 +382,8 @@ function comparison_policy(
     )
     acceptance = get(policy, "acceptance", Dict{String, Any}())
     get(acceptance, "eligible_nonfinite", nothing) == "fail" &&
-        get(acceptance, "eligibility_gaps", nothing) ==
-        "reviewed_scope_manifest_only" || throw(
+    get(acceptance, "eligibility_gaps", nothing) ==
+    "reviewed_scope_manifest_only" || throw(
         RunnerError(
             "Comparison Policy at $path has incompatible acceptance rules",
         ),
@@ -423,7 +422,7 @@ function comparison_policy(
     fresh = model["fresh_fortran_boundary"]
     calibration_name = get(fresh, "calibration_manifest", nothing)
     calibration_name isa String &&
-        basename(calibration_name) == calibration_name || throw(
+    basename(calibration_name) == calibration_name || throw(
         RunnerError(
             "Comparison Policy at $path has an invalid calibration manifest",
         ),
@@ -431,8 +430,8 @@ function comparison_policy(
     calibration_path = joinpath(dirname(path), calibration_name)
     calibration = parse_toml(calibration_path, "$model_name Calibration")
     get(calibration, "schema_version", nothing) == 1 &&
-        get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
-        get(calibration, "cell_count", nothing) == 4263 || throw(
+    get(calibration, "source", nothing) == "fresh_fortran_full_grid" &&
+    get(calibration, "cell_count", nothing) == 4263 || throw(
         RunnerError(
             "$model_name Calibration at $calibration_path is incompatible",
         ),
@@ -440,7 +439,7 @@ function comparison_policy(
     raw_absolute =
         get(get(calibration, "method", Dict{String, Any}()), "raw_absolute", "")
     occursin("a(r) = max(0", raw_absolute) &&
-        !occursin("5e-10", raw_absolute) || throw(
+    !occursin("5e-10", raw_absolute) || throw(
         RunnerError(
             "$model_name Calibration at $calibration_path declares an obsolete absolute floor",
         ),
@@ -486,12 +485,12 @@ function comparison_policy(
                     atol = get(derived, "atol", nothing)
                     rtol = get(derived, "rtol", nothing)
                     atol isa Real &&
-                        isfinite(atol) &&
-                        atol >= 0 &&
-                        rtol isa Real &&
-                        isfinite(rtol) &&
-                        rtol >= 0 &&
-                        get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+                    isfinite(atol) &&
+                    atol >= 0 &&
+                    rtol isa Real &&
+                    isfinite(rtol) &&
+                    rtol >= 0 &&
+                    get(derived, "validation_failed_pairs", nothing) == 0 || throw(
                         RunnerError(
                             "$model_name Calibration at $calibration_path has an invalid tolerance",
                         ),
@@ -558,7 +557,7 @@ function comparison_policy(
             )
             derived = get(values, "derived_policy", Dict{String, Any}())
             get(values, "units", nothing) isa String &&
-                !haskey(derived, "absolute_floor") || throw(
+            !haskey(derived, "absolute_floor") || throw(
                 RunnerError(
                     "$model_name Calibration at $calibration_path has incomplete annual diagnostics",
                 ),
@@ -566,12 +565,12 @@ function comparison_policy(
             atol = get(derived, "atol", nothing)
             rtol = get(derived, "rtol", nothing)
             atol isa Real &&
-                rtol isa Real &&
-                isfinite(atol) &&
-                isfinite(rtol) &&
-                atol >= 0 &&
-                rtol >= 0 &&
-                get(derived, "validation_failed_pairs", nothing) == 0 || throw(
+            rtol isa Real &&
+            isfinite(atol) &&
+            isfinite(rtol) &&
+            atol >= 0 &&
+            rtol >= 0 &&
+            get(derived, "validation_failed_pairs", nothing) == 0 || throw(
                 RunnerError(
                     "$model_name Calibration at $calibration_path has an invalid annual tolerance",
                 ),
@@ -581,8 +580,8 @@ function comparison_policy(
         end
         Set(keys(annual_tolerance["annual_mean"])) ==
         CASA_CN_ANNUAL_MEAN_VARIABLES &&
-            Set(keys(annual_tolerance["annual_total"])) ==
-            CASA_CN_ANNUAL_TOTAL_VARIABLES || throw(
+        Set(keys(annual_tolerance["annual_total"])) ==
+        CASA_CN_ANNUAL_TOTAL_VARIABLES || throw(
             RunnerError(
                 "$model_name Calibration at $calibration_path has incompatible annual variables",
             ),
@@ -590,31 +589,28 @@ function comparison_policy(
         reducers = model["annual_reducers"]
         get(get(reducers, "state_pool", Dict{String, Any}()), "reducers", []) ==
         ["annual_mean", "end_of_year"] &&
-            get(get(reducers, "flux", Dict{String, Any}()), "reducers", []) ==
-            ["annual_total"] &&
-            get(get(reducers, "budget", Dict{String, Any}()), "reducers", []) ==
-            ["maximum_absolute_residual"] || throw(
+        get(get(reducers, "flux", Dict{String, Any}()), "reducers", []) ==
+        ["annual_total"] &&
+        get(get(reducers, "budget", Dict{String, Any}()), "reducers", []) ==
+        ["maximum_absolute_residual"] || throw(
             RunnerError(
                 "Comparison Policy at $path has incompatible $model_name annual reducers",
             ),
         )
         samples = model["fixed_daily_samples"]
         get(samples, "years", []) == [1901, 1957, 2014] &&
-            get(samples, "months", []) == [1, 4, 7, 10] &&
-            get(samples, "days_per_window", nothing) == 7 &&
-            get(samples, "sample_count_per_variable_cell", nothing) == 84 ||
-            throw(
-                RunnerError(
-                    "Comparison Policy at $path has incompatible $model_name fixed daily samples",
-                ),
-            )
+        get(samples, "months", []) == [1, 4, 7, 10] &&
+        get(samples, "days_per_window", nothing) == 7 &&
+        get(samples, "sample_count_per_variable_cell", nothing) == 84 || throw(
+            RunnerError(
+                "Comparison Policy at $path has incompatible $model_name fixed daily samples",
+            ),
+        )
         invalid = model["invalid_oracle_variables"]
         Set(keys(invalid)) == Set(("nLitInptStruc",)) &&
-            get(invalid["nLitInptStruc"], "scope", nothing) ==
-            "fresh_fortran" &&
-            get(invalid["nLitInptStruc"], "kind", nothing) ==
-            "variable_level" &&
-            get(invalid["nLitInptStruc"], "reviewed", false) === true || throw(
+        get(invalid["nLitInptStruc"], "scope", nothing) == "fresh_fortran" &&
+        get(invalid["nLitInptStruc"], "kind", nothing) == "variable_level" &&
+        get(invalid["nLitInptStruc"], "reviewed", false) === true || throw(
             RunnerError(
                 "Comparison Policy at $path has incompatible $model_name invalid-oracle variables",
             ),
@@ -625,13 +621,13 @@ function comparison_policy(
             Dict{String, Any}(),
         )
         get(window_gap, "scope", nothing) == "fresh_fortran" &&
-            get(window_gap, "kind", nothing) == "time_window" &&
-            get(window_gap, "required_years", []) == [1901, 1957, 2014] &&
-            get(window_gap, "available_years", []) == [1901, 2014] &&
-            get(window_gap, "missing_years", []) == [1957] &&
-            get(window_gap, "comparison", nothing) ==
-            "missing_window_native_julia_only" &&
-            get(window_gap, "reviewed", false) === true || throw(
+        get(window_gap, "kind", nothing) == "time_window" &&
+        get(window_gap, "required_years", []) == [1901, 1957, 2014] &&
+        get(window_gap, "available_years", []) == [1901, 2014] &&
+        get(window_gap, "missing_years", []) == [1957] &&
+        get(window_gap, "comparison", nothing) ==
+        "missing_window_native_julia_only" &&
+        get(window_gap, "reviewed", false) === true || throw(
             RunnerError(
                 "Comparison Policy at $path has incompatible $model_name invalid-oracle windows",
             ),
@@ -656,7 +652,7 @@ function comparison_policy(
                 derived =
                     get(values, "derived_policy", Dict{String, Any}())
                 get(values, "units", nothing) isa String &&
-                    !haskey(derived, "absolute_floor") || throw(
+                !haskey(derived, "absolute_floor") || throw(
                     RunnerError(
                         "$model_name Calibration at $calibration_path has incomplete daily diagnostics",
                     ),
@@ -664,16 +660,17 @@ function comparison_policy(
                 atol = get(derived, "atol", nothing)
                 rtol = get(derived, "rtol", nothing)
                 atol isa Real &&
-                    rtol isa Real &&
-                    isfinite(atol) &&
-                    isfinite(rtol) &&
-                    atol >= 0 &&
-                    rtol >= 0 &&
-                    get(derived, "validation_failed_pairs", nothing) == 0 || throw(
-                    RunnerError(
-                        "$model_name Calibration at $calibration_path has an invalid daily tolerance",
-                    ),
-                )
+                rtol isa Real &&
+                isfinite(atol) &&
+                isfinite(rtol) &&
+                atol >= 0 &&
+                rtol >= 0 &&
+                get(derived, "validation_failed_pairs", nothing) == 0 ||
+                    throw(
+                        RunnerError(
+                            "$model_name Calibration at $calibration_path has an invalid daily tolerance",
+                        ),
+                    )
                 Dict("atol" => Float64(atol), "rtol" => Float64(rtol))
             end for (name, values) in daily_variables
         )
@@ -854,7 +851,7 @@ function validate_available(configuration)
         )
     configuration.scope == "representative" ||
         length(configuration.models) == 1 &&
-            only(configuration.models) in ("CASA-C", "CASA-CN") ||
+        only(configuration.models) in ("CASA-C", "CASA-CN") ||
         throw(
             RunnerError(
                 "multi-model validation is available only for the Representative Scope",
@@ -926,13 +923,13 @@ function reference_path(scope, model = "CASA-C")
     oracle, manifest =
         artifact_payload(directory, "oracle", "Representative $model reference")
     get(manifest, "kind", nothing) == "reference" &&
-        get(manifest, "model", nothing) == model &&
-        get(manifest, "scope", nothing) == "representative" || throw(
+    get(manifest, "model", nothing) == model &&
+    get(manifest, "scope", nothing) == "representative" || throw(
         RunnerError("Representative $model reference manifest is incompatible"),
     )
     document = parse_toml(oracle, "Representative $model reduced oracle")
     get(document, "model", nothing) == model &&
-        get(document, "scope", nothing) == "representative" || throw(
+    get(document, "scope", nothing) == "representative" || throw(
         RunnerError("Representative $model reduced oracle is incompatible"),
     )
     return oracle, hash
@@ -1022,9 +1019,67 @@ function validate_fixture_scope_provenance(path, scope)
     return nothing
 end
 
+function forcing_payload_git_tree_sha1(root)
+    manifest_path = joinpath(root, "manifest.toml")
+    islink(manifest_path) && throw(
+        RunnerError(
+            "Representative forcing manifest must not be a symbolic link",
+        ),
+    )
+    manifest = parse_toml(manifest_path, "Representative forcing manifest")
+    files = get(manifest, "files", nothing)
+    files isa AbstractDict && !isempty(files) || throw(
+        RunnerError("Representative forcing manifest lacks payload files"),
+    )
+    declared = sort!(String.(collect(keys(files))))
+    all(relative -> length(splitpath(relative)) == 1, declared) ||
+        throw(RunnerError("Representative forcing payload paths must be flat"))
+    Set(readdir(root)) == Set(vcat(declared, ["manifest.toml"])) || throw(
+        RunnerError("Representative forcing contains undeclared payload files"),
+    )
+    entries = map(declared) do relative
+        path = joinpath(root, relative)
+        isfile(path) && !islink(path) || throw(
+            RunnerError("Representative forcing payload is invalid at $path"),
+        )
+        expected = files[relative]
+        expected isa AbstractString && occursin(r"^[0-9a-f]{64}$", expected) || throw(
+            RunnerError("Representative forcing declares an invalid SHA-256"),
+        )
+        sha256sum(path) == expected || throw(
+            RunnerError(
+                "Representative forcing payload differs from its manifest",
+            ),
+        )
+        mode = Pkg.GitTools.gitmode(path)
+        mode in (Pkg.GitTools.mode_normal, Pkg.GitTools.mode_executable) ||
+            throw(
+                RunnerError(
+                    "Representative forcing payload has an invalid mode",
+                ),
+            )
+        hash = Pkg.GitTools.blob_hash(SHA.SHA1_CTX, path)
+        return (; name = relative, hash, mode)
+    end
+    content_size = sum(entries; init = 0) do entry
+        ndigits(UInt32(entry.mode); base = 8) +
+        1 +
+        sizeof(entry.name) +
+        1 +
+        sizeof(entry.hash)
+    end
+    context = SHA.SHA1_CTX()
+    SHA.update!(context, Vector{UInt8}("tree $(content_size)\0"))
+    for entry in entries
+        SHA.update!(context, Vector{UInt8}("$(entry.mode) $(entry.name)\0"))
+        SHA.update!(context, entry.hash)
+    end
+    return bytes2hex(SHA.digest!(context))
+end
+
 function validate_reference_forcing_artifact(
     reference,
-    forcing_artifact,
+    forcing_root,
     model,
     scope,
 )
@@ -1040,7 +1095,7 @@ function validate_reference_forcing_artifact(
         Dict{String, Any}(),
     )
     get(provenance, "forcing_artifact_git_tree_sha1", nothing) ==
-    forcing_artifact || throw(
+    forcing_payload_git_tree_sha1(forcing_root) || throw(
         RunnerError(
             "Pinned $model reference was not generated from the pinned Representative forcing artifact",
         ),
@@ -1140,7 +1195,7 @@ function validate_eligible_reference_values(reference, scope, model = "CASA-C")
         throw(RunnerError("Pinned $model reference has invalid cell IDs"))
     end
     !isempty(reference_cell_ids) &&
-        length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
+    length(reference_cell_ids) == length(unique(reference_cell_ids)) ||
         throw(RunnerError("Pinned $model reference has invalid cell IDs"))
     eligible_ids = eligible_cell_ids(scope, model)
     positions = Int[]
@@ -1169,7 +1224,7 @@ function validate_eligible_reference_values(reference, scope, model = "CASA-C")
         fresh_historical = get(fresh, "historical", Dict{String, Any}())
         Set(keys(fresh_historical)) ==
         union(CASA_CN_FRESH_DAILY_VARIABLES, Set(("sample_days",))) &&
-            length(get(fresh_historical, "sample_days", [])) == 56 || throw(
+        length(get(fresh_historical, "sample_days", [])) == 56 || throw(
             RunnerError(
                 "Pinned $model reference has incompatible fresh-Fortran daily variables",
             ),
@@ -1295,9 +1350,9 @@ function corpse_policy_metadata(scientific)
     id = get(calibration, "id", nothing)
     sha256 = get(calibration, "sha256", nothing)
     id isa AbstractString &&
-        !isempty(strip(id)) &&
-        sha256 isa AbstractString &&
-        occursin(r"^[0-9a-f]{64}$", sha256) || throw(
+    !isempty(strip(id)) &&
+    sha256 isa AbstractString &&
+    occursin(r"^[0-9a-f]{64}$", sha256) || throw(
         RunnerError(
             "CORPSE comparison report lacks its applied policy identity",
         ),
@@ -1966,7 +2021,7 @@ function main(
         validate_fixture_scope_provenance(fixture_manifest, scope)
         model in ("CASA-C", "CASA-CN") && validate_reference_forcing_artifact(
             reference,
-            forcing_artifact,
+            dirname(fixture_manifest),
             model,
             scope,
         )
