@@ -7,16 +7,19 @@ end
 if !isdefined(@__MODULE__, :TestbedNativeMIMICSCNReconstruction)
     include(joinpath(@__DIR__, "native_mimics_cn_reconstruction.jl"))
 end
+if !isdefined(@__MODULE__, :TestbedCandidateReconstruction)
+    include(joinpath(@__DIR__, "candidate_reconstruction.jl"))
+end
 
 module SelectedMIMICSCNValidation
-
-import TOML
 
 const HARNESS = getfield(parentmodule(@__MODULE__), :TestbedReferenceHarness)
 const SELECTED =
     getfield(parentmodule(@__MODULE__), :GenerateSelectedCORPSEReference)
 const NATIVE =
     getfield(parentmodule(@__MODULE__), :TestbedNativeMIMICSCNReconstruction)
+const CANDIDATES =
+    getfield(parentmodule(@__MODULE__), :TestbedCandidateReconstruction)
 const FIXTURE_ROOT = joinpath(@__DIR__, "fixtures", "selected_cells")
 const YEARS = 1901:2014
 const POINTS = 37
@@ -124,6 +127,16 @@ end
 
 function prepare_inputs(source_root, selected_root; fixture_root = FIXTURE_ROOT)
     mkpath(selected_root)
+    prespin_parameters = joinpath(
+        selected_root,
+        "candidates",
+        "pftlookup_igbp_updated4_borealNfix.candidate.csv",
+    )
+    CANDIDATES.derive_candidate(
+        source_root,
+        "casa_boreal_nfix",
+        prespin_parameters,
+    )
     SELECTED.write_fortran_grid(
         joinpath(fixture_root, "grid_selected_cells.csv"),
         joinpath(selected_root, "grid_packed.csv"),
@@ -139,25 +152,31 @@ function prepare_inputs(source_root, selected_root; fixture_root = FIXTURE_ROOT)
             selected_year = year,
         )
     end
-    return forcing_root
+    return (; forcing_root, prespin_parameters)
 end
 
 function write_workflow(
     source_root,
-    reference_template,
     run_root;
     prepare = true,
     fixture_root = FIXTURE_ROOT,
     points = POINTS,
+    source_commit,
 )
     configuration = joinpath(run_root, "configuration")
     controls = joinpath(configuration, "controls")
     selected_root = joinpath(run_root, "selected_inputs")
     mkpath(controls)
-    forcing_root =
-        prepare ?
-        prepare_inputs(source_root, selected_root; fixture_root) :
-        joinpath(selected_root, "forcing")
+    prepared =
+        prepare ? prepare_inputs(source_root, selected_root; fixture_root) :
+        (;
+            forcing_root = joinpath(selected_root, "forcing"),
+            prespin_parameters = joinpath(
+                selected_root,
+                "candidates",
+                "pftlookup_igbp_updated4_borealNfix.candidate.csv",
+            ),
+        )
     if prepare
         mimics_parameters = joinpath(
             source_root,
@@ -170,12 +189,6 @@ function write_workflow(
             "Selected validation must use issue 43's unchanged KO4/FI30 parameter file",
         )
     end
-    prespin_parameters = joinpath(
-        reference_template,
-        "candidates",
-        "parameters",
-        "pftlookup_igbp_updated4_borealNfix.candidate.csv",
-    )
     stages = Dict{String, Any}[]
     for stage in STAGE_SPECS
         control = HARNESS.write_smoke_control(
@@ -202,10 +215,10 @@ function write_workflow(
                 source_root,
                 selected_root,
                 fixture_root,
-                prespin_parameters,
+                prepared.prespin_parameters,
                 stage,
             ),
-            forcing_inputs(forcing_root, stage),
+            forcing_inputs(prepared.forcing_root, stage),
             restart_inputs(stage),
         )
         push!(
@@ -225,14 +238,17 @@ function write_workflow(
     workflow = Dict(
         "schema_version" => 1,
         "name" => "selected-mimics-cn-issue31-ko4-fi30",
-        "source_commit" => TOML.parsefile(
-            joinpath(reference_template, "configuration", "workflow.toml"),
-        )["source_commit"],
+        "source_commit" => source_commit,
         "stage" => stages,
     )
     workflow_path = joinpath(configuration, "workflow.toml")
     HARNESS.write_toml_atomic(workflow_path, workflow)
-    return (; workflow_path, forcing_root, selected_root)
+    return (;
+        workflow_path,
+        forcing_root = prepared.forcing_root,
+        selected_root,
+        prespin_parameters = prepared.prespin_parameters,
+    )
 end
 
 function run_fortran(executable, workflow_path, run_root)
@@ -241,7 +257,6 @@ end
 
 function run_julia(
     source_root,
-    reference_template,
     run_root,
     output_root;
     fixture_root = FIXTURE_ROOT,
@@ -256,12 +271,10 @@ function run_julia(
         expected_points = points,
         grid_path = joinpath(selected_root, "grid_packed.csv"),
         soil_path = joinpath(fixture_root, "soil_selected_cells.csv"),
-        archive_grid_path =
-            joinpath(fixture_root, "grid_selected_cells.csv"),
+        archive_grid_path = joinpath(fixture_root, "grid_selected_cells.csv"),
         prespin_parameters_path = joinpath(
-            reference_template,
+            selected_root,
             "candidates",
-            "parameters",
             "pftlookup_igbp_updated4_borealNfix.candidate.csv",
         ),
         compare_archive = false,
@@ -272,15 +285,18 @@ end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    length(ARGS) == 5 || error(
-        "usage: selected_mimics_cn_validation.jl SOURCE_ROOT REFERENCE_TEMPLATE FORTRAN_EXECUTABLE RUN_ROOT JULIA_OUTPUT_ROOT",
+    length(ARGS) == 4 || error(
+        "usage: selected_mimics_cn_validation.jl SOURCE_ROOT FORTRAN_EXECUTABLE RUN_ROOT JULIA_OUTPUT_ROOT",
     )
-    prepared =
-        SelectedMIMICSCNValidation.write_workflow(ARGS[1], ARGS[2], ARGS[4])
+    prepared = SelectedMIMICSCNValidation.write_workflow(
+        ARGS[1],
+        ARGS[3];
+        source_commit = TestbedCandidateReconstruction.checkout_commit(ARGS[1]),
+    )
     SelectedMIMICSCNValidation.run_fortran(
-        ARGS[3],
+        ARGS[2],
         prepared.workflow_path,
-        ARGS[4],
+        ARGS[3],
     )
-    SelectedMIMICSCNValidation.run_julia(ARGS[1], ARGS[2], ARGS[4], ARGS[5])
+    SelectedMIMICSCNValidation.run_julia(ARGS[1], ARGS[3], ARGS[4])
 end

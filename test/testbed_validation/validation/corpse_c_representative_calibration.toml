@@ -165,7 +165,7 @@ sha256 = "18b9efbea769bef8e58cd2acda215b83d754cf83372a46d6d5fe8af4ac053739"
 
 [provenance.runner_source]
 id = "test/testbed_validation/native_corpse_c_reconstruction.jl"
-sha256 = "87c231e814359782cdda23e0bf1574bfd4284e88102e9f009dc852fe80150557"
+sha256 = "99cbd0cdad938891d5a2cfd9659c77de4348ca943e675dae5135f37d1bb59aae"
 
 [provenance.scope_manifest]
 id = "validation/scopes/representative.toml"

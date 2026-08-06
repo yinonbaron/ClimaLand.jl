@@ -1,0 +1,47 @@
+canonical = true
+compatibility_identity = "17bc06b1e8a31b68326d84ab01e0bc3250378598e668cdb92ac91ce9ae2f20ec"
+generation = "representative-linux-v1"
+kind = "reference"
+model = "CASA-CN"
+outcome = "passed"
+schema_version = 1
+scope = "representative"
+
+[artifact]
+binding = "representative_casa_cn_reference"
+filename = "representative-linux-v1-representative_casa_cn_reference-a3a4bfca744162bd550cf27c1f9a581d735f1c4c.tar.gz"
+git_tree_sha1 = "a3a4bfca744162bd550cf27c1f9a581d735f1c4c"
+sha256 = "e1a8e58f39ef7a51bc38f0fc2a017ca1531c508648da486416079e2fc3b2ee7e"
+url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_casa_cn_reference-a3a4bfca744162bd550cf27c1f9a581d735f1c4c.tar.gz"
+
+[files]
+"reduced_oracle.toml" = "c8d7044e193baf5a92fc776d1503c869340f4530b3439ac0e9675bd4aa0d49d3"
+
+[payload]
+oracle = "reduced_oracle.toml"
+
+[provenance]
+build_platform = "x86_64-linux-gnu"
+build_receipt_sha256 = "9799090e0377fce4bb409a11033460996e7b68befb8e1947e4034701b5c34941"
+comparison_report_sha256 = "4083e0a91bfbdac7bdb3b8ff738ab394290c0a10dc80dcb957c74cdd5c5949c9"
+comparison_schema = "reduced-comparison-oracle-v1"
+compiler_identity = "GNU Fortran (GCC) 13.2.0"
+generator_revision = "ad52fd96d3fb5ece2a5dbb3787fad4b12c5e57b7a7fe7acb784711b60f4d9fa5"
+scope_manifest_sha256 = "293190db2dda44f1babd13715a7e33027349df9e959a40dd60cc9d329671e9f4"
+source_revision = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+toolchain_identity = "climaland-biogeochem-reference-linux-gfortran-v1"
+
+    [provenance.forcing_sha256]
+    "forcing_1901_2014.nc" = "7f78f6ac31e58466b6e85667b64f8a9b85b1b4403a910b982eddfb0d7e0b38d3"
+    "grid_selected_cells.csv" = "7956d4e354f8e834998618cf3d032e9a5231620ed5f5c9e0d14e2d44c6e3831f"
+    "soil_selected_cells.csv" = "8f369cc9f16b0afa90f3827c7c6f012549d15b327d98fa5d779c55999b7277d1"
+
+    [provenance.parameter_sha256]
+    "candidate_reconstruction.toml" = "676600d1deeb94783032b47a12c5b51462765a5d8f2dd426558bbeabfca0f832"
+    "pftlookup_igbp_updated4.csv" = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+    "pftlookup_igbp_updated4_exud0.csv" = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+    "validation/casa_cn_full_grid_calibration.toml" = "8ee4013ecf95bdaa437db8fa34093fc49825a6565db46c7cf0dad7b27a255ece"
+
+    [provenance.shared_parameter_sha256]
+    "co2delta_control.txt" = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+    "modis_phenology_wtundra.txt" = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"

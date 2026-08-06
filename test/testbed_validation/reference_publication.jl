@@ -38,6 +38,47 @@ const REFERENCE_PAYLOAD_ROLES = Dict(
     "CASA-C" => ("oracle",),
     "CASA-CN" => ("oracle",),
 )
+const FORCING_FIXTURE_ROLES = ("forcing", "grid", "soil")
+const SHARED_PARAMETER_FIXTURE_ROLES = ("phenology", "perturbation")
+const MODEL_PARAMETER_FIXTURE_ROLES = Dict(
+    "CORPSE" => ("casa_c_parameters", "corpse_parameters"),
+    "MIMICS-C" => ("casa_cn_parameters", "mimics_parameters"),
+    "MIMICS-CN" => ("casa_cn_parameters", "mimics_parameters"),
+    "CASA-C" => ("casa_c_parameters",),
+    "CASA-CN" => ("casa_c_parameters", "casa_cn_parameters"),
+)
+const MODEL_VERSIONED_INPUTS = Dict(
+    "CORPSE" => ("validation/corpse_c_representative_calibration.toml",),
+    "MIMICS-C" => (
+        "candidate_reconstruction.toml",
+        "fixtures/selected_cells/mimics_cn_parameters.csv",
+        "validation/mimics_c_full_grid_calibration.toml",
+        "validation/mimics_c_historical_calibration.toml",
+    ),
+    "MIMICS-CN" => (
+        "candidate_reconstruction.toml",
+        "validation/mimics_cn_boundary_calibration.toml",
+        "validation/mimics_cn_historical_calibration.toml",
+        "fixtures/selected_cells/mimics_cn_parameters.csv",
+        "fixtures/selected_cells/mimics_cn_prespin_parameters.csv",
+    ),
+    "CASA-C" => (
+        "candidate_reconstruction.toml",
+        "validation/casa_c_full_grid_calibration.toml",
+    ),
+    "CASA-CN" => (
+        "candidate_reconstruction.toml",
+        "validation/casa_cn_full_grid_calibration.toml",
+    ),
+)
+const MODEL_GENERATORS = Dict(
+    "CORPSE" => "generate_representative_corpse_reference.jl",
+    "MIMICS-C" => "generate_selected_mimics_c_reference.jl",
+    "MIMICS-CN" => "generate_selected_mimics_cn_reference.jl",
+    "CASA-C" => "generate_selected_casa_workflow_reference.jl",
+    "CASA-CN" => "generate_selected_casa_workflow_reference.jl",
+)
+const COMPARISON_SCHEMA = "reduced-comparison-oracle-v1"
 
 struct PublicationError <: Exception
     message::String
@@ -144,7 +185,334 @@ function write_toml(path, document)
     return path
 end
 
-function canonical_build_receipt(fresh_root, candidate_root)
+function file_hashes(root; excluded = ())
+    excluded_set = Set(excluded)
+    return Dict(
+        relative => sha256sum(joinpath(root, relative)) for
+        relative in payload_files(root) if !(relative in excluded_set)
+    )
+end
+
+function named_hashes(paths)
+    return Dict(relpath(path, @__DIR__) => sha256sum(path) for path in paths)
+end
+
+function copy_selected_payload(source, destination, relative_paths)
+    mkpath(destination)
+    for relative in relative_paths
+        relative isa AbstractString && !isempty(relative) ||
+            fail("publication payload has an invalid path")
+        normalized = normpath(relative)
+        isabspath(relative) && fail("publication payload has an unsafe path")
+        any(part -> part in (".", ".."), splitpath(normalized)) &&
+            fail("publication payload has an unsafe path")
+        normalized == relative ||
+            fail("publication payload path is not normalized")
+        source_path = joinpath(source, normalized)
+        isfile(source_path) ||
+            fail("publication payload file is missing at $source_path")
+        current = source
+        for part in splitpath(normalized)
+            current = joinpath(current, part)
+            islink(current) &&
+                fail("publication payloads must not contain symbolic links")
+        end
+        destination_path = joinpath(destination, normalized)
+        mkpath(dirname(destination_path))
+        cp(source_path, destination_path)
+    end
+    return destination
+end
+
+function candidate_provenance(
+    metadata,
+    forcing_sha256,
+    parameter_sha256,
+    shared_parameter_sha256,
+    scope_sha256,
+    generator_revision,
+)
+    verification = metadata["verification"]
+    return Dict(
+        "scope_manifest_sha256" => scope_sha256,
+        "forcing_sha256" => forcing_sha256,
+        "shared_parameter_sha256" => shared_parameter_sha256,
+        "source_revision" => String(verification["source_commit"]),
+        "parameter_sha256" => parameter_sha256,
+        "comparison_schema" => COMPARISON_SCHEMA,
+        "generator_revision" => generator_revision,
+        "compiler_identity" => String(metadata["compiler_identity"]),
+        "build_platform" => String(metadata["build_platform"]),
+        "toolchain_identity" => String(metadata["toolchain_identity"]),
+    )
+end
+
+function write_candidate_payload(
+    destination,
+    kind,
+    generation,
+    payload,
+    provenance;
+    model = nothing,
+)
+    files = file_hashes(destination)
+    document = Dict{String, Any}(
+        "schema_version" => 1,
+        "kind" => kind,
+        "scope" => "representative",
+        "generation" => generation,
+        "outcome" => "passed",
+        "canonical" => true,
+        "files" => files,
+        "payload" => payload,
+        "provenance" => provenance,
+    )
+    isnothing(model) || (document["model"] = model)
+    write_toml(joinpath(destination, "manifest.toml"), document)
+    return destination
+end
+
+function fixture_hashes(records, roles)
+    return Dict{String, String}(
+        map(roles) do role
+            haskey(records, role) || fail("Representative forcing lacks $role")
+            record = records[role]
+            filename = get(record, "filename", nothing)
+            digest = get(record, "sha256", nothing)
+            filename isa AbstractString && valid_sha256(digest) ||
+                fail("Representative forcing has invalid $role provenance")
+            String(filename) => String(digest)
+        end,
+    )
+end
+
+function copy_forcing_payload(forcing_root, destination, scope)
+    isdir(forcing_root) || fail("Representative forcing bundle is missing")
+    fixture_path = joinpath(forcing_root, "fixture.toml")
+    fixture =
+        parse_toml(fixture_path, "Representative forcing fixture manifest")
+    get(fixture, "schema_version", nothing) == 1 || fail(
+        "Representative forcing fixture manifest has an incompatible schema",
+    )
+    selection = get(fixture, "selection", Dict{String, Any}())
+    Int.(get(selection, "representative_cell_ids", Int[])) == scope.cell_ids &&
+        get(selection, "scope_manifest_sha256", nothing) == scope.sha256 ||
+        fail("Representative forcing differs from the exact Scope Manifest")
+    audit = get(fixture, "audit", nothing)
+    audit isa AbstractDict && !isempty(audit) && all(values(audit)) ||
+        fail("Representative forcing fixture did not pass its generation audit")
+    records = get(fixture, "fixture", nothing)
+    records isa AbstractDict && !isempty(records) ||
+        fail("Representative forcing fixture manifest lacks payload records")
+    required_roles = Set((
+        FORCING_FIXTURE_ROLES...,
+        SHARED_PARAMETER_FIXTURE_ROLES...,
+        (
+            role for roles in values(MODEL_PARAMETER_FIXTURE_ROLES) for
+            role in roles
+        )...,
+    ))
+    all(role -> haskey(records, role), required_roles) ||
+        fail("Representative forcing fixture manifest is incomplete")
+    relative_paths = String["fixture.toml"]
+    for (role, record) in records
+        relative = get(record, "filename", nothing)
+        expected_bytes = get(record, "bytes", nothing)
+        expected_sha256 = get(record, "sha256", nothing)
+        relative isa AbstractString && valid_sha256(expected_sha256) ||
+            fail("Representative forcing has an invalid $role record")
+        source_path = joinpath(forcing_root, relative)
+        isfile(source_path) ||
+            fail("Representative forcing $role is missing at $source_path")
+        expected_bytes isa Integer && filesize(source_path) == expected_bytes ||
+            fail("Representative forcing $role has the wrong byte count")
+        sha256sum(source_path) == expected_sha256 ||
+            fail("Representative forcing $role differs from its manifest")
+        push!(relative_paths, String(relative))
+    end
+    length(unique(relative_paths)) == length(relative_paths) ||
+        fail("Representative forcing payload paths are not unique")
+    copy_selected_payload(forcing_root, destination, relative_paths)
+    forcing_sha256 = fixture_hashes(records, FORCING_FIXTURE_ROLES)
+    shared_parameter_sha256 =
+        fixture_hashes(records, SHARED_PARAMETER_FIXTURE_ROLES)
+    model_parameter_sha256 = Dict(
+        model =>
+            fixture_hashes(records, MODEL_PARAMETER_FIXTURE_ROLES[model])
+        for model in MODELS
+    )
+    return (;
+        payload = Dict("fixture_manifest" => "fixture.toml"),
+        forcing_sha256,
+        shared_parameter_sha256,
+        model_parameter_sha256,
+    )
+end
+
+function model_payload_sources(model, fresh_model, report)
+    source_reference = abspath(String(report["reference"]["path"]))
+    first(splitpath(relpath(source_reference, fresh_model))) == ".." &&
+        fail("$model fresh comparison references an oracle outside its run")
+    if model == "CORPSE"
+        payload_root = joinpath(fresh_model, "payload")
+        payload = Dict(
+            "boundaries" => "boundaries.tar",
+            "boundaries_manifest" => "boundaries.toml",
+            "reduced_history" => "reduced_history.nc",
+            "reduced_history_manifest" => "reduced_history.toml",
+        )
+        sha256sum(joinpath(payload_root, payload["reduced_history"])) ==
+        sha256sum(source_reference) ||
+            fail("CORPSE publication payload differs from its fresh oracle")
+        return (; source = payload_root, payload)
+    end
+    return (;
+        source = dirname(source_reference),
+        payload = Dict("oracle" => basename(source_reference)),
+    )
+end
+
+"""
+    construct_candidate(fresh_root, forcing_root, candidate_root, generation)
+
+Construct one atomic shared publication candidate from retained canonical fresh
+evidence and the exact Representative forcing bundle. Only publication payloads
+are copied; full Fortran and Julia run directories remain in `fresh_root`.
+"""
+function construct_candidate(
+    fresh_root,
+    forcing_root,
+    candidate_root,
+    generation,
+    ;
+    _machine = Sys.MACHINE,
+)
+    fresh_root = abspath(fresh_root)
+    forcing_root = abspath(forcing_root)
+    candidate_root = abspath(candidate_root)
+    generation isa AbstractString &&
+        occursin(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", generation) ||
+        fail("publication candidate has an invalid generation")
+    ispath(candidate_root) &&
+        fail("publication candidate output already exists")
+    isdir(fresh_root) || fail("retained fresh evidence is missing")
+    isdir(forcing_root) || fail("Representative forcing bundle is missing")
+    for source in (fresh_root, forcing_root)
+        relative = relpath(candidate_root, realpath(source))
+        first(splitpath(relative)) == ".." ||
+            fail("publication candidate output must be outside its inputs")
+    end
+    _machine == CANONICAL_BUILD_PLATFORM || fail(
+        "publication candidates must be constructed on $CANONICAL_BUILD_PLATFORM",
+    )
+    build = canonical_build(fresh_root)
+    metadata = build.metadata
+    scope = representative_scope()
+    executable_sha256 = build.executable_sha256
+    parent = dirname(candidate_root)
+    mkpath(parent)
+    staging = mktempdir(parent; prefix = ".candidate-", cleanup = false)
+    completed = false
+    try
+        forcing_destination = joinpath(staging, "forcing")
+        forcing = copy_forcing_payload(forcing_root, forcing_destination, scope)
+        forcing_provenance = candidate_provenance(
+            metadata,
+            forcing.forcing_sha256,
+            file_hashes(forcing_destination),
+            forcing.shared_parameter_sha256,
+            scope.sha256,
+            sha256sum(@__FILE__),
+        )
+        write_candidate_payload(
+            forcing_destination,
+            "forcing",
+            generation,
+            forcing.payload,
+            forcing_provenance,
+        )
+
+        for model in MODELS
+            fresh_model = joinpath(fresh_root, "model-$model")
+            report = try
+                FreshReferenceOrchestration.validated_comparison(
+                    model,
+                    joinpath(fresh_model, "comparison.toml");
+                    expected_executable_sha256 = executable_sha256,
+                    expected_scope_manifest_sha256 = scope.sha256,
+                    fortran_path = joinpath(fresh_model, "fortran_output.toml"),
+                )
+            catch error
+                fail(sprint(showerror, error))
+            end
+            scientific_checks(model, report)
+            reference = get(report, "reference", Dict{String, Any}())
+            get(reference, "kind", nothing) == "fresh_reduced_oracle" || fail(
+                "$model fresh comparison lacks its reduced oracle identity",
+            )
+            source_reference = get(reference, "path", nothing)
+            source_reference isa AbstractString ||
+                fail("$model fresh comparison lacks its reduced oracle path")
+            isfile(source_reference) ||
+                fail("$model fresh reduced oracle is missing")
+            sha256sum(source_reference) == get(reference, "sha256", nothing) ||
+                fail("$model fresh reduced oracle differs from its comparison")
+            sources = model_payload_sources(model, fresh_model, report)
+            destination = joinpath(staging, "model-$model", "reference")
+            copy_selected_payload(
+                sources.source,
+                destination,
+                collect(values(sources.payload)),
+            )
+            provenance = candidate_provenance(
+                metadata,
+                forcing.forcing_sha256,
+                merge(
+                    forcing.model_parameter_sha256[model],
+                    named_hashes(
+                        map(
+                            relative -> joinpath(@__DIR__, relative),
+                            MODEL_VERSIONED_INPUTS[model],
+                        ),
+                    ),
+                ),
+                forcing.shared_parameter_sha256,
+                scope.sha256,
+                sha256sum(joinpath(@__DIR__, MODEL_GENERATORS[model])),
+            )
+            write_candidate_payload(
+                destination,
+                "reference",
+                generation,
+                sources.payload,
+                provenance;
+                model,
+            )
+        end
+        write_toml(
+            joinpath(staging, "publication_candidate.toml"),
+            Dict(
+                "schema_version" => 1,
+                "operation" => "reference_publication",
+                "outcome" => "passed",
+                "scope" => "representative",
+                "generation" => generation,
+                "change_kind" => "shared",
+                "models" => collect(MODELS),
+            ),
+        )
+        ispath(candidate_root) && fail(
+            "publication candidate output appeared before the atomic commit",
+        )
+        mv(staging, candidate_root)
+        completed = true
+    finally
+        completed || (ispath(staging) && rm(staging; recursive = true))
+    end
+    return candidate_root
+end
+
+function canonical_build(fresh_root)
     build_root = joinpath(fresh_root, "build")
     metadata_path = joinpath(build_root, "build_metadata.toml")
     metadata = parse_toml(metadata_path, "verified shared-build metadata")
@@ -175,21 +543,35 @@ function canonical_build_receipt(fresh_root, candidate_root)
         PINNED_FORTRAN_SOURCE_COMMIT ||
         fail("shared Fortran build lacks clean pinned-source evidence")
 
+    return (;
+        build_root,
+        metadata_path,
+        metadata,
+        compiler = String(compiler),
+        verification,
+        executable,
+        executable_sha256,
+    )
+end
+
+function canonical_build_receipt(fresh_root, candidate_root)
+    build = canonical_build(fresh_root)
+
     copied_metadata = joinpath(candidate_root, "build_metadata.toml")
-    cp(metadata_path, copied_metadata; force = true)
+    cp(build.metadata_path, copied_metadata; force = true)
     receipt = Dict(
         "schema_version" => 1,
         "kind" => "canonical_fortran_build_receipt",
         "verified" => true,
         "canonical" => true,
-        "compiler_identity" => String(compiler),
+        "compiler_identity" => build.compiler,
         "build_platform" => CANONICAL_BUILD_PLATFORM,
         "toolchain_identity" => CANONICAL_TOOLCHAIN_IDENTITY,
         "source_build_metadata_sha256" => sha256sum(copied_metadata),
         "verification" => Dict(
-            "source_commit" => String(verification["source_commit"]),
+            "source_commit" => String(build.verification["source_commit"]),
             "source_code_clean" => true,
-            "executable_sha256" => executable_sha256,
+            "executable_sha256" => build.executable_sha256,
         ),
     )
     path = write_toml(
@@ -982,6 +1364,18 @@ function copy_payload(source, destination)
     return nothing
 end
 
+function normalize_gzip_header!(archive)
+    open(archive, "r+") do io
+        header = read(io, 10)
+        length(header) == 10 || fail("archive has a truncated gzip header")
+        header[1:3] == UInt8[0x1f, 0x8b, 0x08] ||
+            fail("archive does not have the expected gzip header")
+        seek(io, 4)
+        write(io, zeros(UInt8, 4))
+    end
+    return archive
+end
+
 function create_archive(bundle, asset_directory, generation)
     tree_hash = Pkg.Artifacts.create_artifact() do artifact_directory
         copy_payload(bundle.payload, artifact_directory)
@@ -990,7 +1384,9 @@ function create_archive(bundle, asset_directory, generation)
     binding = binding_name(bundle)
     filename = "$generation-$binding-$tree_sha1.tar.gz"
     archive = joinpath(asset_directory, filename)
-    sha256 = Pkg.Artifacts.archive_artifact(tree_hash, archive)
+    Pkg.Artifacts.archive_artifact(tree_hash, archive)
+    normalize_gzip_header!(archive)
+    sha256 = sha256sum(archive)
     chmod(archive, 0o444)
     return (; binding, filename, tree_hash, tree_sha1, sha256)
 end
@@ -1180,30 +1576,49 @@ function stage_publication(
     release_base_url;
     expected_manifest_directory = nothing,
 )
-    bind_canonical_evidence!(fresh_root, candidate_root)
-    return _stage_prepared_publication(
-        candidate_root,
-        output,
-        artifacts_toml,
-        release_base_url;
-        expected_manifest_directory,
-    )
+    ispath(output) &&
+        fail("publication output already exists and cannot be overwritten")
+    candidate_root = abspath(candidate_root)
+    prepared_root = mktempdir(; prefix = "reference-publication-candidate-")
+    prepared_candidate = joinpath(prepared_root, "candidate")
+    try
+        cp(candidate_root, prepared_candidate)
+        bind_canonical_evidence!(fresh_root, prepared_candidate)
+        return _stage_prepared_publication(
+            prepared_candidate,
+            output,
+            artifacts_toml,
+            release_base_url;
+            expected_manifest_directory,
+        )
+    finally
+        rm(prepared_root; recursive = true, force = true)
+    end
 end
 
 """
     main(args = ARGS)
 
-Run the explicit `stage` publication command and return a successful exit code.
+Run the explicit `construct` or `stage` publication command and return a
+successful exit code.
 
 Called from the script entry point after command-line arguments are collected.
 """
 function main(args = ARGS)
+    isempty(args) && fail("usage: reference_publication.jl construct|stage ...")
+    if first(args) == "construct"
+        length(args) == 5 || fail(
+            "usage: reference_publication.jl construct FRESH_RUN FORCING " *
+            "CANDIDATE GENERATION",
+        )
+        construct_candidate(args[2], args[3], args[4], args[5])
+        return 0
+    end
+    first(args) == "stage" || fail("unknown reference-publication operation")
     5 <= length(args) <= 7 || fail(
         "usage: reference_publication.jl stage FRESH_RUN CANDIDATE OUTPUT " *
         "RELEASE_BASE_URL [ARTIFACTS_TOML [EXPECTED_MANIFEST_DIRECTORY]]",
     )
-    first(args) == "stage" ||
-        fail("only the explicit stage operation is supported")
     fresh_root, candidate, output, release_base_url = args[2:5]
     artifacts_toml = length(args) >= 6 ? args[6] : DEFAULT_ARTIFACTS_TOML
     expected_manifest_directory = length(args) == 7 ? args[7] : nothing

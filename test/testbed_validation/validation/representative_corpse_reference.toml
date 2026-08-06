@@ -1,0 +1,52 @@
+canonical = true
+compatibility_identity = "17bc06b1e8a31b68326d84ab01e0bc3250378598e668cdb92ac91ce9ae2f20ec"
+generation = "representative-linux-v1"
+kind = "reference"
+model = "CORPSE"
+outcome = "passed"
+schema_version = 1
+scope = "representative"
+
+[artifact]
+binding = "representative_corpse_reference"
+filename = "representative-linux-v1-representative_corpse_reference-1426e867e98d06206142ee2b9643ca6f80c27fd6.tar.gz"
+git_tree_sha1 = "1426e867e98d06206142ee2b9643ca6f80c27fd6"
+sha256 = "afee167571ee50643f5f584cc5864e2a2d46435e754d3cf9cae417116da40b87"
+url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_corpse_reference-1426e867e98d06206142ee2b9643ca6f80c27fd6.tar.gz"
+
+[files]
+"boundaries.tar" = "d818a8f2932d98793ee348a3aa7307fcc8d6a139f0d4a45e407caf79a28ca978"
+"boundaries.toml" = "d1802727b12c687859a69b6191149f2d633654ad1dce4e08c9469ba85b124363"
+"reduced_history.nc" = "372c09571157cc2336af9779aec6e0b64d9149779e8c639db7b87c081bb37a13"
+"reduced_history.toml" = "6c92fa4b269064267054344da3e58852d9b7b6e237d472dc5daf07ccabcb6079"
+
+[payload]
+boundaries = "boundaries.tar"
+boundaries_manifest = "boundaries.toml"
+reduced_history = "reduced_history.nc"
+reduced_history_manifest = "reduced_history.toml"
+
+[provenance]
+build_platform = "x86_64-linux-gnu"
+build_receipt_sha256 = "9799090e0377fce4bb409a11033460996e7b68befb8e1947e4034701b5c34941"
+comparison_report_sha256 = "f21d41a065ec6d42a55c62271d20002b08baab50e3bf09da7342bece2317bc06"
+comparison_schema = "reduced-comparison-oracle-v1"
+compiler_identity = "GNU Fortran (GCC) 13.2.0"
+generator_revision = "7a77070fd4362fd60a2e53af64bae1df65b6a188b846e7f0631c17993e78a4fb"
+scope_manifest_sha256 = "293190db2dda44f1babd13715a7e33027349df9e959a40dd60cc9d329671e9f4"
+source_revision = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+toolchain_identity = "climaland-biogeochem-reference-linux-gfortran-v1"
+
+    [provenance.forcing_sha256]
+    "forcing_1901_2014.nc" = "7f78f6ac31e58466b6e85667b64f8a9b85b1b4403a910b982eddfb0d7e0b38d3"
+    "grid_selected_cells.csv" = "7956d4e354f8e834998618cf3d032e9a5231620ed5f5c9e0d14e2d44c6e3831f"
+    "soil_selected_cells.csv" = "8f369cc9f16b0afa90f3827c7c6f012549d15b327d98fa5d779c55999b7277d1"
+
+    [provenance.parameter_sha256]
+    "corpse_params_12.18d.2017.nml" = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+    "pftlookup_igbp_updated4_exud0.csv" = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+    "validation/corpse_c_representative_calibration.toml" = "ac28c0a2340b601a5a78b4372ff1b5c97da561aa2e8e5b7c07887be38a2f849c"
+
+    [provenance.shared_parameter_sha256]
+    "co2delta_control.txt" = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+    "modis_phenology_wtundra.txt" = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"

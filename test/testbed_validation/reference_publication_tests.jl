@@ -106,7 +106,7 @@ function write_payload_manifest(
         Dict("fixture_manifest" => "fixture.toml")
     elseif model == "CORPSE"
         Dict(
-            "boundaries" => "boundaries.nc",
+            "boundaries" => "boundaries.tar",
             "boundaries_manifest" => "boundaries.toml",
             "reduced_history" => "reduced_history.nc",
             "reduced_history_manifest" => "reduced_history.toml",
@@ -455,6 +455,143 @@ function empty_artifacts_toml(path)
     return path
 end
 
+function publication_snapshot(root)
+    snapshot = Dict{String, String}()
+    for (directory, _, files) in walkdir(root)
+        for file in files
+            path = joinpath(directory, file)
+            snapshot[relpath(path, root)] = sha256sum(path)
+        end
+    end
+    return snapshot
+end
+
+function make_raw_representative_forcing(root)
+    mkpath(root)
+    filenames = Dict(
+        "forcing" => "forcing.nc",
+        "grid" => "grid.csv",
+        "soil" => "soil.csv",
+        "phenology" => "phenology.txt",
+        "perturbation" => "perturbation.txt",
+        "casa_c_parameters" => "casa-c.csv",
+        "casa_cn_parameters" => "casa-cn.csv",
+        "mimics_parameters" => "mimics.csv",
+        "corpse_parameters" => "corpse.nml",
+    )
+    fixture = Dict{String, Any}()
+    for (role, filename) in filenames
+        path = joinpath(root, filename)
+        write(path, "$role fixture\n")
+        fixture[role] = Dict(
+            "filename" => filename,
+            "bytes" => filesize(path),
+            "sha256" => sha256sum(path),
+        )
+    end
+    write_publication_manifest(
+        joinpath(root, "fixture.toml"),
+        Dict(
+            "schema_version" => 1,
+            "selection" => Dict(
+                "representative_cell_ids" => PUBLICATION_CELL_IDS,
+                "scope_manifest_sha256" =>
+                    sha256sum(PUBLICATION_SCOPE_PATH),
+            ),
+            "audit" => Dict(
+                "source_selection_exact_before_repacking" => true,
+                "fixture_roundtrip_exact" => true,
+                "static_rows_exact" => true,
+                "copied_inputs_exact" => true,
+            ),
+            "fixture" => fixture,
+        ),
+    )
+    write(joinpath(root, "incidental-download.log"), "not a payload")
+    return root
+end
+
+@testset "Reference Publication constructs, binds, and stages retained evidence" begin
+    mktempdir() do directory
+        seed = make_candidate(joinpath(directory, "seed"))
+        forcing = make_raw_representative_forcing(
+            joinpath(directory, "representative-forcing"),
+        )
+        fresh = make_canonical_fresh_run(joinpath(directory, "fresh"), seed)
+        write(
+            joinpath(fresh, "model-MIMICS-C", "full_daily_output.nc"),
+            "incidental full run output",
+        )
+        candidate = joinpath(directory, "candidate")
+
+        result = ReferencePublication.construct_candidate(
+            fresh,
+            forcing,
+            candidate,
+            "representative-linux-test-v1",
+            _machine = ReferencePublication.CANONICAL_BUILD_PLATFORM,
+        )
+
+        @test result == candidate
+        @test !isfile(joinpath(candidate, "canonical_build_receipt.toml"))
+        @test isfile(joinpath(candidate, "forcing", "forcing.nc"))
+        @test !isfile(joinpath(candidate, "forcing", "incidental-download.log"))
+        forcing_manifest =
+            TOML.parsefile(joinpath(candidate, "forcing", "manifest.toml"))
+        @test Set(keys(forcing_manifest["provenance"]["forcing_sha256"])) ==
+              Set(("forcing.nc", "grid.csv", "soil.csv"))
+        @test Set(
+            keys(forcing_manifest["provenance"]["shared_parameter_sha256"]),
+        ) == Set(("phenology.txt", "perturbation.txt"))
+        mimics_cn_manifest = TOML.parsefile(
+            joinpath(
+                candidate,
+                "model-MIMICS-CN",
+                "reference",
+                "manifest.toml",
+            ),
+        )
+        @test haskey(
+            mimics_cn_manifest["provenance"]["parameter_sha256"],
+            "candidate_reconstruction.toml",
+        )
+        @test !ispath(
+            joinpath(
+                candidate,
+                "model-MIMICS-C",
+                "reference",
+                "full_daily_output.nc",
+            ),
+        )
+        @test Set(
+            readdir(joinpath(candidate, "model-MIMICS-C", "reference")),
+        ) == Set(("manifest.toml", "oracle.toml"))
+
+        ReferencePublication.bind_canonical_evidence!(fresh, candidate)
+        @test isfile(joinpath(candidate, "canonical_build_receipt.toml"))
+        destination = joinpath(directory, "publication")
+        staged = ReferencePublication._stage_prepared_publication(
+            candidate,
+            destination,
+            empty_artifacts_toml(joinpath(directory, "Artifacts.toml")),
+            RELEASE_URL,
+        )
+
+        @test staged.output == destination
+        publication = TOML.parsefile(joinpath(destination, "publication.toml"))
+        @test length(publication["asset"]) == 6
+        @test publication["atomic_compatibility_set"]
+
+        @test_throws ReferencePublication.PublicationError ReferencePublication.construct_candidate(
+            fresh,
+            forcing,
+            joinpath(directory, "wrong-platform"),
+            "representative-linux-test-v1";
+            _machine = "aarch64-apple-darwin",
+        )
+    end
+end
+
 @testset "Reference Publication rejects ordinary fresh output" begin
     mktempdir() do directory
         fresh = joinpath(directory, "fresh")
@@ -611,6 +748,39 @@ end
                 RELEASE_URL,
             )
         end
+    end
+end
+
+@testset "Reference Publication staging is pure and reproducible" begin
+    mktempdir() do directory
+        candidate = make_candidate(joinpath(directory, "candidate"))
+        fresh =
+            make_canonical_fresh_run(joinpath(directory, "fresh"), candidate)
+        artifacts = empty_artifacts_toml(joinpath(directory, "Artifacts.toml"))
+        candidate_before = publication_snapshot(candidate)
+
+        first = joinpath(directory, "first")
+        ReferencePublication.stage_publication(
+            fresh,
+            candidate,
+            first,
+            artifacts,
+            RELEASE_URL,
+        )
+        @test publication_snapshot(candidate) == candidate_before
+
+        sleep(1.1)
+        second = joinpath(directory, "second")
+        ReferencePublication.stage_publication(
+            fresh,
+            candidate,
+            second,
+            artifacts,
+            RELEASE_URL,
+        )
+
+        @test publication_snapshot(candidate) == candidate_before
+        @test publication_snapshot(second) == publication_snapshot(first)
     end
 end
 

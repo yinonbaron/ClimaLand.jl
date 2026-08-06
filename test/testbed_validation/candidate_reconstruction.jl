@@ -348,6 +348,56 @@ function write_candidate_atomic(destination, content, candidate)
 end
 
 """
+    derive_candidate(source_root, candidate_id, destination,
+                     spec_path = CANDIDATE_SPEC_PATH)
+
+Derive one hash-pinned candidate directly from the immutable source checkout.
+
+This is the production entry point for workflows that need one reconstructed
+input without materializing the complete candidate matrix.
+"""
+function derive_candidate(
+    source_root,
+    candidate_id,
+    destination,
+    spec_path = CANDIDATE_SPEC_PATH,
+)
+    spec = TOML.parsefile(spec_path)
+    get(spec, "schema_version", 0) == 1 ||
+        error("Unsupported candidate specification schema")
+    actual_commit = checkout_commit(source_root)
+    expected_commit = spec["source_commit"]
+    actual_commit in ("unavailable", expected_commit) || error(
+        "Candidate source must be pinned to $expected_commit; found $actual_commit",
+    )
+    candidates = filter(
+        candidate -> get(candidate, "id", nothing) == candidate_id,
+        spec["candidate"],
+    )
+    length(candidates) == 1 ||
+        error("Candidate specification does not uniquely define $candidate_id")
+    candidate = only(candidates)
+    source_relative =
+        safe_relative_path(candidate["source"], "candidate source")
+    source = joinpath(source_root, source_relative)
+    isfile(source) || error("Missing candidate source: $source")
+    path_is_within(source, source_root) ||
+        error("Candidate source escapes its immutable source root: $source")
+    path_is_within(destination, source_root) &&
+        error("Candidate generation cannot write into its source tree")
+    verify_expected_hash(candidate, "expected_source_sha256", sha256sum(source))
+
+    lines = readlines(source; keep = true)
+    diffs = Dict{String, Any}[]
+    for mutation in candidate["mutation"]
+        lines, record = apply_mutation(lines, mutation)
+        push!(diffs, record)
+    end
+    write_candidate_atomic(destination, join(lines), candidate)
+    return candidate_record(candidate, source, destination, diffs)
+end
+
+"""
     verify_validation_inputs(source_root, spec; expected_paths = nothing)
 
 Verify every pinned upstream input staged by reduced validation.
@@ -452,35 +502,22 @@ function derive_candidates(
 
     records = Dict{String, Any}[]
     for candidate in spec["candidate"]
-        source_relative =
-            safe_relative_path(candidate["source"], "candidate source")
         destination_relative = safe_relative_path(
             candidate["destination"],
             "candidate destination",
         )
-        source = joinpath(source_root, source_relative)
         destination = joinpath(output_root, destination_relative)
-        isfile(source) || error("Missing candidate source: $source")
-        path_is_within(source, source_root) ||
-            error("Candidate source escapes its immutable source root: $source")
         path_is_within(destination, output_root) ||
             error("Candidate destination escapes its output root: $destination")
-        path_is_within(destination, source_root) &&
-            error("Candidate generation cannot write into its source tree")
-        verify_expected_hash(
-            candidate,
-            "expected_source_sha256",
-            sha256sum(source),
+        push!(
+            records,
+            derive_candidate(
+                source_root,
+                candidate["id"],
+                destination,
+                spec_path,
+            ),
         )
-
-        lines = readlines(source; keep = true)
-        diffs = Dict{String, Any}[]
-        for mutation in candidate["mutation"]
-            lines, record = apply_mutation(lines, mutation)
-            push!(diffs, record)
-        end
-        write_candidate_atomic(destination, join(lines), candidate)
-        push!(records, candidate_record(candidate, source, destination, diffs))
     end
 
     report = Dict(

@@ -30,10 +30,11 @@ The ephemeral fresh-reference adapter now performs those two steps as one
 MIMICS-CN worker: it runs the pinned shared Fortran executable, reduces the
 80-cell output, runs the existing selected-cell Julia comparison with the
 frozen policy, and writes the standard `comparison.toml`. Configure
-`FreshReferenceAdapter.commands` with `mimics_cn_forcing_root` and
-`mimics_cn_reference_template` before passing its build, worker, and preflight
-commands to `run_fresh_reference`. The other four model workers remain
-fail-closed.
+`FreshReferenceAdapter.commands` with `mimics_cn_forcing_root` before passing
+its build, worker, and preflight commands to `run_fresh_reference`. The prespin
+CASA parameter input is derived from the pinned source checkout with the
+versioned candidate-reconstruction contract. All five model workers share the
+same verified Fortran build and fail closed on missing inputs or evidence.
 
 The worker checks every fresh Fortran stage boundary and every selected daily
 historical value. Julia checks every prognostic state step, plus every

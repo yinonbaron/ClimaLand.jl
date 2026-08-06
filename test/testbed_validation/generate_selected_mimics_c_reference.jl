@@ -51,6 +51,35 @@ function source_indices(fortran_root, cell_ids)
     end
 end
 
+"""
+    reference_grid(fortran_root, grid)
+
+Replace global grid indices with the packed indices the Fortran run wrote.
+
+The Representative run packs its 80 cells along `lon` with a singleton `lat`,
+so reading its output by global index is out of bounds.
+"""
+function reference_grid(fortran_root, grid)
+    rows = Native.casa().parse_rows(
+        joinpath(fortran_root, "stages", "01-prespin", "grid.csv"),
+    )
+    by_id = Dict(parse(Int, strip(row.ijcam)) => row for row in rows)
+    return map(grid) do point
+        row = get(by_id, point.cell_id) do
+            error(
+                "MIMICS-C Fortran grid has no requested cell $(point.cell_id)",
+            )
+        end
+        merge(
+            point,
+            (
+                longitude_index = parse(Int, strip(row.ilon)),
+                latitude_index = parse(Int, strip(row.ilat)),
+            ),
+        )
+    end
+end
+
 function finite_vector(values, eligible_positions, location)
     any(ismissing, values) &&
         error("MIMICS-C Fortran oracle is missing $location")
@@ -280,8 +309,11 @@ function write_reference(
         Workflow.selected_casa.selected_grid(collection.files["grid"], cell_ids)
     boundary, boundary_sources =
         boundary_values(fortran_root, cell_ids, eligible_positions)
-    annual, daily, historical_sources =
-        historical_values(fortran_root, grid, eligible_positions)
+    annual, daily, historical_sources = historical_values(
+        fortran_root,
+        reference_grid(fortran_root, grid),
+        eligible_positions,
+    )
     workflow_path = joinpath(fortran_root, "configuration", "workflow.toml")
     workflow = TOML.parsefile(workflow_path)
     fortran_grid_path =

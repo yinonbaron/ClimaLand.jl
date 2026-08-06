@@ -55,9 +55,13 @@ end
     build = commands.build("/tmp/fresh-build")
     worker = commands.worker("CASA-C", "/tmp/fresh-casa", "/tmp/fresh-build")
 
+    project = dirname(Base.active_project())
     @test first(build.exec) == Base.julia_cmd().exec[1]
     @test "build" in build.exec
     @test abspath("../biogeochem_testbed") in build.exec
+    # Every subprocess must resolve the same environment as the runner.
+    @test "--project=$project" in build.exec
+    @test "--project=$project" in worker.exec
     @test "worker" in worker.exec
     @test "CASA-C" in worker.exec
     @test abspath("../biogeochem_testbed") in worker.exec
@@ -81,7 +85,6 @@ end
         corpse_forcing_root = "/tmp/corpse-forcing",
         mimics_c_forcing_root = "/tmp/forcing",
         mimics_cn_forcing_root = "/tmp/forcing",
-        mimics_cn_reference_template = "/tmp/reference-template",
     )
     @test isnothing(configured.preflight(["CASA-C"]))
     @test isnothing(configured.preflight(["CASA-CN"]))
@@ -109,7 +112,7 @@ end
     )
     @test "worker" in mimics_cn.exec
     @test "/tmp/forcing" in mimics_cn.exec
-    @test "/tmp/reference-template" in mimics_cn.exec
+    @test length(mimics_cn.exec) == length(mimics_c.exec)
     corpse =
         configured.worker("CORPSE", "/tmp/fresh-corpse", "/tmp/fresh-build")
     @test "worker" in corpse.exec

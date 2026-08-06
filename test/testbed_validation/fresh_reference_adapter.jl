@@ -243,13 +243,12 @@ function commands(
     corpse_forcing_root = nothing,
     mimics_c_forcing_root = nothing,
     mimics_cn_forcing_root = nothing,
-    mimics_cn_reference_template = nothing,
 )
     source_root = abspath(source_root)
     project = dirname(Base.active_project())
     build =
         build_directory ->
-            `$(Base.julia_cmd()) --startup-file=no $SCRIPT_PATH build $source_root $build_directory`
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH build $source_root $build_directory`
     worker =
         (model, run_directory, build_directory) -> begin
             arguments = String[
@@ -276,8 +275,6 @@ function commands(
             elseif model == "MIMICS-CN"
                 isnothing(mimics_cn_forcing_root) ||
                     push!(arguments, abspath(mimics_cn_forcing_root))
-                isnothing(mimics_cn_reference_template) ||
-                    push!(arguments, abspath(mimics_cn_reference_template))
             end
             `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH $arguments`
         end
@@ -312,18 +309,17 @@ function commands(
                 )
             end
             if "MIMICS-CN" in selected
-                !isnothing(mimics_cn_forcing_root) &&
-                    !isnothing(mimics_cn_reference_template) || throw(
+                !isnothing(mimics_cn_forcing_root) || throw(
                     AdapterError(
-                        "MIMICS-CN Representative fresh worker requires forcing and reference-template paths",
+                        "MIMICS-CN Representative fresh worker requires a forcing path",
                     ),
                 )
             end
             nothing
         end
     mimics_cn =
-        (forcing_root, reference_template, run_directory, build_directory) ->
-            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH run-mimics-cn-80 $source_root $forcing_root $reference_template $run_directory $build_directory`
+        (forcing_root, run_directory, build_directory) ->
+            `$(Base.julia_cmd()) --startup-file=no --project=$project $SCRIPT_PATH run-mimics-cn-80 $source_root $forcing_root $run_directory $build_directory`
     return (; build, worker, preflight, mimics_cn)
 end
 
@@ -1431,7 +1427,7 @@ function _run_mimics_c_80(
     historical_nonfinite = first_mimics_c_fortran_historical_nonfinites(
         generator,
         run_directory,
-        grid,
+        generator.reference_grid(run_directory, grid),
         fixture_ids,
     )
     fortran_nonfinite =
@@ -1514,13 +1510,11 @@ end
 function _run_mimics_cn_80(
     source_root,
     forcing_root,
-    reference_template,
     run_directory,
     build_directory,
 )
     source_root = abspath(source_root)
     forcing_root = abspath(forcing_root)
-    reference_template = abspath(reference_template)
     run_directory = abspath(run_directory)
     executable = verified_executable(build_directory)
     Harness.source_commit(source_root) == PINNED_SOURCE_COMMIT ||
@@ -1535,8 +1529,6 @@ function _run_mimics_cn_80(
     fixture_ids = Int.(fixture["selection"]["representative_cell_ids"])
     fixture_ids == Int.(scope["cell_ids"]) && length(fixture_ids) == 80 ||
         throw(AdapterError("MIMICS-CN forcing is not the Representative scope"))
-    isfile(joinpath(reference_template, "configuration", "workflow.toml")) ||
-        throw(AdapterError("MIMICS-CN reference template is incomplete"))
     require_empty_directory(run_directory)
 
     parent = parentmodule(@__MODULE__)
@@ -1544,10 +1536,10 @@ function _run_mimics_cn_80(
     generator = getfield(parent, :GenerateSelectedMIMICSCNReference)
     prepared = selected.write_workflow(
         source_root,
-        reference_template,
         run_directory;
         fixture_root = forcing_root,
         points = 80,
+        source_commit = PINNED_SOURCE_COMMIT,
     )
     pin_workflow_source!(prepared.workflow_path)
     stages =
@@ -1866,13 +1858,12 @@ function main(args = ARGS)
             return isnothing(result.comparison) || result.comparison.passed ?
                    0 : 1
         elseif model == "MIMICS-CN"
-            length(args) == 7 || throw(
+            length(args) == 6 || throw(
                 AdapterError(
-                    "MIMICS-CN Representative fresh worker requires forcing and reference-template paths",
+                    "MIMICS-CN Representative fresh worker requires a forcing path",
                 ),
             )
-            result =
-                run_mimics_cn_80(args[5], args[6], args[7], args[3], args[4])
+            result = run_mimics_cn_80(args[5], args[6], args[3], args[4])
             return isnothing(result.comparison) || result.comparison.passed ?
                    0 : 1
         end
@@ -1900,9 +1891,9 @@ function main(args = ARGS)
         result = run_mimics_c_80(args[2:end]...)
         return isnothing(result.comparison) || result.comparison.passed ? 0 : 1
     elseif mode == "run-mimics-cn-80"
-        length(args) == 6 || throw(
+        length(args) == 5 || throw(
             AdapterError(
-                "usage: fresh_reference_adapter.jl run-mimics-cn-80 SOURCE_ROOT FORCING_ROOT REFERENCE_TEMPLATE RUN_DIRECTORY BUILD_DIRECTORY",
+                "usage: fresh_reference_adapter.jl run-mimics-cn-80 SOURCE_ROOT FORCING_ROOT RUN_DIRECTORY BUILD_DIRECTORY",
             ),
         )
         result = run_mimics_cn_80(args[2:end]...)

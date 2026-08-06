@@ -40,7 +40,7 @@ jobs:
           restore-keys: |
             representative-${{ runner.os }}-julia-1.12-
       - name: Install validation dependencies
-        run: julia --startup-file=no --project=test -e 'using Pkg; Pkg.instantiate()'
+        run: julia --startup-file=no --project=test -e 'using Pkg; Pkg.develop(; path = "."); Pkg.instantiate()'
       - name: Stage all pinned Representative artifacts
         id: stage_artifacts
         continue-on-error: true

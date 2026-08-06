@@ -15,8 +15,10 @@ const SELECTED =
 const FIXTURE_ROOT = joinpath(@__DIR__, "fixtures", "selected_cells")
 const YEARS = 1901:2014
 const POINTS = 80
+# The pinned Fortran reads desorpQ10/desorpTref unconditionally, so only the
+# MIMICS_mod5_GSWP3_JAMES table can drive it.
 const MIMICS_PARAMETER_SHA256 =
-    "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+    "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
 const STAGE_SPECS = (
     (
         name = "prespin",

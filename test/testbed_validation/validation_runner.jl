@@ -104,6 +104,9 @@ const CORPSE_FORCING_OVERRIDE = "CLIMALAND_VALIDATION_CORPSE_FORCING"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
 const PERFORMANCE_BUDGET_SECONDS = 3600.0
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
+# Canonical five-worker Representative runs can exceed the default budget on
+# slower shared filesystems, so an explicit override may raise the deadline.
+const MAXIMUM_TIMEOUT_SECONDS = 21600.0
 const DEFAULT_REFERENCE = joinpath(
     @__DIR__,
     "fixtures",
@@ -1219,8 +1222,7 @@ function scientific_outcome(
     checks = Dict(
         "initialization" => get(initialization, "all_match", false),
         "fresh_fortran_boundaries" =>
-            Set(keys(boundaries)) == boundary_stages &&
-            all(
+            Set(keys(boundaries)) == boundary_stages && all(
                 get(
                     get(
                         get(boundaries[stage], "source", Dict{String, Any}()),
@@ -1250,8 +1252,7 @@ function scientific_outcome(
         daily_match = get(fresh_fortran_daily, "all_match", false)
         checks["nitrogen_budget"] = get(nitrogen_budget, "all_close", false)
         checks["annual_reducers_and_daily_samples"] =
-            get(fresh_fortran_annual, "all_match", false) &&
-            daily_match
+            get(fresh_fortran_annual, "all_match", false) && daily_match
         checks["fresh_fortran_daily"] = daily_match
     end
     return (; passed = all(values(checks)), checks)
@@ -1635,8 +1636,6 @@ function configured_fresh_commands(models)
         mimics_c_forcing_root = "MIMICS-C" in selected ? forcing_root : nothing,
         mimics_cn_forcing_root = "MIMICS-CN" in selected ? forcing_root :
                                  nothing,
-        mimics_cn_reference_template = "MIMICS-CN" in selected ?
-                                       reference("MIMICS-CN") : nothing,
     )
 end
 
@@ -2033,13 +2032,13 @@ function timeout_seconds()
     catch
         throw(
             RunnerError(
-                "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(DEFAULT_TIMEOUT_SECONDS))",
+                "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(MAXIMUM_TIMEOUT_SECONDS))",
             ),
         )
     end
-    0 < seconds <= DEFAULT_TIMEOUT_SECONDS || throw(
+    0 < seconds <= MAXIMUM_TIMEOUT_SECONDS || throw(
         RunnerError(
-            "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(DEFAULT_TIMEOUT_SECONDS))",
+            "$TIMEOUT_OVERRIDE must be a positive number no greater than $(Int(MAXIMUM_TIMEOUT_SECONDS))",
         ),
     )
     return seconds

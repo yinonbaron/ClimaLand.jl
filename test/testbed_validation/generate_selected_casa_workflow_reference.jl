@@ -32,6 +32,28 @@ const CASA_C_CALIBRATION_PATH =
     joinpath(@__DIR__, "validation", "casa_c_full_grid_calibration.toml")
 const CASA_CN_CALIBRATION_PATH =
     joinpath(@__DIR__, "validation", "casa_cn_full_grid_calibration.toml")
+const COMPARISON_POLICY_PATH =
+    joinpath(@__DIR__, "validation", "comparison_policy.toml")
+
+"""
+    policy_budget_rtol(model)
+
+Read `model`'s calibrated conservation-budget tolerance from the Comparison
+Policy.
+
+CASA-C and CASA-CN have separately calibrated budgets, so the carbon-only bound
+must never be applied to a carbon-nitrogen run.
+"""
+function policy_budget_rtol(model)
+    policy = TOML.parsefile(COMPARISON_POLICY_PATH)
+    rules = get(get(policy, "model", Dict{String, Any}()), model, nothing)
+    rules isa AbstractDict ||
+        error("Comparison Policy has no $model rules")
+    budget_rtol = get(rules, "budget_rtol", nothing)
+    budget_rtol isa Real && isfinite(budget_rtol) && budget_rtol >= 0 ||
+        error("Comparison Policy has an invalid $model budget rtol")
+    return Float64(budget_rtol)
+end
 
 const FORTRAN_BOUNDARY_VARIABLES = Dict(
     "casapool%clabile" => "casa_plant.c_labile",
@@ -807,6 +829,7 @@ function finish_representative_worker(
             reference_path = oracle_path,
             compare_references = true,
             concurrency_budget = ReferenceCells.ConcurrencyBudget(1),
+            budget_rtol = policy_budget_rtol(model),
             nonfinite_path = julia_nonfinite_path,
         )
     catch

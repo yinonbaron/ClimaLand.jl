@@ -4,22 +4,11 @@ import TOML
 @testset "selected MIMICS-CN validation workflow" begin
     mktempdir() do run_root
         source_root = abspath(joinpath(@__DIR__, "..", ".."))
-        template = joinpath(run_root, "template")
-        mkpath(joinpath(template, "configuration"))
-        mkpath(joinpath(template, "candidates", "parameters"))
-        open(joinpath(template, "configuration", "workflow.toml"), "w") do io
-            TOML.print(
-                io,
-                Dict(
-                    "source_commit" => "82c57f8aa1179865d9752b617493ef06f45c3266",
-                ),
-            )
-        end
         result = SelectedMIMICSCNValidation.write_workflow(
             source_root,
-            template,
             run_root;
             prepare = false,
+            source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266",
         )
         workflow = TOML.parsefile(result.workflow_path)
         @test workflow["source_commit"] ==
@@ -59,5 +48,13 @@ import TOML
                 TestbedNativeMIMICSCNReconstruction.MIMICS_PARAMETER_FILE,
             ) for source in mimics_sources
         )
+        prespin_sources = [
+            input["source"] for stage in workflow["stage"] for
+            input in stage["input"] if
+            input["destination"] == "casa_parameters.csv" &&
+            stage["name"] == "prespin"
+        ]
+        @test prespin_sources == [result.prespin_parameters]
+        @test occursin("selected_inputs/candidates", only(prespin_sources))
     end
 end

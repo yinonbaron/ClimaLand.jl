@@ -127,6 +127,18 @@ using Test
                   ["KO=9 belongs to another branch"]
             @test only(candidate["diff"])["changed"]
 
+            single_path = joinpath(root, "single", "ko6.csv")
+            single =
+                derive_candidate(source_root, "ko6", single_path, spec_path)
+            @test read(single_path, String) == "6,KO(1),x\n"
+            @test single["id"] == "ko6"
+            @test_throws ErrorException derive_candidate(
+                source_root,
+                "missing-candidate",
+                joinpath(root, "missing.csv"),
+                spec_path,
+            )
+
             @test_throws ErrorException derive_candidates(
                 source_root,
                 source_root,

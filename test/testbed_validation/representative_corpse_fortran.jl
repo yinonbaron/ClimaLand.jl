@@ -30,6 +30,7 @@ const STAGES = (
         years = 1901:1901,
         initialization = 0,
         interval = 99,
+        daily = 0,
         saved_years = (1, 99, 100),
     ),
     (
@@ -38,6 +39,7 @@ const STAGES = (
         years = 1901:1920,
         initialization = 3,
         interval = 9960,
+        daily = 0,
         saved_years = (1, 9960, 9980),
     ),
     (
@@ -46,14 +48,17 @@ const STAGES = (
         years = 1901:1920,
         initialization = 3,
         interval = 9960,
+        daily = 0,
         saved_years = (1, 9960, 9980),
     ),
     (
+        # The reduced oracle reads 365 daily records for every historical year.
         name = "historical",
         loops = 1,
         years = 1901:2014,
         initialization = 2,
         interval = 1,
+        daily = 1,
         saved_years = Tuple(1901:2014),
     ),
 )
@@ -63,8 +68,9 @@ const BOUNDARY_END = Dict(
     "spin_continuation" => (499 * 20 * 365, "1920-12-31"),
 )
 
-output_name(prefix, year) =
-    "$(prefix)_pool_flux_$(lpad(year, 4, '0')).nc"
+# The Fortran appends `_daily` to its NetCDF names when daily output is on.
+output_name(prefix, year, daily = 0) =
+    "$(prefix)_pool_flux_$(lpad(year, 4, '0'))$(daily == 1 ? "_daily" : "").nc"
 
 sha256sum(path) = open(path) do io
     bytes2hex(SHA.sha256(io))
@@ -107,7 +113,7 @@ end
 function stage_outputs(stage)
     outputs = ["casa_final.csv", "casa_flux_final.csv", "corpse_final.csv"]
     for prefix in ("casaclm", "corpse")
-        append!(outputs, output_name.(prefix, stage.saved_years))
+        append!(outputs, output_name.(prefix, stage.saved_years, stage.daily))
     end
     if stage.initialization == 0
         push!(outputs, "casaclm_pool_flux_yyyy.nc")
@@ -144,7 +150,7 @@ function write_workflow(
         control = Harness.write_smoke_control(
             controls;
             points = 80,
-            daily_output = 0,
+            daily_output = stage.daily,
             soil_model = 3,
             loops = stage.loops,
             initialization = stage.initialization,

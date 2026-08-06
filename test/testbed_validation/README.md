@@ -317,6 +317,14 @@ until a rerun passes the archive integrity gate.
 blocked attempts remain in it so later work does not repeat searches or erase
 unexplained differences.
 
+Every `--project=test` command below expects the test environment to resolve
+`ClimaLand` from this checkout rather than from the registry:
+
+```bash
+julia --startup-file=no --project=test \
+  -e 'using Pkg; Pkg.develop(; path = "."); Pkg.instantiate()'
+```
+
 `reference_harness.jl` currently has no non-stdlib Julia dependencies. From
 the repository root:
 
@@ -711,10 +719,19 @@ before starting any model worker and records its manifest checksum and
 provenance in the report. Without the override, pinned mode continues to use
 the bound forcing artifact.
 
+The runner enforces a hard process deadline of two hours by default and records
+`timed_out` for every model still running when it fires.
+`CLIMALAND_VALIDATION_TIMEOUT_SECONDS` adjusts that deadline up to six hours;
+values outside `(0, 21600]` are rejected. A canonical five-worker Representative
+run needs the extra budget on slower shared filesystems, and it should be the
+only heavy job on the machine, because competing load is itself enough to
+exhaust the default deadline.
+
 ### Reference publication
 
-`reference_publication.jl` is the explicit staging operation for a successful
-canonical run. It does not upload assets or edit the input `Artifacts.toml`.
+`reference_publication.jl` provides explicit candidate construction and staging
+operations for a successful canonical run. It does not upload assets or edit
+the input `Artifacts.toml`.
 The candidate must declare the canonical `x86_64-linux-gnu` platform, a
 versioned GNU Fortran compiler, and the pinned
 `climaland-biogeochem-reference-linux-gfortran-v1` toolchain identity. Local
@@ -733,8 +750,18 @@ budget, and fixed-daily checks, and identify the exact files being published.
 The forcing and model payloads are independently checked against their
 model-specific schemas before staging.
 
+Construct the shared candidate directly from the retained evidence root and
+the exact Representative forcing bundle. This copies the forcing and the five
+reduced publication payloads, but not incidental Fortran or Julia run output:
+
 ```sh
-julia --startup-file=no --project=. \
+julia --startup-file=no --project=test \
+  test/testbed_validation/reference_publication.jl construct \
+  CANONICAL_FRESH_RUN REPRESENTATIVE_FORCING CANDIDATE GENERATION
+```
+
+```sh
+julia --startup-file=no --project=test \
   test/testbed_validation/reference_publication.jl stage \
   CANONICAL_FRESH_RUN CANDIDATE STAGED_OUTPUT \
   https://github.com/OWNER/REPOSITORY/releases/download/IMMUTABLE_TAG \

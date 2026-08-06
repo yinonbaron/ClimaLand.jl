@@ -749,9 +749,10 @@ function boundary_pairs(state, stage, grid, reference_root)
     root = joinpath(reference_root, "stages", stage_directory(stage))
     casa_columns, casa_rows = csv_table(joinpath(root, "casa_final.csv"))
     corpse_columns, corpse_rows = csv_table(joinpath(root, "corpse_final.csv"))
-    length(casa_rows) == 4263 ||
-        error("Fortran CASA boundary must contain 4,263 rows")
+    # Both the full grid and the 80-cell Representative scope reach here, so the
+    # boundary is checked against the run's own grid rather than a fixed count.
     reference_grid = native_casa().read_grid(joinpath(root, "grid.csv"))
+    isempty(reference_grid) && error("Fortran CASA grid is empty")
     length(reference_grid) == length(casa_rows) ||
         error("Fortran CASA boundary and grid differ")
     casa_by_id = Dict(
