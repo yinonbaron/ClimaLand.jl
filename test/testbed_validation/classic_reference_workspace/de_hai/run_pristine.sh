@@ -58,6 +58,11 @@ record_command() {
     printf '\n' >> "$commands_log"
 }
 
+run_recorded() {
+    record_command "$@"
+    "$@"
+}
+
 run_logged() {
     local log=$1
     shift
@@ -65,26 +70,19 @@ run_logged() {
     "$@" > "$log" 2>&1
 }
 
-record_command tar -xzf "$source_archive" --strip-components=1 -C "$source_dir"
-tar -xzf "$source_archive" --strip-components=1 -C "$source_dir"
+run_recorded tar -xzf "$source_archive" --strip-components=1 -C "$source_dir"
 
 container_dir="$source_dir/tools/apptainerContainerRecipe"
-record_command tar -xzf "$container_archive" -C "$container_dir"
-tar -xzf "$container_archive" -C "$container_dir"
+run_recorded tar -xzf "$container_archive" -C "$container_dir"
 
-record_command tar -xzf "$fluxnet_archive" -C "$extraction_root"
-tar -xzf "$fluxnet_archive" -C "$extraction_root"
+run_recorded tar -xzf "$fluxnet_archive" -C "$extraction_root"
 mkdir -p "$source_dir/inputFiles/CO2"
-record_command mv "$fluxnet_stage/TRENDY_v13_CO2_1700-2023_GCP2024.nc" "$source_dir/inputFiles/CO2/"
-mv "$fluxnet_stage/TRENDY_v13_CO2_1700-2023_GCP2024.nc" "$source_dir/inputFiles/CO2/"
-record_command mv "$fluxnet_stage/meteorology" "$source_dir/inputFiles/"
-mv "$fluxnet_stage/meteorology" "$source_dir/inputFiles/"
-record_command mv "$fluxnet_stage/FLUXNETsites_obs" "$source_dir/inputFiles/"
-mv "$fluxnet_stage/FLUXNETsites_obs" "$source_dir/inputFiles/"
+run_recorded mv "$fluxnet_stage/TRENDY_v13_CO2_1700-2023_GCP2024.nc" "$source_dir/inputFiles/CO2/"
+run_recorded mv "$fluxnet_stage/meteorology" "$source_dir/inputFiles/"
+run_recorded mv "$fluxnet_stage/FLUXNETsites_obs" "$source_dir/inputFiles/"
 rmdir "$fluxnet_stage"
 
-record_command tar -xzf "$benchmark_archive" -C "$published_root" Benchmark_CLASSIC_output/DE-Hai
-tar -xzf "$benchmark_archive" -C "$published_root" Benchmark_CLASSIC_output/DE-Hai
+run_recorded tar -xzf "$benchmark_archive" -C "$published_root" Benchmark_CLASSIC_output/DE-Hai
 
 sif="$container_dir/CLASSIC_container.sif"
 {
