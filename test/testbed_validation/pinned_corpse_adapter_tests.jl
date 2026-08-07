@@ -1,6 +1,7 @@
 module TestbedPinnedCORPSEAdapterTests
 
 using Test
+import NCDatasets
 import SHA
 import Tar
 import TOML
@@ -11,7 +12,7 @@ const PinnedCORPSE = TestbedPinnedCORPSEAdapter
 const VALID_TEST_SHA256 = repeat("a", 64)
 const REVIEWED_GAPS = [
     Dict("model" => "CORPSE", "cell_id" => id, "reviewed" => true) for
-    id in (51, 3442)
+    id in (51, 52)
 ]
 
 sha256sum(path) = bytes2hex(SHA.sha256(read(path)))
@@ -166,6 +167,7 @@ function make_inputs(root)
         Dict(
             "schema_version" => 1,
             "name" => "representative",
+            "eligibility_gaps" => REVIEWED_GAPS,
             "cell_ids" => collect(1:80),
         ),
     )
@@ -179,6 +181,75 @@ function make_inputs(root)
     )
     return (; scope, forcing, reference)
 end
+
+function reduced_test_calibration()
+    native = PinnedCORPSEExecutor.native_corpse()
+    return Dict(
+        "reducer" => Dict(
+            reducer => Dict(
+                description.name => Dict(
+                    "finite_pair_count" => 78 * sample_count,
+                    "units" => native.reduced_units(description, reducer),
+                    "derived_policy" => Dict(
+                        "atol" => 0.0,
+                        "rtol" => 0.0,
+                        "validation_failed_pairs" => 0,
+                    ),
+                ) for description in variables
+            ) for (reducer, variables, sample_count) in (
+                ("annual_mean", native.REDUCED_STATE_VARIABLES, 114),
+                ("end_of_year", native.REDUCED_STATE_VARIABLES, 114),
+                ("annual_total", native.REDUCED_FLUX_VARIABLES, 114),
+                (
+                    "fixed_daily_sample",
+                    native.REDUCED_VARIABLES,
+                    length(native.REDUCED_SAMPLE_DAYS),
+                ),
+            )
+        ),
+    )
+end
+
+function write_reduced_test_file(path, ids; eligible = trues(length(ids)))
+    native = PinnedCORPSEExecutor.native_corpse()
+    NCDatasets.NCDataset(path, "c") do output
+        NCDatasets.defDim(output, "point", length(ids))
+        NCDatasets.defDim(output, "year", 114)
+        NCDatasets.defDim(output, "sample", length(native.REDUCED_SAMPLE_DAYS))
+        NCDatasets.defVar(output, "cell_id", Int, ("point",))[:] = ids
+        NCDatasets.defVar(output, "eligible", Int8, ("point",))[:] =
+            Int8.(eligible)
+        NCDatasets.defVar(output, "year", Int, ("year",))[:] = 1901:2014
+        NCDatasets.defVar(output, "sample_day", Int, ("sample",))[:] =
+            native.REDUCED_SAMPLE_DAYS
+        for (reducer, variables, sample_count) in (
+            ("annual_mean", native.REDUCED_STATE_VARIABLES, 114),
+            ("end_of_year", native.REDUCED_STATE_VARIABLES, 114),
+            ("annual_total", native.REDUCED_FLUX_VARIABLES, 114),
+            (
+                "fixed_daily_sample",
+                native.REDUCED_VARIABLES,
+                length(native.REDUCED_SAMPLE_DAYS),
+            ),
+        )
+            values = repeat(Float64.(ids), 1, sample_count)
+            dimension = reducer == "fixed_daily_sample" ? "sample" : "year"
+            for description in variables
+                NCDatasets.defVar(
+                    output,
+                    "$(reducer)__$(description.name)",
+                    Float64,
+                    ("point", dimension),
+                )[
+                    :,
+                    :,
+                ] = values
+            end
+        end
+    end
+    return path
+end
+
 
 @testset "Pinned CORPSE separates scientific hashes from regenerated metadata" begin
     mktempdir() do root
@@ -293,7 +364,45 @@ end
     end
 end
 
+@testset "Pinned CORPSE adapter executes one assigned cell shard" begin
+    mktempdir() do root
+        inputs = make_inputs(root)
+        assigned = collect(1:8:80)
+        executor = function (output_root; cell_ids, kwargs...)
+            @test cell_ids == assigned
+            mkpath(output_root)
+            report = write_toml(
+                joinpath(output_root, "report.toml"),
+                Dict("outcome" => "passed"),
+            )
+            return (;
+                passed = true,
+                report,
+                seconds = 0.1,
+                coverage = Dict(
+                    "scope_cells" => 10,
+                    "eligible_cells" => 10,
+                    "compared_cells" => 10,
+                    "eligibility_gaps" => Dict{String, Any}[],
+                ),
+            )
+        end
+
+        result = PinnedCORPSE.run_pinned_corpse(
+            joinpath(root, "output");
+            scope_manifest = inputs.scope,
+            forcing_artifact_root = inputs.forcing,
+            reference_artifact_root = inputs.reference,
+            cell_ids = assigned,
+            executor,
+        )
+
+        @test result.passed
+        @test result.coverage["scope_cells"] == 10
+    end
+end
 @testset "Pinned CORPSE adapter fails closed" begin
+
     mktempdir() do root
         inputs = make_inputs(root)
         manifest_path = joinpath(inputs.reference, "manifest.toml")
@@ -385,6 +494,40 @@ end
             executor,
         )
     end
+
+    mktempdir() do root
+        inputs = make_inputs(root)
+        executor = function (output_root; kwargs...)
+            mkpath(output_root)
+            report = write_toml(
+                joinpath(output_root, "report.toml"),
+                Dict("outcome" => "passed"),
+            )
+            extra_gap = Dict(
+                "model" => "OTHER",
+                "cell_id" => 99,
+                "reviewed" => false,
+            )
+            return (;
+                passed = true,
+                report,
+                seconds = 0.0,
+                coverage = Dict(
+                    "scope_cells" => 80,
+                    "eligible_cells" => 78,
+                    "compared_cells" => 78,
+                    "eligibility_gaps" => [REVIEWED_GAPS; extra_gap],
+                ),
+            )
+        end
+        @test_throws PinnedCORPSE.AdapterError PinnedCORPSE.run_pinned_corpse(
+            joinpath(root, "output");
+            scope_manifest = inputs.scope,
+            forcing_artifact_root = inputs.forcing,
+            reference_artifact_root = inputs.reference,
+            executor,
+        )
+    end
 end
 
 @testset "Pinned CORPSE preflight validates the complete compatibility set" begin
@@ -442,4 +585,41 @@ end
     end
 end
 
+include(joinpath(@__DIR__, "pinned_corpse_executor.jl"))
+const PinnedCORPSEExecutor = TestbedPinnedCORPSEExecutor
+
+@testset "Pinned CORPSE reduced shards map full-oracle rows by cell ID" begin
+    mktempdir() do root
+        mask = trues(80)
+        mask[[51, 80]] .= false
+        reference = write_reduced_test_file(
+            joinpath(root, "reference.nc"),
+            collect(1:80);
+            eligible = mask,
+        )
+        candidate =
+            write_reduced_test_file(joinpath(root, "candidate.nc"), [11, 33])
+        calibration = reduced_test_calibration()
+        comparison = PinnedCORPSEExecutor.compare_reduced_historical(
+            candidate,
+            reference,
+            calibration;
+            require_full_population = false,
+        )
+        @test PinnedCORPSEExecutor.reduced_passed(comparison)
+        @test comparison["annual_mean"][first(
+            keys(comparison["annual_mean"]),
+        )]["values"] == 2 * 114
+
+        for (name, ids) in ("unknown" => [11, 81], "duplicate" => [11, 11])
+            invalid = write_reduced_test_file(joinpath(root, "$name.nc"), ids)
+            @test_throws ErrorException PinnedCORPSEExecutor.compare_reduced_historical(
+                invalid,
+                reference,
+                calibration;
+                require_full_population = false,
+            )
+        end
+    end
+end
 end

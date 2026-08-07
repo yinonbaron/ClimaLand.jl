@@ -389,7 +389,7 @@ Verify the CORPSE executor result and complete 78-cell eligible coverage.
 
 Called from `run_pinned_corpse` after the scientific executor finishes.
 """
-function validate_result(result)
+function validate_result(result; cell_ids = nothing, eligibility_gaps = nothing)
     all(
         hasproperty(result, name) for
         name in (:passed, :report, :seconds, :coverage)
@@ -404,22 +404,33 @@ function validate_result(result)
     coverage = result.coverage
     coverage isa AbstractDict ||
         fail("CORPSE executor returned invalid coverage")
-    get(coverage, "scope_cells", nothing) == 80 &&
-    get(coverage, "eligible_cells", nothing) == 78 &&
-    get(coverage, "compared_cells", nothing) == 78 || fail(
+    expected_scope = isnothing(cell_ids) ? 80 : length(cell_ids)
+    expected_gaps =
+        isnothing(eligibility_gaps) ? nothing : collect(eligibility_gaps)
+    expected_gap_ids =
+        isnothing(expected_gaps) ? Set((51, 3442)) :
+        Set(Int(gap["cell_id"]) for gap in expected_gaps)
+    expected_eligible = expected_scope - length(expected_gap_ids)
+    get(coverage, "scope_cells", nothing) == expected_scope &&
+    get(coverage, "eligible_cells", nothing) == expected_eligible &&
+    get(coverage, "compared_cells", nothing) == expected_eligible || fail(
         "CORPSE executor did not compare every eligible Representative cell",
     )
     gaps = get(coverage, "eligibility_gaps", nothing)
-    gaps isa AbstractVector && length(gaps) == 2 || fail(
-        "CORPSE executor did not report both Representative eligibility gaps",
-    )
+    gaps isa AbstractVector ||
+        fail("CORPSE executor did not report Representative eligibility gaps")
+    length(gaps) == length(expected_gap_ids) ||
+        fail("CORPSE executor reported unexpected Representative gaps")
     gap_ids = Set(
         Int(get(gap, "cell_id", 0)) for
         gap in gaps if get(gap, "model", nothing) == "CORPSE" &&
             get(gap, "reviewed", false) === true
     )
-    gap_ids == Set((51, 3442)) ||
-        fail("CORPSE executor did not report the reviewed Representative gaps")
+    gap_ids == expected_gap_ids ||
+        fail("CORPSE executor did not report the assigned reviewed gaps")
+    isnothing(expected_gaps) ||
+        gaps == expected_gaps ||
+        fail("CORPSE executor gap evidence differs from the Scope Manifest")
     return result
 end
 
@@ -437,6 +448,7 @@ function run_pinned_corpse(
     forcing_artifact_root,
     reference_artifact_root,
     workers = 1,
+    cell_ids = nothing,
     executor = nothing,
 )
     workers isa Integer && workers > 0 ||
@@ -447,6 +459,23 @@ function run_pinned_corpse(
         reference_artifact_root,
     )
     scope = inputs.scope
+    assigned_cell_ids = if isnothing(cell_ids)
+        scope.cell_ids
+    else
+        assigned = Int.(cell_ids)
+        !isempty(assigned) &&
+        assigned == sort(unique(assigned)) &&
+        all(id -> id in scope.cell_ids, assigned) || throw(
+            ArgumentError("cell_ids must be a sorted nonempty scope subset"),
+        )
+        assigned
+    end
+    assigned_set = Set(assigned_cell_ids)
+    assigned_gaps = [
+        gap for gap in get(scope.manifest, "eligibility_gaps", Any[]) if
+        get(gap, "model", nothing) == "CORPSE" &&
+            Int(get(gap, "cell_id", 0)) in assigned_set
+    ]
     forcing = inputs.forcing
     reference = inputs.reference
     selected_executor = if isnothing(executor)
@@ -458,16 +487,25 @@ function run_pinned_corpse(
         executor
     end
     result = materialize_boundaries(reference) do boundary_root
-        selected_executor(
-            output_root;
+        arguments = (
             bundle = reference,
             boundary_root,
             fixture_manifest = forcing.fixture_manifest,
             scope_manifest = scope.path,
             workers,
         )
+        isnothing(cell_ids) ? selected_executor(output_root; arguments...) :
+        selected_executor(
+            output_root;
+            arguments...,
+            cell_ids = assigned_cell_ids,
+        )
     end
-    return validate_result(result)
+    return validate_result(
+        result;
+        cell_ids = assigned_cell_ids,
+        eligibility_gaps = assigned_gaps,
+    )
 end
 
 end

@@ -685,7 +685,8 @@ also remains informational unless its missing inputs are recovered.
 
 `validation_runner.jl` is the public local and CI entry point. Its defaults are
 the 80-cell Representative Scope, all five models, pinned references, automatic
-bounded process concurrency, and an ephemeral output directory:
+bounded process concurrency, no cell sharding, and an ephemeral output
+directory:
 
 ```sh
 julia --startup-file=no --project=test \
@@ -699,6 +700,17 @@ number of isolated single-threaded model processes. `--scope` accepts `core`,
 `smoke`, `representative`, `broad`, or `global`. Broad and Global remain later
 iterations. The temporary programmatic aliases `ordinary` and `extended` map to
 Core and Smoke with a deprecation warning.
+
+`--shard-index N --shard-count M` selects one deterministic, one-based cell
+shard. Sharding is available only for one pinned model in the Representative
+Scope; both options are required together. The ordered Scope Manifest is split
+by striding from `N` through the cell IDs with step `M`, so the complete set of
+indices partitions every cell exactly once. Omitting the options preserves the
+unsharded local behavior. GitHub Actions crosses the five model choices with
+eight shards to create 40 single-threaded jobs, then reconstructs the standard
+all-model report in a required fail-closed aggregation job. See
+[`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md) for the
+topology, artifacts, diagnosis procedure, and external proof checklist.
 
 Pinned mode resolves immutable forcing and reduced Fortran-reference Julia
 artifacts and fails closed on missing or incompatible bundles. Fresh mode is an
@@ -722,10 +734,11 @@ the bound forcing artifact.
 The runner enforces a hard process deadline of two hours by default and records
 `timed_out` for every model still running when it fires.
 `CLIMALAND_VALIDATION_TIMEOUT_SECONDS` adjusts that deadline up to six hours;
-values outside `(0, 21600]` are rejected. A canonical five-worker Representative
-run needs the extra budget on slower shared filesystems, and it should be the
-only heavy job on the machine, because competing load is itself enough to
-exhaust the default deadline.
+values outside `(0, 21600]` are rejected. The CI shard jobs conservatively keep
+the 7,200-second runner deadline and a 180-minute Actions timeout, with a
+provisional warning after 3,600 seconds. These are pending measurement from the
+first clean GitHub-hosted 40-job run and must not be interpreted as measured
+shard requirements.
 
 ### Reference publication
 
@@ -789,7 +802,10 @@ before the atomic staging move.
 Every execution writes `validation_report.toml`, including scope and artifact
 provenance, applied policy, coverage and gaps, model outcomes, and per-model and
 aggregate timings. Detailed model logs remain separate from this compact
-report. Current completion gaps are tracked in
+report. Shard executions additionally identify their shard index, count, and
+exact cell IDs. The aggregate refuses missing, duplicate, overlapping, or
+incompatible shard reports. Current completion and external verification status
+are tracked in
 [`STABLE_REPRESENTATIVE_V1_READINESS.md`](STABLE_REPRESENTATIVE_V1_READINESS.md).
 
 Ordinary package tests do not compile or run Fortran and do not require large
@@ -889,15 +905,19 @@ fresh-Fortran and native-Julia references in `complete_casa_workflow.toml`,
 checks early/middle/late historical dates, and reports both stage and
 complete-workflow C/N budgets.
 
-The regular 80-cell CI contracts are documented in
+The regular 80-cell model contracts are documented in
 [`CASA_C_REPRESENTATIVE_VALIDATION.md`](CASA_C_REPRESENTATIVE_VALIDATION.md)
 and
 [`CASA_CN_REPRESENTATIVE_VALIDATION.md`](CASA_CN_REPRESENTATIVE_VALIDATION.md).
 The equivalent reduced-oracle and Eligibility Gap contract for MIMICS-CN is
 documented in
 [`MIMICS_CN_REPRESENTATIVE_VALIDATION.md`](MIMICS_CN_REPRESENTATIVE_VALIDATION.md).
-The current all-model integration status, measured checks, and remaining
-blocking contracts are recorded in
+The CORPSE contract is documented in
+[`CORPSE_REPRESENTATIVE_VALIDATION.md`](CORPSE_REPRESENTATIVE_VALIDATION.md).
+The 40-job workflow, artifact layout, fail-closed aggregate, timeout policy, and
+pending external proof are documented in
+[`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md). Current
+all-model integration status and Linux baseline measurements are recorded in
 [`STABLE_REPRESENTATIVE_V1_READINESS.md`](STABLE_REPRESENTATIVE_V1_READINESS.md).
 
 Regenerate one reference configuration only from completed native and

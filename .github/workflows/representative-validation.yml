@@ -13,12 +13,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  representative-validation:
-    name: Representative scientific validation
+  representative-shard:
+    name: Representative shard / ${{ matrix.target.model }} / ${{ matrix.shard }} of 8
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 40
+      matrix:
+        target:
+          - model: CORPSE
+            slug: corpse
+            reference_artifact: representative_corpse_reference
+          - model: MIMICS-C
+            slug: mimics-c
+            reference_artifact: representative_mimics_c_reference
+          - model: MIMICS-CN
+            slug: mimics-cn
+            reference_artifact: representative_mimics_cn_reference
+          - model: CASA-C
+            slug: casa-c
+            reference_artifact: representative_casa_c_reference
+          - model: CASA-CN
+            slug: casa-cn
+            reference_artifact: representative_casa_cn_reference
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     timeout-minutes: 180
     env:
       JULIA_NUM_THREADS: '1'
+      MODEL: ${{ matrix.target.model }}
+      MODEL_SLUG: ${{ matrix.target.slug }}
+      REFERENCE_ARTIFACT: ${{ matrix.target.reference_artifact }}
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_COUNT: '8'
       OPENBLAS_NUM_THREADS: '1'
       CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '7200'
       VALIDATION_OUTPUT: validation-output
@@ -41,7 +67,7 @@ jobs:
             representative-${{ runner.os }}-julia-1.12-
       - name: Install validation dependencies
         run: julia --startup-file=no --project=test -e 'using Pkg; Pkg.develop(; path = "."); Pkg.instantiate()'
-      - name: Stage all pinned Representative artifacts
+      - name: Stage pinned artifacts for this model
         id: stage_artifacts
         continue-on-error: true
         run: |
@@ -50,14 +76,7 @@ jobs:
           julia --startup-file=no --project=test -e '
             import Pkg
             artifacts_toml = joinpath(pwd(), "test", "testbed_validation", "validation", "Artifacts.toml")
-            required = (
-                "representative_forcing",
-                "representative_corpse_reference",
-                "representative_mimics_c_reference",
-                "representative_mimics_cn_reference",
-                "representative_casa_c_reference",
-                "representative_casa_cn_reference",
-            )
+            required = ("representative_forcing", ENV["REFERENCE_ARTIFACT"])
             hashes = map(name -> Pkg.Artifacts.artifact_hash(name, artifacts_toml), required)
             missing = filter(index -> isnothing(hashes[index]), eachindex(required))
             isempty(missing) || error(
@@ -70,7 +89,7 @@ jobs:
                 println("Staged $name ($hash)")
             end
           ' 2>&1 | tee "${VALIDATION_OUTPUT}/logs/artifact-staging.log"
-      - name: Run all Representative model comparisons
+      - name: Run one Representative model shard
         id: validation
         if: steps.stage_artifacts.outcome == 'success'
         continue-on-error: true
@@ -80,14 +99,17 @@ jobs:
           julia --startup-file=no --project=test \
             test/testbed_validation/validation_runner.jl \
             --scope representative \
-            --models all \
+            --models "${MODEL}" \
             --reference pinned \
+            --shard-index "${SHARD_INDEX}" \
+            --shard-count "${SHARD_COUNT}" \
+            --workers 1 \
             --output "${VALIDATION_OUTPUT}" \
             2>&1 | tee "${VALIDATION_OUTPUT}/logs/validation-runner.log" &
           validation_pid=$!
           while kill -0 "${validation_pid}" 2>/dev/null; do
             if (( SECONDS >= 3600 )); then
-              echo "::warning title=Representative validation exceeded its performance budget::The scientific validation job has run for more than one hour."
+              echo "::warning title=Representative shard exceeded its provisional performance budget::${MODEL} shard ${SHARD_INDEX}/${SHARD_COUNT} has run for more than one hour."
               break
             fi
             sleep 30
@@ -110,28 +132,39 @@ jobs:
                 "artifact_staging_outcome = \"${STAGING_OUTCOME}\"" \
                 "validation_runner_outcome = \"${VALIDATION_OUTCOME}\"" \
                 '' \
+                '[shard]' \
+                "index = ${SHARD_INDEX}" \
+                "count = ${SHARD_COUNT}" \
+                '' \
                 '[scope]' \
                 'name = "representative"' \
-                'cell_count = 80'
-              for model in CORPSE MIMICS-C MIMICS-CN CASA-C CASA-CN; do
-                printf '\n[[model]]\nname = "%s"\nreference_mode = "pinned"\noutcome = "failed"\nseconds = 0.0\n' "${model}"
-                printf '[model.coverage]\nscope_cells = 80\neligible_cells = 0\ncompared_cells = 0\neligibility_gaps = []\n'
-              done
+                'cell_count = 80' \
+                '' \
+                '[[model]]' \
+                "name = \"${MODEL}\"" \
+                'reference_mode = "pinned"' \
+                'outcome = "failed"' \
+                'seconds = 0.0' \
+                '[model.coverage]' \
+                'scope_cells = 80' \
+                'eligible_cells = 0' \
+                'compared_cells = 0' \
+                'eligibility_gaps = []'
             } > "${VALIDATION_OUTPUT}/validation_report.toml"
           fi
-      - name: Upload compact validation report
+      - name: Upload compact shard report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: representative-validation-report
+          name: representative-validation-shard-${{ matrix.target.slug }}-${{ matrix.shard }}
           path: validation-output/validation_report.toml
           if-no-files-found: error
           retention-days: 30
-      - name: Upload detailed failure logs
-        if: steps.stage_artifacts.outcome != 'success' || steps.validation.outcome != 'success'
+      - name: Upload detailed shard failure logs
+        if: ${{ always() && (steps.stage_artifacts.outcome != 'success' || steps.validation.outcome != 'success') }}
         uses: actions/upload-artifact@v7
         with:
-          name: representative-validation-failure-logs
+          name: representative-validation-failure-${{ matrix.target.slug }}-${{ matrix.shard }}
           path: validation-output/logs/
           if-no-files-found: warn
           retention-days: 7
@@ -142,10 +175,84 @@ jobs:
           VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
         run: |
           [[ "${STAGING_OUTCOME}" == "success" ]] || {
-            echo "Pinned Representative artifacts did not stage; publication issue #55 must complete before this required job can pass."
+            echo "Pinned forcing or ${MODEL} reference did not stage."
             exit 1
           }
           [[ "${VALIDATION_OUTCOME}" == "success" ]] || {
-            echo "The public Validation Runner did not complete all five Representative comparisons."
+            echo "The public Validation Runner did not complete ${MODEL} shard ${SHARD_INDEX}/${SHARD_COUNT}."
+            exit 1
+          }
+
+  aggregate-validation:
+    name: Representative scientific validation
+    needs: representative-shard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+      - name: Cache Julia depot
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.julia/packages
+            ~/.julia/compiled
+            ~/.julia/artifacts
+            ~/.julia/scratchspaces
+            ~/.julia/registries
+          key: representative-${{ runner.os }}-julia-1.12-${{ hashFiles('test/Project.toml', 'test/Manifest.toml', 'test/testbed_validation/validation/Artifacts.toml') }}
+          restore-keys: |
+            representative-${{ runner.os }}-julia-1.12-
+      - name: Install validation dependencies
+        run: julia --startup-file=no --project=test -e 'using Pkg; Pkg.develop(; path = "."); Pkg.instantiate()'
+      - name: Download shard reports
+        id: download_reports
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          merge-multiple: false
+          pattern: representative-validation-shard-*
+          path: shard-reports
+      - name: Aggregate shard reports
+        id: aggregate
+        if: always()
+        continue-on-error: true
+        run: |
+          julia --startup-file=no --project=test \
+            test/testbed_validation/aggregate_validation_shards.jl \
+            --input shard-reports \
+            --output validation-output \
+            --shard-count 8 \
+            --models all
+      - name: Upload aggregate validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: representative-validation-report
+          path: |
+            validation-output/validation_report.toml
+            validation-output/models/*/comparison_report.toml
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enforce matrix and aggregate outcomes
+        if: always()
+        env:
+          MATRIX_OUTCOME: ${{ needs.representative-shard.result }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_reports.outcome }}
+          AGGREGATION_OUTCOME: ${{ steps.aggregate.outcome }}
+        run: |
+          [[ "${MATRIX_OUTCOME}" == "success" ]] || {
+            echo "At least one Representative shard job failed or was cancelled."
+            exit 1
+          }
+          [[ "${DOWNLOAD_OUTCOME}" == "success" ]] || {
+            echo "The complete set of Representative shard reports was not downloaded."
+            exit 1
+          }
+          [[ "${AGGREGATION_OUTCOME}" == "success" ]] || {
+            echo "Representative shard aggregation failed closed."
             exit 1
           }

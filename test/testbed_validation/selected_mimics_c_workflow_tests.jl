@@ -761,14 +761,15 @@ end
             output_root;
             collection,
             stages,
+            execution_cell_ids = [first(collection.cells).id],
             compare_references = false,
             nonfinite_observer = (stage, step, _, _, _) ->
                 push!(observed, (stage.name, step)),
         )
         report = TOML.parsefile(result.report)
         @test report["coverage"]["scope_cell_ids"] ==
-              getproperty.(collection.cells, :id)
-        @test report["coverage"]["compared_cells"] == 2
+              [first(collection.cells).id]
+        @test report["coverage"]["compared_cells"] == 1
         @test isempty(report["coverage"]["eligibility_gaps"])
         @test report["carbon_budget"]["all_close"]
         @test report["carbon_budget"]["reducer"] == "maximum_absolute_residual"

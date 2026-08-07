@@ -44,6 +44,7 @@ include("generate_pinned_corpse_payload_tests.jl")
 include("pinned_corpse_adapter_tests.jl")
 include("validation_runner_tests.jl")
 include("validation_runner_contract_tests.jl")
+include("validation_shard_aggregation_tests.jl")
 include("scientific_validation_workflow_tests.jl")
 
 TestbedReferenceHarness.self_test()

@@ -17,8 +17,9 @@ function write_contract_forcing_bundle(root)
                 "selection" => Dict(
                     "scope_manifest_sha256" =>
                         ContractRunner.sha256sum(CONTRACT_SCOPE_PATH),
-                    "representative_cell_ids" =>
-                        Int.(TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],),
+                    "representative_cell_ids" => Int.(
+                        TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],
+                    ),
                 ),
             );
             sorted = true,
@@ -46,7 +47,13 @@ function write_contract_forcing_bundle(root)
     return root
 end
 
-function run_injected_representative(model, passed)
+function run_injected_representative(
+    model,
+    passed;
+    shard_index = nothing,
+    shard_count = nothing,
+    captured_cell_ids = Ref{Any}(nothing),
+)
     return mktempdir() do directory
         output = joinpath(directory, "output")
         reference = joinpath(directory, "reference")
@@ -72,6 +79,9 @@ function run_injected_representative(model, passed)
             )
         end
         corpse_runner = function (root; kwargs...)
+            assigned_cell_ids = Int.(kwargs[:cell_ids])
+            captured_cell_ids[] = assigned_cell_ids
+            assigned = Set(assigned_cell_ids)
             mkpath(root)
             scientific_path = joinpath(root, "scientific.toml")
             stages = Dict(
@@ -105,7 +115,8 @@ function run_injected_representative(model, passed)
                 )
             end
             gaps = filter(
-                gap -> gap["model"] == "CORPSE",
+                gap ->
+                    gap["model"] == "CORPSE" && Int(gap["cell_id"]) in assigned,
                 get(scope, "eligibility_gaps", Any[]),
             )
             return (;
@@ -113,9 +124,11 @@ function run_injected_representative(model, passed)
                 report = scientific_path,
                 seconds = 0.01,
                 coverage = Dict(
-                    "scope_cells" => 80,
-                    "eligible_cells" => 78,
-                    "compared_cells" => 78,
+                    "scope_cells" => length(assigned_cell_ids),
+                    "eligible_cells" =>
+                        length(assigned_cell_ids) - length(gaps),
+                    "compared_cells" =>
+                        length(assigned_cell_ids) - length(gaps),
                     "eligibility_gaps" => gaps,
                 ),
             )
@@ -135,21 +148,33 @@ function run_injected_representative(model, passed)
             report["seconds"] = 0.01
             return passed
         end
+        arguments = [
+            "--scope",
+            "representative",
+            "--models",
+            model,
+            "--reference",
+            "pinned",
+            "--workers",
+            "1",
+            "--output",
+            output,
+        ]
+        if !isnothing(shard_index)
+            append!(
+                arguments,
+                [
+                    "--shard-index",
+                    string(shard_index),
+                    "--shard-count",
+                    string(shard_count),
+                ],
+            )
+        end
         exitcode = redirect_stdout(devnull) do
             redirect_stderr(devnull) do
                 ContractRunner.main(
-                    [
-                        "--scope",
-                        "representative",
-                        "--models",
-                        model,
-                        "--reference",
-                        "pinned",
-                        "--workers",
-                        "1",
-                        "--output",
-                        output,
-                    ];
+                    arguments;
                     reference_resolver = (_, selected_model) -> (
                         reference,
                         selected_model == "CORPSE" ? repeat("a", 40) : nothing,
@@ -490,6 +515,25 @@ end
         @test report["outcome"] == "failed"
         @test only(report["model"])["outcome"] == "failed"
     end
+end
+
+@testset "Validation Runner public shard CLI reaches the CORPSE executor" begin
+    captured = Ref{Any}(nothing)
+    exitcode, report, _ = run_injected_representative(
+        "CORPSE",
+        true;
+        shard_index = 3,
+        shard_count = 8,
+        captured_cell_ids = captured,
+    )
+    canonical = Int.(TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"])
+    expected = canonical[3:8:end]
+    @test exitcode == 0
+    @test captured[] == expected
+    @test report["comparison_schema"] ==
+          ContractRunner.REPRESENTATIVE_COMPARISON_SCHEMA
+    @test report["shard"]["cell_ids"] == expected
+    @test only(report["model"])["coverage"]["scope_cells"] == length(expected)
 end
 
 @testset "Validation Runner records explicit maintainer evidence retention" begin

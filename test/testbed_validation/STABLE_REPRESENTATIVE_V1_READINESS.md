@@ -1,9 +1,11 @@
 # Stable Representative Validation v1 readiness
 
-Audit date: 2026-08-01. Repository revision at the start of the audit:
-`4e3852acb575e713d371d4d82f98689020048ec2`.
+Audit updated: 2026-08-07.
 
-The public entry point is:
+All six canonical Linux artifacts are published and bound: one shared
+Representative forcing bundle and one pinned Fortran-reference bundle for each
+of CORPSE, MIMICS-C, MIMICS-CN, CASA-C, and CASA-CN. The public unsharded
+entry point remains:
 
 ```sh
 julia --startup-file=no --project=test \
@@ -12,48 +14,47 @@ julia --startup-file=no --project=test \
   --output validation-output
 ```
 
-The same command is used by the Representative scientific-validation workflow.
-It writes `validation-output/validation_report.toml` in success, scientific
-failure, timeout, and preflight-failure paths.
+The GitHub Actions workflow uses the same runner but creates 40 independent
+single-model jobs: five models crossed with eight deterministic cell shards.
+Its required aggregation job reconstructs the standard all-model report and
+fails closed on incomplete, duplicate, overlapping, inconsistent, or failed
+shard evidence. The exact CI topology and operator checklist are documented in
+[`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md).
 
 ## Acceptance status
 
-| Ticket #57 criterion | Status | Evidence or blocker |
+| Criterion | Status | Evidence or remaining proof |
 | --- | --- | --- |
-| One runner and aggregate report for all five models | In progress | Bounded model processes and deterministic aggregation are connected. CASA-C, CASA-CN, MIMICS-C, and MIMICS-CN have pinned worker adapters. CORPSE payload staging is fail-closed pending a published payload schema and scientific executor. |
-| Pinned artifacts and forced-fresh mode | Blocked | Reference publication defines immutable role-addressed bundles, but CORPSE/MIMICS bundles are not published. Real fresh build and model commands are not connected to the public runner. |
-| CI and local command use the same path | Ready | Both use `validation_runner.jl` with Representative, all models, and pinned references. |
-| Scope, model, reference, report, eligibility, publication, and alias documentation | Partial | The ADRs and this directory document the contracts. A consolidated user guide should be completed after the remaining execution paths exist. |
-| Focused and relevant repository tests | Partial | Focused runner and orchestration tests pass. The all-five Representative execution cannot run before publication and CORPSE/fresh integration. |
-| Timings against the one-hour budget | Partial | Existing CASA Core/Smoke timings are recorded below. Per-model Representative timings require the published all-five run. |
+| Pinned references | Ready | The forcing and all five model references have immutable Linux artifact bindings. |
+| Deterministic shard runner | Ready | One-based index/count controls preserve unsharded defaults and partition the exact ordered Scope Manifest. |
+| Fail-closed aggregation | Ready locally | Synthetic parity and malformed/missing/duplicate/inconsistent report contracts are repository-tested. |
+| Forty-job Actions workflow | Implemented, external proof pending | The 5-by-8 matrix, model-specific staging, unique report artifacts, and required aggregate job are configured. |
+| Runtime budget | Provisional | Conservative shard timeouts remain until a clean GitHub-hosted run measures every shard. |
 
-## Measured checks
+## Linux baseline measurements
 
-Measurements used Julia 1.12.6 on macOS with the repository test environment.
+The following successful single-model Representative runs establish the
+unsharded baseline. They do not predict GitHub Actions matrix wall time.
 
-| Check | Result | Wall time |
+| Model | Result | Wall time (s) |
 | --- | ---: | ---: |
-| `model_process_orchestration_tests.jl` | 28/28 passed | 5.60 s |
-| `validation_runner_tests.jl` baseline | 121/121 passed | 818.56 s |
-| Pinned Core and Smoke CASA-C scientific testset | 26/26 passed | 598.0 s |
-| Synthetic five-model report aggregation | passed | 7.6 s including Julia startup |
-| Public default preflight without unpublished bundles | expected exit 2 with a five-model report | 27 s including Julia startup |
+| CASA-C | 80/80 | 1082.496 |
+| CASA-CN | 80/80 | 2743.260 |
+| CORPSE | 78/80 and 2 reviewed gaps | 7877.423 |
+| MIMICS-C | 80/80 | 2025.416 |
+| MIMICS-CN | 80/80 | 11281.390 |
 
-The baseline runner suite was measured before the multi-model adapter edit; the
-post-edit checks were deliberately limited to static loading, policy loading,
-payload-role resolution, CLI preflight paths, and synthetic aggregation to avoid
-repeating the ten-minute scientific baseline while required artifacts remain
-unpublished.
+The current workflow retains a 7,200-second runner deadline, a 180-minute job
+timeout, and a provisional warning at 3,600 seconds for every shard. These
+limits intentionally include substantial margin until CI supplies observed
+per-shard distributions.
 
-## Remaining blocking contracts
+## Remaining external verification
 
-1. Publish and bind the Representative CORPSE, MIMICS-C, and MIMICS-CN
-   references as one compatible set with the forcing and CASA references.
-2. Define the scientific schema of CORPSE's `boundaries` and `reduced_history`
-   payloads and connect them to the current calibrated CORPSE executor. The
-   publication manifest currently proves file identity but does not define how
-   the scientific arrays map to comparison variables and stages.
-3. Connect real pinned Fortran build and per-model fresh execution commands to
-   the existing ephemeral fresh-reference process orchestration.
-4. Run the exact all-five Representative command, record every model timing and
-   aggregate timing, and close any scientific or report-schema failures.
+Repository implementation cannot prove GitHub-hosted scheduling or runtime.
+A clean Actions run must still demonstrate all 40 matrix jobs plus aggregation,
+record the run URL and commit, verify aggregate coverage and provenance, record
+per-shard timings, and exercise retained diagnostics for a deliberately missing
+or invalid shard. Until that evidence is recorded, the workflow is implemented
+but not declared operationally verified. See the unchecked proof list in
+[`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md).

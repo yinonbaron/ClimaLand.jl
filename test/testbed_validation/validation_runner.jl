@@ -84,6 +84,8 @@ const CASA_CN_DAILY_VARIABLES = union(
 const CASA_CN_FRESH_DAILY_VARIABLES =
     union(CASA_CN_ANNUAL_MEAN_VARIABLES, CASA_CN_ANNUAL_TOTAL_VARIABLES)
 const REPORT_FILENAME = "validation_report.toml"
+const REPRESENTATIVE_COMPARISON_SCHEMA = "representative-pinned-comparison-v1"
+const SHARD_STRATEGY = "scope-order-round-robin-v1"
 const REFERENCE_OVERRIDE = Dict(
     "CORPSE" => "CLIMALAND_VALIDATION_CORPSE_REFERENCE",
     "MIMICS-C" => "CLIMALAND_VALIDATION_MIMICS_C_REFERENCE",
@@ -140,6 +142,8 @@ function usage(io = stdout)
           --reference MODE   pinned|fresh
           --workers N        positive model-worker limit
           --output PATH      report and model-output directory
+          --shard-index N    one-based Representative shard index
+          --shard-count N    total number of Representative shards
           --retain-fresh-evidence
                               retain a successful fresh run for publication review
           --help             show this help
@@ -169,6 +173,16 @@ function parse_models(value)
     return unique(models)
 end
 
+function parse_positive_integer(value, option)
+    parsed = try
+        parse(Int, value)
+    catch
+        throw(RunnerError("$option must be a positive integer"))
+    end
+    parsed > 0 || throw(RunnerError("$option must be positive"))
+    return parsed
+end
+
 function parse_args(args)
     scope = "representative"
     models = collect(MODELS)
@@ -176,6 +190,8 @@ function parse_args(args)
     workers = min(length(MODELS), Sys.CPU_THREADS)
     output = nothing
     retain_fresh_evidence = false
+    shard_index = nothing
+    shard_count = nothing
     index = 1
     while index <= length(args)
         option = args[index]
@@ -198,6 +214,16 @@ function parse_args(args)
                 throw(RunnerError("workers must be a positive integer"))
             end
             workers > 0 || throw(RunnerError("workers must be positive"))
+        elseif option == "--shard-index"
+            shard_index = parse_positive_integer(
+                option_value(args, index, option),
+                option,
+            )
+        elseif option == "--shard-count"
+            shard_count = parse_positive_integer(
+                option_value(args, index, option),
+                option,
+            )
         elseif option == "--output"
             output = option_value(args, index, option)
         else
@@ -227,6 +253,17 @@ function parse_args(args)
                 "--retain-fresh-evidence requires an explicit --output path",
             ),
         )
+    isnothing(shard_index) == isnothing(shard_count) || throw(
+        RunnerError(
+            "--shard-index and --shard-count must be provided together",
+        ),
+    )
+    if !isnothing(shard_index)
+        shard_index <= shard_count ||
+            throw(RunnerError("--shard-index must not exceed --shard-count"))
+        shard_count <= AVAILABLE_SCOPE_METADATA["representative"].cell_count ||
+            throw(RunnerError("--shard-count must not exceed 80"))
+    end
     return (;
         help = false,
         scope,
@@ -235,6 +272,8 @@ function parse_args(args)
         workers,
         output,
         retain_fresh_evidence,
+        shard_index,
+        shard_count,
     )
 end
 
@@ -705,13 +744,49 @@ function eligible_cell_ids(scope, model)
     return filter(id -> id ∉ gap_ids, scope.cell_ids)
 end
 
+function execution_selection(scope, model, configuration)
+    cell_ids =
+        hasproperty(configuration, :shard_index) &&
+        !isnothing(configuration.shard_index) ?
+        scope.cell_ids[(configuration.shard_index):(configuration.shard_count):end] :
+        scope.cell_ids
+    selected = Set(cell_ids)
+    gaps = filter(
+        gap -> gap["model"] == model && Int(gap["cell_id"]) in selected,
+        scope.gaps,
+    )
+    gap_ids = Set(Int(gap["cell_id"]) for gap in gaps)
+    eligible_ids = filter(id -> id ∉ gap_ids, cell_ids)
+    return (; cell_ids, eligible_ids, gaps)
+end
+
+function add_execution_contract!(report, configuration, scope)
+    if configuration.scope == "representative" &&
+       configuration.reference_mode == "pinned"
+        report["comparison_schema"] = REPRESENTATIVE_COMPARISON_SCHEMA
+    end
+    if hasproperty(configuration, :shard_index) &&
+       !isnothing(configuration.shard_index)
+        report["shard"] = Dict(
+            "schema_version" => 1,
+            "index" => configuration.shard_index,
+            "count" => configuration.shard_count,
+            "cell_ids" =>
+                scope.cell_ids[(configuration.shard_index):(configuration.shard_count):end],
+            "strategy" => SHARD_STRATEGY,
+        )
+    end
+    return report
+end
+
 function initial_report(configuration, output_root, scope, policy)
     model_name =
         hasproperty(configuration, :models) ? only(configuration.models) :
         "CASA-C"
+    selection = execution_selection(scope, model_name, configuration)
     cell_ids = scope.cell_ids
-    eligibility_gaps = model_eligibility_gaps(scope, model_name)
-    eligible_ids = eligible_cell_ids(scope, model_name)
+    eligibility_gaps = selection.gaps
+    eligible_ids = selection.eligible_ids
     report = Dict(
         "schema_version" => 1,
         "scope" => Dict(
@@ -782,7 +857,7 @@ function initial_report(configuration, output_root, scope, policy)
                 "name" => model_name,
                 "reference_mode" => configuration.reference_mode,
                 "coverage" => Dict(
-                    "scope_cells" => length(cell_ids),
+                    "scope_cells" => length(selection.cell_ids),
                     "eligible_cells" => length(eligible_ids),
                     "compared_cells" => 0,
                     "eligibility_gaps" => eligibility_gaps,
@@ -794,6 +869,7 @@ function initial_report(configuration, output_root, scope, policy)
     )
     only(report["model"])["comparison_policy"] =
         deepcopy(report["comparison_policy"])
+    add_execution_contract!(report, configuration, scope)
     return report
 end
 
@@ -857,6 +933,26 @@ function validate_available(configuration)
                 "multi-model validation is available only for the Representative Scope",
             ),
         )
+    sharded =
+        hasproperty(configuration, :shard_index) &&
+        !isnothing(configuration.shard_index)
+    sharded &&
+        configuration.scope != "representative" &&
+        throw(
+            RunnerError(
+                "cell sharding is available only for Representative Scope",
+            ),
+        )
+    sharded &&
+        configuration.reference_mode != "pinned" &&
+        throw(
+            RunnerError(
+                "cell sharding is available only for pinned references",
+            ),
+        )
+    sharded &&
+        length(configuration.models) != 1 &&
+        throw(RunnerError("cell sharding requires exactly one model"))
     return nothing
 end
 
@@ -1318,11 +1414,12 @@ function stage_casa(
     pinned_reference,
     policy,
     fixture_manifest,
-    model = "CASA-C",
+    model = "CASA-C";
+    cell_ids = eligible_cell_ids(scope, model),
 )
     collection = TestbedReferenceCellComparisons.selected_cell_collection(
         scope.name,
-        eligible_cell_ids(scope, model);
+        cell_ids;
         manifest_path = fixture_manifest,
     )
     TestbedSelectedCASAWorkflow.workflow_reference(
@@ -1343,6 +1440,69 @@ function summarize_budget(budget, units)
         maximum(abs(get(report, residual, Inf)) for report in reports)
     summary["reducer"] = "maximum_absolute_residual"
     return summary
+end
+
+function project_casa_evidence!(
+    model_report,
+    scientific,
+    fresh_daily,
+    report_path,
+)
+    for key in ("initialization_comparison", "boundary_comparison")
+        haskey(scientific, key) &&
+            (model_report[key] = deepcopy(scientific[key]))
+    end
+    passive =
+        deepcopy(get(scientific, "passive_restoration", Dict{String, Any}()))
+    passive_summary = Dict{String, Any}(
+        key => deepcopy(passive[key]) for key in (
+            "multiplier",
+            "verified",
+            "unaffected_verified",
+            "checkpoint_roundtrip_verified",
+        ) if haskey(passive, key)
+    )
+    for element in ("carbon", "nitrogen")
+        haskey(passive, element) &&
+            haskey(passive[element], "verified") &&
+            (
+                passive_summary[element] =
+                    Dict("verified" => passive[element]["verified"])
+            )
+    end
+    model_report["passive_restoration"] = passive_summary
+    historical =
+        deepcopy(get(scientific, "historical_comparison", Dict{String, Any}()))
+    isempty(fresh_daily) ||
+        (historical["fresh_fortran_daily"] = deepcopy(fresh_daily))
+    model_report["historical"] = historical
+    model_report["shard_evidence"] = Dict(
+        "comparison_report_sha256" => sha256sum(report_path),
+        "passive_restoration" => passive,
+    )
+    return model_report
+end
+
+function project_corpse_evidence!(model_report, scientific, report_path)
+    stages = scientific["stage"]
+    model_report["boundary_comparison"] =
+        Dict(name => deepcopy(stage["comparison"]) for (name, stage) in stages)
+    model_report["reduced_historical"] =
+        deepcopy(scientific["reduced_historical"])
+    model_report["shard_evidence"] = Dict(
+        "comparison_report_sha256" => sha256sum(report_path),
+        "stage" => Dict(
+            name => Dict(
+                key => deepcopy(stage[key]) for key in (
+                    "checkpoint_sha256",
+                    "restart_transform_verified",
+                    "checkpoint_handoff_verified",
+                    "conservation_verified",
+                ) if haskey(stage, key)
+            ) for (name, stage) in stages
+        ),
+    )
+    return model_report
 end
 
 function corpse_policy_metadata(scientific)
@@ -1451,6 +1611,12 @@ function run_casa!(
     model_report["outcome"] = outcome.passed ? "passed" : "failed"
     model_report["seconds"] = seconds
     model_report["comparison_report"] = abspath(result.report)
+    project_casa_evidence!(
+        model_report,
+        scientific_report,
+        fresh_daily,
+        result.report,
+    )
     model_report["comparison"] = outcome.checks
     model_report["budget"] = Dict(
         "carbon" => summarize_budget(
@@ -1462,14 +1628,6 @@ function run_casa!(
         model_report["budget"]["nitrogen"] = summarize_budget(
             get(scientific_report, "nitrogen_budget", Dict{String, Any}()),
             "kg_n",
-        )
-        historical =
-            get(scientific_report, "historical_comparison", Dict{String, Any}())
-        model_report["historical"] = Dict(
-            "annual" => get(historical, "annual", Dict{String, Any}()),
-            "fixed_daily_samples" =>
-                get(historical, "selected_dates", Dict{String, Any}()),
-            "fresh_fortran_daily" => fresh_daily,
         )
     end
     model_report["reference"] = Dict(
@@ -1540,6 +1698,7 @@ function run_mimics!(
     policy,
     model,
 )
+    selection = execution_selection(scope, model, configuration)
     collection = TestbedReferenceCellComparisons.selected_cell_collection(
         scope.name,
         scope.cell_ids;
@@ -1557,6 +1716,7 @@ function run_mimics!(
             comparison_policy = policy.tolerance,
             scope_manifest_path = scope.path,
             eligibility_gaps = model_eligibility_gaps(scope, model),
+            execution_cell_ids = selection.cell_ids,
         )
     else
         TestbedSelectedMIMICSCNWorkflow.run_selected_case(
@@ -1566,6 +1726,7 @@ function run_mimics!(
             reference_path = pinned_reference,
             comparison_policy = policy.tolerance,
             eligibility_gaps = model_eligibility_gaps(scope, model),
+            execution_cell_ids = selection.cell_ids,
         )
     end
     seconds = (time_ns() - started) / 1e9
@@ -1594,6 +1755,8 @@ function run_mimics!(
     )
     project_mimics_evidence!(model_report, scientific, model)
     model_report["comparison_report"] = abspath(result.report)
+    model_report["shard_evidence"] =
+        Dict("comparison_report_sha256" => sha256sum(result.report))
     model_report["reference"] = Dict(
         "path" => abspath(pinned_reference),
         "sha256" => sha256sum(pinned_reference),
@@ -1605,8 +1768,24 @@ function run_mimics!(
     return passed
 end
 
-function empty_aggregate_report(configuration, output_root, scope)
+function empty_model_report(configuration, scope, model)
+    selection = execution_selection(scope, model, configuration)
     return Dict(
+        "name" => model,
+        "reference_mode" => configuration.reference_mode,
+        "coverage" => Dict(
+            "scope_cells" => length(selection.cell_ids),
+            "eligible_cells" => length(selection.eligible_ids),
+            "compared_cells" => 0,
+            "eligibility_gaps" => selection.gaps,
+        ),
+        "outcome" => "failed",
+        "seconds" => 0.0,
+    )
+end
+
+function empty_aggregate_report(configuration, output_root, scope)
+    report = Dict(
         "schema_version" => 1,
         "scope" => Dict(
             "name" => scope.name,
@@ -1621,22 +1800,12 @@ function empty_aggregate_report(configuration, output_root, scope)
         "outcome" => "failed",
         "seconds" => 0.0,
         "model" => [
-            Dict(
-                "name" => model,
-                "reference_mode" => configuration.reference_mode,
-                "coverage" => Dict(
-                    "scope_cells" => length(scope.cell_ids),
-                    "eligible_cells" =>
-                        length(eligible_cell_ids(scope, model)),
-                    "compared_cells" => 0,
-                    "eligibility_gaps" =>
-                        model_eligibility_gaps(scope, model),
-                ),
-                "outcome" => "failed",
-                "seconds" => 0.0,
-            ) for model in configuration.models
+            empty_model_report(configuration, scope, model) for
+            model in configuration.models
         ],
     )
+    add_execution_contract!(report, configuration, scope)
+    return report
 end
 
 function aggregate_model_reports!(report, model_reports, outcomes, seconds)
@@ -1930,6 +2099,7 @@ function main(
         end
     end
     model = only(configuration.models)
+    selection = execution_selection(scope, model, configuration)
     if model == "CORPSE"
         report = empty_aggregate_report(configuration, output_root, scope)
         try
@@ -1942,6 +2112,7 @@ function main(
                 forcing_artifact_root = forcing_root,
                 reference_artifact_root = reference_root,
                 workers = configuration.workers,
+                cell_ids = selection.cell_ids,
             )
             scientific = TOML.parsefile(result.report)
             model_report = only(report["model"])
@@ -1949,6 +2120,7 @@ function main(
             model_report["outcome"] = result.passed ? "passed" : "failed"
             model_report["seconds"] = result.seconds
             model_report["comparison_report"] = abspath(result.report)
+            project_corpse_evidence!(model_report, scientific, result.report)
             model_report["comparison_policy"] =
                 corpse_policy_metadata(scientific)
             model_report["comparison"] = Dict(
@@ -2038,7 +2210,14 @@ function main(
             )
         else
             collection = try
-                stage_casa(scope, pinned_reference, policy, fixture_manifest, model)
+                stage_casa(
+                    scope,
+                    pinned_reference,
+                    policy,
+                    fixture_manifest,
+                    model;
+                    cell_ids = selection.eligible_ids,
+                )
             catch error
                 throw(
                     RunnerError(

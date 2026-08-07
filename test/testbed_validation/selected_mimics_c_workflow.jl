@@ -791,6 +791,7 @@ function run_selected_case(
         "$(collection.name).toml",
     ),
     eligibility_gaps = nothing,
+    execution_cell_ids = nothing,
     nonfinite_observer = nothing,
 )
     reference = if compare_references
@@ -810,9 +811,21 @@ function run_selected_case(
     end
     cells =
         getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
-    active_collection =
-        isnothing(reference) ? collection :
-        cells.subset(collection, reference.eligible_ids)
+    scope_collection =
+        isnothing(execution_cell_ids) ? collection :
+        cells.subset(collection, execution_cell_ids)
+    requested_ids = getproperty.(scope_collection.cells, :id)
+    requested = Set(requested_ids)
+    eligible_ids =
+        isnothing(reference) ? requested_ids :
+        filter(id -> id in requested, reference.eligible_ids)
+    active_collection = cells.subset(scope_collection, eligible_ids)
+    reported_gaps =
+        isnothing(reference) ? Dict{String, Any}[] :
+        filter(
+            gap -> Int(gap["cell_id"]) in requested,
+            reference.eligibility_gaps,
+        )
     setup = load_setup(; collection = active_collection)
     boundary_snapshots = Dict{String, Any}()
     budget = native_mimics.CarbonBudgetAccumulator(setup.grid, setup.domain)
@@ -918,9 +931,9 @@ function run_selected_case(
     )
     annotate_report!(
         result.report,
-        collection,
+        scope_collection,
         active_collection,
-        isnothing(reference) ? Dict{String, Any}[] : reference.eligibility_gaps,
+        reported_gaps,
     )
     return result
 end

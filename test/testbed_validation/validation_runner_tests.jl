@@ -451,6 +451,8 @@ end
     @test defaults.scope == "representative"
     @test defaults.models == collect(VALIDATION_RUNNER_MODULE.MODELS)
     @test defaults.reference_mode == "pinned"
+    @test isnothing(defaults.shard_index)
+    @test isnothing(defaults.shard_count)
 
     invalid = run_validation("--scope", "unknown")
     @test invalid.exitcode == 2
@@ -461,7 +463,117 @@ end
     @test occursin("workers must be positive", invalid.stderr)
 end
 
+@testset "Validation Runner exposes deterministic Representative shards" begin
+    scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+    shards = [
+        VALIDATION_RUNNER_MODULE.parse_args([
+            "--models",
+            "CASA-C",
+            "--shard-index",
+            string(index),
+            "--shard-count",
+            "8",
+        ]) for index in 1:8
+    ]
+    assigned = [
+        VALIDATION_RUNNER_MODULE.execution_selection(scope, "CASA-C", config).cell_ids for config in shards
+    ]
+
+    @test all(length(ids) == 10 for ids in assigned)
+    @test sort(reduce(vcat, assigned)) == scope.cell_ids
+    @test all(
+        isempty(intersect(assigned[left], assigned[right])) for left in 1:8 for
+        right in (left + 1):8
+    )
+    @test assigned[1] == scope.cell_ids[1:8:end]
+
+    for args in (
+        ["--models", "CASA-C", "--shard-index", "1"],
+        ["--models", "CASA-C", "--shard-count", "8"],
+        ["--models", "CASA-C", "--shard-index", "0", "--shard-count", "8"],
+        ["--models", "CASA-C", "--shard-index", "9", "--shard-count", "8"],
+        ["--models", "CASA-C", "--shard-index", "1", "--shard-count", "0"],
+        ["--models", "CASA-C", "--shard-index", "1", "--shard-count", "81"],
+    )
+        @test_throws VALIDATION_RUNNER_MODULE.RunnerError VALIDATION_RUNNER_MODULE.parse_args(
+            args,
+        )
+    end
+
+    for args in (
+        [
+            "--scope",
+            "core",
+            "--models",
+            "CASA-C",
+            "--shard-index",
+            "1",
+            "--shard-count",
+            "8",
+        ],
+        [
+            "--models",
+            "CASA-C,CASA-CN",
+            "--shard-index",
+            "1",
+            "--shard-count",
+            "8",
+        ],
+        [
+            "--models",
+            "CASA-C",
+            "--reference",
+            "fresh",
+            "--shard-index",
+            "1",
+            "--shard-count",
+            "8",
+        ],
+    )
+        config = VALIDATION_RUNNER_MODULE.parse_args(args)
+        @test_throws VALIDATION_RUNNER_MODULE.RunnerError VALIDATION_RUNNER_MODULE.validate_available(
+            config,
+        )
+    end
+end
+
+@testset "Validation Runner reports shard-local coverage with canonical provenance" begin
+    scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+    configuration = VALIDATION_RUNNER_MODULE.parse_args([
+        "--models",
+        "CORPSE",
+        "--shard-index",
+        "1",
+        "--shard-count",
+        "8",
+    ])
+    mktempdir() do output
+        report = VALIDATION_RUNNER_MODULE.empty_aggregate_report(
+            configuration,
+            output,
+            scope,
+        )
+        model = only(report["model"])
+
+        @test report["comparison_schema"] ==
+              "representative-pinned-comparison-v1"
+        @test report["scope"]["cell_count"] == 80
+        @test report["scope"]["manifest_sha256"] ==
+              VALIDATION_RUNNER_MODULE.sha256sum(scope.path)
+        @test report["shard"] == Dict(
+            "schema_version" => 1,
+            "index" => 1,
+            "count" => 8,
+            "cell_ids" => scope.cell_ids[1:8:end],
+            "strategy" => "scope-order-round-robin-v1",
+        )
+        @test model["coverage"]["scope_cells"] == 10
+        @test model["coverage"]["eligible_cells"] == 9
+        @test only(model["coverage"]["eligibility_gaps"])["cell_id"] == 51
+    end
+end
 @testset "Validation Runner aggregates deterministic model reports" begin
+
     configuration =
         VALIDATION_RUNNER_MODULE.parse_args(["--models", "MIMICS-C,CASA-C"])
     scope = VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
@@ -915,6 +1027,72 @@ end
     end
 end
 
+@testset "Validation Runner projects durable CASA and CORPSE shard evidence" begin
+    mktempdir() do directory
+        report_path = joinpath(directory, "comparison.toml")
+        write(report_path, "schema_version = 1\n")
+        diagnostic = Dict("all_match" => true, "maximum_absolute_error" => 0.25)
+        casa_scientific = Dict(
+            "initialization_comparison" => diagnostic,
+            "boundary_comparison" => Dict("prespin" => diagnostic),
+            "historical_comparison" => Dict("annual" => diagnostic),
+            "passive_restoration" => Dict(
+                "multiplier" => 0.25,
+                "verified" => true,
+                "carbon" => Dict(
+                    "before" => [1.0, 2.0],
+                    "after" => [0.25, 0.5],
+                    "verified" => true,
+                ),
+                "checkpoint_roundtrip_verified" => true,
+            ),
+        )
+        casa = VALIDATION_RUNNER_MODULE.project_casa_evidence!(
+            Dict{String, Any}(),
+            casa_scientific,
+            Dict("all_match" => true),
+            report_path,
+        )
+        @test casa["boundary_comparison"] ==
+              casa_scientific["boundary_comparison"]
+        @test casa["historical"]["annual"] == diagnostic
+        @test casa["historical"]["fresh_fortran_daily"]["all_match"]
+        @test casa["shard_evidence"]["comparison_report_sha256"] ==
+              VALIDATION_RUNNER_MODULE.sha256sum(report_path)
+        @test casa["passive_restoration"]["carbon"] == Dict("verified" => true)
+        @test !haskey(casa["passive_restoration"]["carbon"], "before")
+        @test casa["shard_evidence"]["passive_restoration"]["carbon"]["before"] ==
+              [1.0, 2.0]
+
+        corpse_scientific = Dict(
+            "stage" => Dict(
+                "prespin" => Dict(
+                    "comparison" => Dict("pool" => diagnostic),
+                    "checkpoint_sha256" => repeat("a", 64),
+                    "checkpoint_handoff_verified" => true,
+                    "restart_transform_verified" => true,
+                    "conservation_verified" => true,
+                ),
+            ),
+            "reduced_historical" =>
+                Dict("annual_summaries" => Dict("pool" => diagnostic)),
+        )
+        corpse = VALIDATION_RUNNER_MODULE.project_corpse_evidence!(
+            Dict{String, Any}(),
+            corpse_scientific,
+            report_path,
+        )
+        @test corpse["boundary_comparison"]["prespin"]["pool"] == diagnostic
+        @test corpse["reduced_historical"] ==
+              corpse_scientific["reduced_historical"]
+        @test corpse["shard_evidence"]["stage"]["prespin"]["checkpoint_sha256"] ==
+              repeat("a", 64)
+        @test corpse["shard_evidence"]["stage"]["prespin"]["restart_transform_verified"]
+        @test corpse["shard_evidence"]["stage"]["prespin"]["conservation_verified"]
+    end
+end
+
+
 @testset "Validation Runner completes pinned Core and Smoke comparisons" begin
     for (scope, cell_count) in (("core", 11), ("smoke", 37))
         mktempdir() do output
@@ -1066,6 +1244,40 @@ if get(ENV, "CLIMALAND_RUN_MIMICS_C_REPRESENTATIVE_VALIDATION", "false") ==
 end
 
 if get(ENV, "CLIMALAND_RUN_REPRESENTATIVE_VALIDATION", "false") == "true"
+    @testset "Validation Runner completes a pinned Representative CASA-C shard" begin
+        mktempdir() do output
+            result = run_validation(
+                "--scope",
+                "representative",
+                "--models",
+                "CASA-C",
+                "--reference",
+                "pinned",
+                "--shard-index",
+                "1",
+                "--shard-count",
+                "8",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            )
+            @test result.exitcode == 0
+            report = TOML.parsefile(joinpath(output, "validation_report.toml"))
+            model = only(report["model"])
+            scope =
+                VALIDATION_RUNNER_MODULE.load_scope_manifests("representative")
+            @test report["shard"]["cell_ids"] == scope.cell_ids[1:8:end]
+            @test model["coverage"]["scope_cells"] == 10
+            @test model["coverage"]["compared_cells"] == 10
+            @test model["outcome"] == "passed"
+            @test haskey(model, "boundary_comparison")
+            @test haskey(model, "historical")
+            @test haskey(model, "shard_evidence")
+        end
+    end
+
+
     @testset "Validation Runner completes pinned Representative CASA-CN" begin
         mktempdir() do output
             result = run_validation(

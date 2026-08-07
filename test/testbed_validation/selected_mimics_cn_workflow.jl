@@ -840,6 +840,7 @@ function run_selected_case(
     reference_path = nothing,
     comparison_policy = nothing,
     eligibility_gaps = Dict{String, Any}[],
+    execution_cell_ids = nothing,
     nonfinite_observer = nothing,
 )
     reference = if compare_references
@@ -860,9 +861,17 @@ function run_selected_case(
         parentmodule(@__MODULE__),
         :TestbedReferenceCellComparisons,
     )
-    active_collection =
-        isnothing(reference) ? collection :
-        cells.subset(collection, reference.eligible_ids)
+    scope_collection =
+        isnothing(execution_cell_ids) ? collection :
+        cells.subset(collection, execution_cell_ids)
+    requested_ids = getproperty.(scope_collection.cells, :id)
+    requested = Set(requested_ids)
+    eligible_ids =
+        isnothing(reference) ? requested_ids :
+        filter(id -> id in requested, reference.eligible_ids)
+    active_collection = cells.subset(scope_collection, eligible_ids)
+    reported_gaps =
+        filter(gap -> Int(gap["cell_id"]) in requested, eligibility_gaps)
     setup = load_setup(; collection = active_collection)
     boundary_snapshots = Dict{String, Any}()
     budget = native_mimics.BudgetAccumulator(setup.grid)
@@ -974,9 +983,9 @@ function run_selected_case(
         )
         annotate_report!(
             result.report,
-            collection,
+            scope_collection,
             active_collection,
-            eligibility_gaps,
+            reported_gaps,
         )
         return result
     finally

@@ -5,6 +5,7 @@ end
 module TestbedPinnedCORPSEExecutor
 
 import ClimaLand
+import NCDatasets
 import TOML
 
 native_corpse() =
@@ -88,6 +89,112 @@ function reduced_passed(comparison)
     )
 end
 
+function compare_boundary_summary(pairs, calibration, stage, full_population)
+    full_population && return native_corpse().calibrated_boundary_summary(
+        pairs,
+        calibration,
+        stage,
+    )
+    rules = calibration["stage"][String(stage.name)]
+    padded = Dict(
+        name => begin
+            local_count = length(pair.actual)
+            full_count = Int(rules[name]["finite_pair_count"])
+            local_count <= full_count || error(
+                "CORPSE shard exceeds its calibration population",
+            )
+            neutral = isempty(pair.expected) ? 0.0 : first(pair.expected)
+            (
+                actual = vcat(
+                    pair.actual,
+                    fill(neutral, full_count - local_count),
+                ),
+                expected = vcat(
+                    pair.expected,
+                    fill(neutral, full_count - local_count),
+                ),
+            )
+        end for (name, pair) in pairs
+    )
+    report =
+        native_corpse().calibrated_boundary_summary(padded, calibration, stage)
+    for (name, record) in report
+        record["values"] = length(pairs[name].actual)
+    end
+    return report
+end
+
+function compare_reduced_historical(
+    candidate_path,
+    reference_path,
+    calibration;
+    require_full_population = true,
+)
+    require_full_population &&
+        return native_corpse().compare_reduced_historical(
+            candidate_path,
+            reference_path,
+            calibration,
+        )
+    native = native_corpse()
+    reference_positions, eligible_count =
+        NCDatasets.NCDataset(candidate_path) do candidate
+            NCDatasets.NCDataset(reference_path) do reference
+                candidate_ids = Int.(candidate["cell_id"][:])
+                candidate_ids == sort(unique(candidate_ids)) ||
+                    error("reduced historical candidate cell order differs")
+                reference_ids = Int.(reference["cell_id"][:])
+                by_id = Dict(
+                    id => index for (index, id) in enumerate(reference_ids)
+                )
+                all(id -> haskey(by_id, id), candidate_ids) ||
+                    error("reduced historical candidate has an unknown cell")
+                positions = [by_id[id] for id in candidate_ids]
+                candidate_mask = Bool.(candidate["eligible"][:])
+                candidate_mask == Bool.(reference["eligible"][positions]) ||
+                    error("reduced historical eligibility masks differ")
+                Int.(candidate["year"][:]) == Int.(reference["year"][:]) ||
+                    error("reduced historical year coordinates differ")
+                Int.(candidate["sample_day"][:]) ==
+                Int.(reference["sample_day"][:]) ||
+                    error("reduced historical sample coordinates differ")
+                (positions, count(candidate_mask))
+            end
+        end
+
+    # Reuse the strict comparator with zero error outside this shard.
+    report = mktempdir() do root
+        expanded = joinpath(root, "expanded_candidate.nc")
+        cp(reference_path, expanded)
+        NCDatasets.NCDataset(candidate_path) do candidate
+            NCDatasets.NCDataset(expanded, "a") do output
+                for (reducer, variables) in (
+                    "annual_mean" => native.REDUCED_STATE_VARIABLES,
+                    "end_of_year" => native.REDUCED_STATE_VARIABLES,
+                    "annual_total" => native.REDUCED_FLUX_VARIABLES,
+                    "fixed_daily_sample" => native.REDUCED_VARIABLES,
+                )
+                    for description in variables
+                        variable = "$(reducer)__$(description.name)"
+                        output[variable][reference_positions, :] =
+                            candidate[variable][:, :]
+                    end
+                end
+            end
+        end
+        native.compare_reduced_historical(expanded, reference_path, calibration)
+    end
+    for (reducer, records) in report
+        sample_count =
+            reducer == "fixed_daily_sample" ?
+            length(native.REDUCED_SAMPLE_DAYS) : 114
+        for record in values(records)
+            record["values"] = eligible_count * sample_count
+        end
+    end
+    return report
+end
+
 """
     execute(output_root; bundle, boundary_root, fixture_manifest,
             scope_manifest, workers)
@@ -102,6 +209,7 @@ function execute(
     fixture_manifest,
     scope_manifest,
     workers,
+    cell_ids = nothing,
 )
     workers isa Integer && workers > 0 ||
         throw(ArgumentError("workers must be positive"))
@@ -122,20 +230,38 @@ function execute(
     native_workflow().sha256sum(bundle.reduced_history_manifest) ||
         error("Fortran reduced historical reference manifest hash differs")
 
+    assigned_cell_ids = if isnothing(cell_ids)
+        scope.cell_ids
+    else
+        assigned = Int.(cell_ids)
+        !isempty(assigned) &&
+        assigned == sort(unique(assigned)) &&
+        all(id -> id in scope.cell_ids, assigned) || throw(
+            ArgumentError("cell_ids must be a sorted nonempty scope subset"),
+        )
+        assigned
+    end
+    assigned_set = Set(assigned_cell_ids)
+    assigned_gaps =
+        Dict(id => pft for (id, pft) in scope.gaps if id in assigned_set)
+    assigned_gap_entries =
+        filter(gap -> Int(gap["cell_id"]) in assigned_set, scope.gap_entries)
+    full_population = assigned_cell_ids == scope.cell_ids
     collection = reference_cells().selected_cell_collection(
         "representative",
-        scope.cell_ids;
+        assigned_cell_ids;
         manifest_path = fixture_manifest,
     )
     setup = selected_corpse().load_complete_setup(collection)
     eligible = native_corpse().eligible_cell.(setup.grid)
-    count(eligible) == 78 ||
-        error("Representative CORPSE must have 78 eligible cells")
+    expected_eligible = length(assigned_cell_ids) - length(assigned_gaps)
+    count(eligible) == expected_eligible ||
+        error("Assigned CORPSE cells differ from reviewed eligibility")
     Dict(
         point.cell_id => point.pft for
         point in setup.grid if !native_corpse().eligible_cell(point)
-    ) == scope.gaps ||
-        error("Representative CORPSE gaps differ from reviewed gaps")
+    ) == assigned_gaps ||
+        error("Assigned CORPSE gaps differ from reviewed gaps")
 
     stoichiometry =
         native_casa().CarbonOnlyPlantStoichiometry(setup.grid, setup.parameters)
@@ -203,7 +329,7 @@ function execute(
             error("CORPSE $(stage.name) checkpoint handoff is not conservative")
         conservation.verified ||
             error("CORPSE $(stage.name) state violates conservation")
-        comparison = native_corpse().calibrated_boundary_summary(
+        comparison = compare_boundary_summary(
             native_corpse().boundary_pairs(
                 current_state,
                 stage,
@@ -212,6 +338,7 @@ function execute(
             ),
             calibration,
             stage,
+            full_population,
         )
         stage_reports[String(stage.name)] = Dict(
             "comparison" => comparison,
@@ -235,10 +362,11 @@ function execute(
         setup.grid,
         eligible,
     )
-    reduced_comparison = native_corpse().compare_reduced_historical(
+    reduced_comparison = compare_reduced_historical(
         reduced_path,
         bundle.reduced_history,
         calibration,
+        require_full_population = full_population,
     )
     passed =
         all(
@@ -247,10 +375,10 @@ function execute(
         ) && reduced_passed(reduced_comparison)
     seconds = time() - started
     coverage = Dict(
-        "scope_cells" => 80,
-        "eligible_cells" => 78,
-        "compared_cells" => 78,
-        "eligibility_gaps" => scope.gap_entries,
+        "scope_cells" => length(assigned_cell_ids),
+        "eligible_cells" => expected_eligible,
+        "compared_cells" => expected_eligible,
+        "eligibility_gaps" => assigned_gap_entries,
     )
     report = Dict(
         "schema_version" => 1,
