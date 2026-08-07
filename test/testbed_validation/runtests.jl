@@ -5,6 +5,10 @@ include("model_architecture_tests.jl")
 include("reference_harness.jl")
 include("candidate_reconstruction.jl")
 include("netcdf_compare.jl")
+include("classic_reference_workspace/de_hai/compare_de_hai_output_tests.jl")
+run(
+    `bash $(joinpath(@__DIR__, "classic_reference_workspace", "de_hai", "runner_tests.sh"))`,
+)
 include("extract_fixture.jl")
 include("selected_cell_fixtures.jl")
 include("representative_cell_selection.jl")

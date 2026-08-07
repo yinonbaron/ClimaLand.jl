@@ -1,0 +1,102 @@
+schema_version = 1
+issue = 97
+site = "DE-Hai"
+execution_status = "success"
+comparison_status = "failed_parity"
+started_utc = "2026-08-06T21:18:01Z"
+completed_utc = "2026-08-06T21:25:53Z"
+run_start_year = 2000
+run_end_year = 2012
+local_netcdf_count = 57
+published_netcdf_count = 176
+overlapping_filename_count = 57
+non_de_hai_netcdf_count = 0
+output_frequency = "daily"
+
+[source]
+record_url = "https://zenodo.org/records/18188101"
+tag = "CLASSICv2.0"
+commit = "7dd82c9a48a7c8beb6455a229888c90ba20d8eff"
+tag_evidence_command = "git ls-remote https://gitlab.com/cccma/classic.git refs/tags/CLASSICv2.0 refs/tags/CLASSICv2.0^{}"
+archive_md5 = "7f3082ebc524d21d29c578f4fdf2ca28"
+archive_sha256 = "8b7a9b7bc50c4b63bdb4aad9e5037406b919100616684a2c1c8c738b6ebe7ef8"
+
+[container]
+record_url = "https://zenodo.org/records/18201505"
+record_version = "2.0"
+archive_md5 = "5510acc8ba800aa3ff716683ab8304b7"
+archive_sha256 = "f5083d3cac1b8dd1d790cabf72652d37275de7ef20ac93246999bc0d26372b8e"
+sif_sha256 = "dcb327e1702e56f2c08f597d402d03d67efd99b5e7264639d9ac33ca89446b3e"
+embedded_version_label = "3.0"
+embedded_base = "ubuntu:24.04"
+embedded_apptainer_version = "1.4.2"
+
+[benchmark]
+record_url = "https://zenodo.org/records/18202323"
+output_archive_md5 = "fb0d8c57e7b926644bf0b9fcdf079a2c"
+output_archive_sha256 = "a2a9f33c4472610cb95c567367e6a633cdf35e3101fb89176ca0eee4138336e2"
+plots_archive_md5 = "bd9c5f9a78456ea35c132e17ea18a7c0"
+plots_archive_sha256 = "91c9129f6697b3806e792e5401aff6b4ec2cf01cde4de4988ed301c5de07a426"
+fluxnet_archive_md5 = "25a26e1cc4664b93a29fc726c4182e5c"
+fluxnet_archive_sha256 = "e16d10e5731b6ac8b447bc2388a7d740f21742ee20ba8cc64ca354fa7652a70f"
+
+[environment]
+host = "cfm040"
+kernel = "Linux 5.14.0-687.12.1.el9_8.x86_64"
+julia = "1.11.2"
+apptainer = "1.5.0-1.el9"
+tar = "GNU tar 1.34"
+gfortran = "13.2.0"
+python = "3.12.3"
+netcdf_c = "4.9.2"
+netcdf_fortran = "4.5.4"
+
+[artifacts]
+binary_sha256 = "20bd7e0b19815f9971a7c9b6afd90d7ddf30223b20be5154e80382298e292b19"
+site_cdl_sha256 = "dcd850210edfb29573c4fac45e7e6dfa74bd484502ac91d68c1343bd0d60df45"
+site_yaml_sha256 = "2cb47075bab3510a3fb722e461cc21b01cd2142f74e0f540381013df9b9d1011"
+initialization_netcdf_sha256 = "2f466cf7b02c17590c86e04490c72493e33789eb5b9c18e2a1a189a5c36c6291"
+job_options_sha256 = "f775e4085d7393a9f6b2ad04e99cdeae0999a51f07e9cb4a4575cf381aa96a06"
+model_parameters_sha256 = "9f3ff5bdbf8e10e5825f4a07e57028cdd376690f7c7bcf765734ea1ab47e16ce"
+final_restart_sha256 = "c86dd6d58ae9966fb7b6321ec37f88a3aa8fbe3f2998aa9993a9fa8ed411a1d8"
+published_restart_sha256 = "7f116299d40ef9bde0ff8d46dde9d3c703059c88075f1f93b908d878651b9f7d"
+
+[restart_role]
+initialization = "DE-Hai_init.nc is generated from the released DE-Hai_init.cdl and is read through init_file."
+overwrite_target = "prep_jobopts.sh copies the initialization to rsfile.nc before the run; CLASSIC overwrites its prognostic variables for use as a future restart."
+published_artifact = "rsFile_modified.nc is packaged beside the published raw NetCDF outputs and has the restart schema, but the released documentation does not explain the _modified filename."
+comparison_policy = "Treat rsFile_modified.nc as a terminal restart comparison artifact, never as forcing or a substitute for the released initialization."
+
+[evidence]
+commands_sha256 = "402c552d200f826a20727b2ce60f29e4a6135271511951bd830ad1ca01f4f025"
+environment_sha256 = "60c9064ea795b7ea45963a0f736f5b9fe6a9773baabaa230330e3b7b29541587"
+build_log_sha256 = "214097ed388ee8685b1e5e8247af505a2ee34aec2409401d3034a60a02c984b4"
+preparation_log_sha256 = "15ac64a4f1eca6d3bac9f6a2eaf6dbdca259cd7f62c586a25c5c3bc57f643fb0"
+run_log_sha256 = "c5a7e9c18897b89bf5cebf39a07354fdbc48c1b50bcd9bf399a37737bff66ce9"
+prepared_inputs_manifest_sha256 = "6273c2d5fd0c3b475c04339e523512d73ab32f8aad8bcd7ba4a9ac6188b151a0"
+output_manifest_sha256 = "77874d88c3c7d28b045f56814a412b9b76ebb562f8b4645094438fb459aa1a89"
+final_restart_manifest_sha256 = "279f88e882ce4b59a2f9c690219e548bb586a68c45bf6ac9709826a771770b90"
+
+[paths]
+workspace = "/gpfs01/work/yinonmb/classic-v2-reference"
+workspace_alias = "/work/yinonmb/classic-v2-reference"
+source = "/gpfs01/work/yinonmb/classic-v2-reference/replaceable/extracted/issue-97-de-hai-pristine/CLASSIC"
+build_evidence = "/gpfs01/work/yinonmb/classic-v2-reference/replaceable/builds/issue-97-de-hai-pristine"
+run = "/gpfs01/work/yinonmb/classic-v2-reference/replaceable/runs/issue-97-de-hai-pristine"
+local_output = "/gpfs01/work/yinonmb/classic-v2-reference/replaceable/runs/issue-97-de-hai-pristine/outputFiles/DE-Hai/netCDF"
+published_output = "/gpfs01/work/yinonmb/classic-v2-reference/replaceable/extracted/issue-97-de-hai-pristine/published/Benchmark_CLASSIC_output/DE-Hai/netCDF"
+
+[[notes]]
+text = "The official preparation helper generated all 59 released site directories; only the documented direct DE-Hai command was executed."
+
+[[notes]]
+text = "The official helper enabled daily output and disabled monthly and annual output, yielding 57 local files whose names all overlap the published collection."
+
+[[notes]]
+text = "The build emitted the documented variable-tracking-size note for prepareOutputs.f90 and completed successfully."
+
+[[notes]]
+text = "Execution success is not parity evidence; the fail-closed comparison found exact numerical mismatches in 47 of 57 overlapping modeled files."
+
+[[notes]]
+text = "The local and published terminal restart files have different whole-file hashes; variable and encoding comparison must determine the reason before drawing a scientific conclusion."
