@@ -1,3 +1,7 @@
+using Test
+
+include("model_architecture.jl")
+include("model_architecture_tests.jl")
 include("reference_harness.jl")
 include("candidate_reconstruction.jl")
 include("netcdf_compare.jl")
