@@ -17,6 +17,8 @@ The manifest pins three version-specific Zenodo records, the CLASSIC v2.0 tag
 commit, publication dates, record and embedded licenses, exact file sizes,
 checksums, and download URLs. Its 8 GB free-space floor covers twice the
 3,675,678,481 compressed bytes; production runs may require more space.
+`verification_receipt.toml` records the successful machine and artifact
+verification without placing the verified archives in Git.
 
 ## Setup
 

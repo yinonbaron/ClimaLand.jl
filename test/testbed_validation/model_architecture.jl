@@ -233,10 +233,15 @@ function test_driven_trajectory(
     for variable in variables
         field = getproperty(component, variable)
         initial = trajectory_entry(drivers.initial_state, variable)
+        destination = vec(parent(field))
         if initial isa Number
-            field .= initial
+            length(destination) == 1 || throw(
+                ArgumentError(
+                    "initial variable `$variable` is scalar; model state has $(length(destination)) values",
+                ),
+            )
+            destination[begin] = initial
         else
-            destination = vec(parent(field))
             values = trajectory_values(initial)
             length(destination) == length(values) || throw(
                 ArgumentError(
@@ -280,8 +285,12 @@ function test_driven_trajectory(
             maximum_absolute = maximum(absolute_errors)
             entry = metrics[variable]
             maximum_step =
-                maximum_absolute > entry.maximum_absolute_error ? step :
-                entry.maximum_absolute_error_step
+                if entry.compared_steps == 0 ||
+                   maximum_absolute > entry.maximum_absolute_error
+                    step
+                else
+                    entry.maximum_absolute_error_step
+                end
             metrics[variable] = (
                 maximum_absolute_error = max(
                     entry.maximum_absolute_error,

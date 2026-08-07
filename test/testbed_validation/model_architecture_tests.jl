@@ -1,4 +1,5 @@
 using Test
+
 import ClimaLand
 
 struct DrivenTrajectoryTestModel{FT, Domain} <: ClimaLand.AbstractExpModel{FT}
@@ -60,7 +61,42 @@ end
     @test metrics.level.maximum_relative_error == 0.25 / 18.25
     @test metrics.level.compared_steps == length(case.drivers.times)
     @test metrics.reserve.maximum_absolute_error == 0.0
+    @test metrics.reserve.maximum_absolute_error_step == 1
     @test metrics.reserve.compared_steps == length(case.drivers.times)
+end
+
+@testset "driven trajectory requires a complete initial state" begin
+    case = trajectory_case()
+    scalar_initial_state = (level = 10.0, reserve = -1.0)
+    scalar_drivers =
+        merge(case.drivers, (initial_state = scalar_initial_state,))
+
+    @test test_driven_trajectory(
+        case.model,
+        scalar_drivers,
+        case.reference,
+        case.tolerances,
+    ).level.compared_steps == length(case.drivers.times)
+
+    domain = ClimaLand.Domains.Plane(;
+        xlim = (0.0, 2.0),
+        ylim = (0.0, 1.0),
+        nelements = (2, 1),
+        npolynomial = 0,
+    )
+    spatial_model = DrivenTrajectoryTestModel{Float64, typeof(domain)}(domain)
+    spatial_drivers = (
+        times = [0.0],
+        initial_state = (level = 10.0, reserve = [-1.0, -1.0]),
+        advance! = (Y, p, t, dt) -> nothing,
+    )
+    spatial_reference = (level = [[10.0, 10.0]], reserve = [[-1.0, -1.0]])
+    @test_throws ArgumentError test_driven_trajectory(
+        spatial_model,
+        spatial_drivers,
+        spatial_reference,
+        case.tolerances,
+    )
 end
 
 @testset "driven trajectory verifies discontinuities before exceptions" begin

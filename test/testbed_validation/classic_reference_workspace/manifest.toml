@@ -28,10 +28,10 @@ archive_top_level = "classic-CLASSICv2.0"
 
 [setup]
 commands = [
-    "julia --startup-file=no classic_workspace.jl check manifest.toml $WORK/classic-v2-reference",
-    "julia --startup-file=no classic_workspace.jl init manifest.toml $WORK/classic-v2-reference",
-    "julia --startup-file=no classic_workspace.jl fetch manifest.toml $WORK/classic-v2-reference",
-    "julia --startup-file=no classic_workspace.jl verify manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl check test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl init test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl fetch test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl verify test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
 ]
 
 [[resource]]

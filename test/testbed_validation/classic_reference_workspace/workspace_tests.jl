@@ -1,4 +1,5 @@
 using Test
+using TOML
 
 include("workspace.jl")
 using .ClassicReferenceWorkspace
@@ -64,6 +65,18 @@ end
           Set(("source", "container", "benchmark_collection"))
     @test sum(length(resource["file"]) for resource in official["resource"]) ==
           5
+
+    receipt = TOML.parsefile(joinpath(@__DIR__, "verification_receipt.toml"))
+    @test receipt["result"] == "verified"
+    expected_files = Dict(
+        file["filename"] => (file["bytes"], file["md5"]) for
+        resource in official["resource"] for file in resource["file"]
+    )
+    verified_files = Dict(
+        file["filename"] => (file["bytes"], file["md5"]) for
+        file in receipt["file"] if file["status"] == "verified"
+    )
+    @test verified_files == expected_files
 end
 
 @testset "workspace allocation boundary" begin
