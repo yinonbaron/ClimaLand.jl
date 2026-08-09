@@ -137,62 +137,79 @@ function compare_reduced_historical(
             calibration,
         )
     native = native_corpse()
-    reference_positions, eligible_count =
-        NCDatasets.NCDataset(candidate_path) do candidate
-            NCDatasets.NCDataset(reference_path) do reference
-                candidate_ids = Int.(candidate["cell_id"][:])
-                candidate_ids == sort(unique(candidate_ids)) ||
-                    error("reduced historical candidate cell order differs")
-                reference_ids = Int.(reference["cell_id"][:])
-                by_id = Dict(
-                    id => index for (index, id) in enumerate(reference_ids)
-                )
-                all(id -> haskey(by_id, id), candidate_ids) ||
-                    error("reduced historical candidate has an unknown cell")
-                positions = [by_id[id] for id in candidate_ids]
-                candidate_mask = Bool.(candidate["eligible"][:])
-                candidate_mask == Bool.(reference["eligible"][positions]) ||
-                    error("reduced historical eligibility masks differ")
-                Int.(candidate["year"][:]) == Int.(reference["year"][:]) ||
-                    error("reduced historical year coordinates differ")
-                Int.(candidate["sample_day"][:]) ==
-                Int.(reference["sample_day"][:]) ||
-                    error("reduced historical sample coordinates differ")
-                (positions, count(candidate_mask))
-            end
-        end
+    return NCDatasets.NCDataset(candidate_path) do candidate
+        NCDatasets.NCDataset(reference_path) do reference
+            candidate_ids = Int.(candidate["cell_id"][:])
+            candidate_ids == sort(unique(candidate_ids)) ||
+                error("reduced historical candidate cell order differs")
+            reference_ids = Int.(reference["cell_id"][:])
+            by_id =
+                Dict(id => index for (index, id) in enumerate(reference_ids))
+            all(id -> haskey(by_id, id), candidate_ids) ||
+                error("reduced historical candidate has an unknown cell")
+            positions = [by_id[id] for id in candidate_ids]
+            candidate_mask = Bool.(candidate["eligible"][:])
+            candidate_mask == Bool.(reference["eligible"][positions]) ||
+                error("reduced historical eligibility masks differ")
+            Int.(candidate["year"][:]) == Int.(reference["year"][:]) ||
+                error("reduced historical year coordinates differ")
+            Int.(candidate["sample_day"][:]) ==
+            Int.(reference["sample_day"][:]) ||
+                error("reduced historical sample coordinates differ")
 
-    # Reuse the strict comparator with zero error outside this shard.
-    report = mktempdir() do root
-        expanded = joinpath(root, "expanded_candidate.nc")
-        cp(reference_path, expanded)
-        NCDatasets.NCDataset(candidate_path) do candidate
-            NCDatasets.NCDataset(expanded, "a") do output
-                for (reducer, variables) in (
-                    "annual_mean" => native.REDUCED_STATE_VARIABLES,
-                    "end_of_year" => native.REDUCED_STATE_VARIABLES,
-                    "annual_total" => native.REDUCED_FLUX_VARIABLES,
-                    "fixed_daily_sample" => native.REDUCED_VARIABLES,
+            eligible = findall(candidate_mask)
+            reference_rows = positions[eligible]
+            rules = get(calibration, "reducer", Dict{String, Any}())
+            result = Dict{String, Any}()
+            for (reducer, variables) in (
+                "annual_mean" => native.REDUCED_STATE_VARIABLES,
+                "end_of_year" => native.REDUCED_STATE_VARIABLES,
+                "annual_total" => native.REDUCED_FLUX_VARIABLES,
+                "fixed_daily_sample" => native.REDUCED_VARIABLES,
+            )
+                names = getproperty.(variables, :name)
+                reducer_rules = get(rules, reducer, nothing)
+                reducer_rules isa AbstractDict ||
+                    error("calibration is missing $reducer")
+                Set(keys(reducer_rules)) == Set(names) ||
+                    error("$reducer calibrated variables differ")
+                result[reducer] = Dict(
+                    name => begin
+                        variable = "$(reducer)__$(name)"
+                        description = only(
+                            filter(item -> item.name == name, variables),
+                        )
+                        rule = reducer_rules[name]
+                        get(rule, "units", nothing) ==
+                        native.reduced_units(description, reducer) ||
+                            error("$variable calibrated units differ")
+                        actual = vec(
+                            Float64.(candidate[variable][eligible, :]),
+                        )
+                        expected = vec(
+                            Float64.(reference[variable][reference_rows, :]),
+                        )
+                        full_count = Int(rule["finite_pair_count"])
+                        length(actual) <= full_count || error(
+                            "CORPSE shard exceeds its calibration population",
+                        )
+                        neutral = isempty(expected) ? 0.0 : first(expected)
+                        padding = full_count - length(actual)
+                        record = native.calibrated_metrics(
+                            vcat(actual, fill(neutral, padding)),
+                            vcat(expected, fill(neutral, padding)),
+                            rule,
+                        )
+                        record["values"] = length(actual)
+                        record
+                    end for name in names
                 )
-                    for description in variables
-                        variable = "$(reducer)__$(description.name)"
-                        output[variable][reference_positions, :] =
-                            candidate[variable][:, :]
-                    end
-                end
             end
-        end
-        native.compare_reduced_historical(expanded, reference_path, calibration)
-    end
-    for (reducer, records) in report
-        sample_count =
-            reducer == "fixed_daily_sample" ?
-            length(native.REDUCED_SAMPLE_DAYS) : 114
-        for record in values(records)
-            record["values"] = eligible_count * sample_count
+            reduced_passed(result) ||
+                error("CORPSE reduced history exceeds calibrated tolerance")
+            return result
         end
     end
-    return report
 end
 
 """

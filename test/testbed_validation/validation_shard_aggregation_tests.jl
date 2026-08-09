@@ -274,6 +274,87 @@ end
     @test length(by_model["CORPSE"]["coverage"]["eligibility_gaps"]) == 2
 end
 
+@testset "CASA-CN budgets are evaluated after global shard reduction" begin
+    reports = [synthetic_shard("CASA-CN", index) for index in 1:8]
+    for (index, report) in enumerate(reports)
+        stop = index == 1 ? 2.0 : 0.0
+        input = index <= 2 ? 1.0 : 0.0
+        residual = stop - input
+        close = iszero(residual)
+        record = Dict(
+            "start_stock_kg_n" => 0.0,
+            "stop_stock_kg_n" => stop,
+            "external_input_kg_n" => input,
+            "external_output_kg_n" => 0.0,
+            "residual_kg_n" => residual,
+            "relative_residual" => abs(residual),
+            "rtol" => 0.1,
+            "close" => close,
+        )
+        model_report = only(report["model"])
+        model_report["budget"]["nitrogen"] = Dict(
+            "all_close" => close,
+            "maximum_absolute_residual_kg_n" => abs(residual),
+            "reducer" => "maximum_absolute_residual",
+            "stage" => Dict("historical" => deepcopy(record)),
+            "workflow" => deepcopy(record),
+        )
+        model_report["comparison"]["nitrogen_budget"] = close
+    end
+
+    aggregate = ShardAggregation.aggregate_shard_reports(
+        reports,
+        SHARD_SCOPE_PATH;
+        expected_models = ["CASA-CN"],
+        shard_count = 8,
+    )
+    model_report = only(aggregate["model"])
+    nitrogen = model_report["budget"]["nitrogen"]
+    @test nitrogen["stage"]["historical"]["residual_kg_n"] == 0.0
+    @test nitrogen["workflow"]["residual_kg_n"] == 0.0
+    @test nitrogen["stage"]["historical"]["rtol"] == 0.1
+    @test nitrogen["all_close"]
+    @test model_report["comparison"]["nitrogen_budget"]
+    @test model_report["outcome"] == "passed"
+    @test aggregate["outcome"] == "passed"
+
+    for record in (
+        reports[2]["model"][1]["budget"]["nitrogen"]["stage"]["historical"],
+        reports[2]["model"][1]["budget"]["nitrogen"]["workflow"],
+    )
+        record["external_input_kg_n"] = 0.0
+        record["residual_kg_n"] = 0.0
+        record["relative_residual"] = 0.0
+        record["close"] = true
+    end
+    reports[2]["model"][1]["budget"]["nitrogen"]["all_close"] = true
+    reports[2]["model"][1]["comparison"]["nitrogen_budget"] = true
+    failed = ShardAggregation.aggregate_shard_reports(
+        reports,
+        SHARD_SCOPE_PATH;
+        expected_models = ["CASA-CN"],
+        shard_count = 8,
+    )
+    @test !only(failed["model"])["budget"]["nitrogen"]["all_close"]
+    @test !only(failed["model"])["comparison"]["nitrogen_budget"]
+    @test only(failed["model"])["outcome"] == "failed"
+    @test failed["outcome"] == "failed"
+
+    for report in reports
+        delete!(only(report["model"])["comparison"], "nitrogen_budget")
+    end
+    missing_local_checks = ShardAggregation.aggregate_shard_reports(
+        reports,
+        SHARD_SCOPE_PATH;
+        expected_models = ["CASA-CN"],
+        shard_count = 8,
+    )
+    missing_check_model = only(missing_local_checks["model"])
+    @test !missing_check_model["comparison"]["nitrogen_budget"]
+    @test missing_check_model["outcome"] == "failed"
+    @test missing_local_checks["outcome"] == "failed"
+end
+
 @testset "Representative shard aggregation fails closed" begin
     complete = all_synthetic_shards()
     @test occursin(

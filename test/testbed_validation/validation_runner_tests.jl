@@ -109,6 +109,25 @@ end
     @test !report["historical_comparison"]["all_match"]
     @test !report["historical_comparison"]["fixed_daily_samples"]["all_match"]
 
+    report["nitrogen_budget"]["all_close"] = false
+    local_budget_failure = VALIDATION_RUNNER_MODULE.scientific_outcome(
+        report,
+        result,
+        "CASA-CN";
+        fresh_fortran_daily,
+    )
+    deferred_budget = VALIDATION_RUNNER_MODULE.scientific_outcome(
+        report,
+        result,
+        "CASA-CN";
+        fresh_fortran_daily,
+        defer_budgets = true,
+    )
+    @test !local_budget_failure.passed
+    @test deferred_budget.passed
+    @test !deferred_budget.checks["nitrogen_budget"]
+    report["nitrogen_budget"]["all_close"] = true
+
     report["historical_comparison"]["annual"]["source"]["fresh_fortran"]["all_match"] =
         false
     failed_annual = VALIDATION_RUNNER_MODULE.scientific_outcome(

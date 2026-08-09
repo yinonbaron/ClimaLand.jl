@@ -210,9 +210,14 @@ function reduced_test_calibration()
     )
 end
 
-function write_reduced_test_file(path, ids; eligible = trues(length(ids)))
+function write_reduced_test_file(
+    path,
+    ids;
+    eligible = trues(length(ids)),
+    deflatelevel = 0,
+)
     native = PinnedCORPSEExecutor.native_corpse()
-    NCDatasets.NCDataset(path, "c") do output
+    NCDatasets.NCDataset(path, "c"; format = :netcdf4) do output
         NCDatasets.defDim(output, "point", length(ids))
         NCDatasets.defDim(output, "year", 114)
         NCDatasets.defDim(output, "sample", length(native.REDUCED_SAMPLE_DAYS))
@@ -239,7 +244,9 @@ function write_reduced_test_file(path, ids; eligible = trues(length(ids)))
                     output,
                     "$(reducer)__$(description.name)",
                     Float64,
-                    ("point", dimension),
+                    ("point", dimension);
+                    deflatelevel,
+                    shuffle = deflatelevel > 0,
                 )[
                     :,
                     :,
@@ -249,7 +256,6 @@ function write_reduced_test_file(path, ids; eligible = trues(length(ids)))
     end
     return path
 end
-
 
 @testset "Pinned CORPSE separates scientific hashes from regenerated metadata" begin
     mktempdir() do root
@@ -620,6 +626,45 @@ const PinnedCORPSEExecutor = TestbedPinnedCORPSEExecutor
                 require_full_population = false,
             )
         end
+    end
+end
+
+@testset "Pinned CORPSE compares compressed reduced shards directly" begin
+    mktempdir() do root
+        mask = trues(80)
+        mask[[51, 80]] .= false
+        reference = write_reduced_test_file(
+            joinpath(root, "reference.nc"),
+            collect(1:80);
+            eligible = mask,
+            deflatelevel = 3,
+        )
+        candidate = write_reduced_test_file(
+            joinpath(root, "candidate.nc"),
+            [11, 33];
+            deflatelevel = 1,
+        )
+        calibration = reduced_test_calibration()
+
+        comparison = PinnedCORPSEExecutor.compare_reduced_historical(
+            candidate,
+            reference,
+            calibration;
+            require_full_population = false,
+        )
+        @test PinnedCORPSEExecutor.reduced_passed(comparison)
+
+        native = PinnedCORPSEExecutor.native_corpse()
+        variable = "annual_mean__$(first(native.REDUCED_STATE_VARIABLES).name)"
+        NCDatasets.NCDataset(candidate, "a") do output
+            output[variable][1, 1] += 1
+        end
+        @test_throws ErrorException PinnedCORPSEExecutor.compare_reduced_historical(
+            candidate,
+            reference,
+            calibration;
+            require_full_population = false,
+        )
     end
 end
 end

@@ -436,10 +436,23 @@ function recompute_budget_extrema!(record)
     return record
 end
 
+function recompute_budget_summary!(record)
+    haskey(record, "all_close") || return record
+    children = Any[]
+    haskey(record, "stage") && append!(children, values(record["stage"]))
+    haskey(record, "workflow") && push!(children, record["workflow"])
+    isempty(children) || (
+        record["all_close"] =
+            all(get(child, "close", false) for child in children)
+    )
+    return record
+end
+
 function recompute_budget_record!(record)
     units = budget_units(record)
     if isnothing(units)
         recompute_budget_extrema!(record)
+        recompute_budget_summary!(record)
         return record
     end
     start = record["start_stock_$units"]
@@ -467,6 +480,18 @@ function recompute_budget_record!(record)
     recompute_budget_extrema!(record)
     record["close"] = abs(residual) <= rtol * scale
     return record
+end
+
+function recompute_budget_comparisons!(result)
+    comparison = get(result, "comparison", nothing)
+    budget = get(result, "budget", nothing)
+    comparison isa AbstractDict && budget isa AbstractDict || return result
+    for (check, element) in
+        ("carbon_budget" => "carbon", "nitrogen_budget" => "nitrogen")
+        haskey(budget, element) || continue
+        comparison[check] = get(budget[element], "all_close", false) === true
+    end
+    return result
 end
 
 function merge_model(shards, scope)
@@ -502,14 +527,14 @@ function merge_model(shards, scope)
     ]
     all(==(first(key_sets)), key_sets) ||
         fail("$model shard reports have incompatible standard fields")
+    shards_passed = all(
+        get(shard.report, "outcome", nothing) == "passed" &&
+            get(shard.model_report, "outcome", nothing) == "passed" for
+        shard in shards
+    )
     result = Dict{String, Any}(
         "name" => model,
-        "outcome" =>
-            all(
-                get(shard.report, "outcome", nothing) == "passed" &&
-                    get(shard.model_report, "outcome", nothing) == "passed"
-                for shard in shards
-            ) ? "passed" : "failed",
+        "outcome" => shards_passed ? "passed" : "failed",
         "reference_mode" => "pinned",
         "seconds" => maximum(
             Float64(get(report, "seconds", 0.0)) for report in model_reports
@@ -560,6 +585,13 @@ function merge_model(shards, scope)
             string(model, '.', key),
         )
     end
+    recompute_budget_comparisons!(result)
+    comparisons = get(result, "comparison", Dict{String, Any}())
+    comparisons_passed =
+        !isempty(comparisons) &&
+        all(value === true for value in values(comparisons))
+    result["outcome"] =
+        shards_passed && comparisons_passed ? "passed" : "failed"
     return result
 end
 

@@ -1361,6 +1361,7 @@ function scientific_outcome(
     result,
     model = "CASA-C";
     fresh_fortran_daily = Dict{String, Any}(),
+    defer_budgets = false,
 )
     initialization =
         get(report, "initialization_comparison", Dict{String, Any}())
@@ -1406,7 +1407,11 @@ function scientific_outcome(
             get(fresh_fortran_annual, "all_match", false) && daily_match
         checks["fresh_fortran_daily"] = daily_match
     end
-    return (; passed = all(values(checks)), checks)
+    deferred = Set(("carbon_budget", "nitrogen_budget"))
+    passed = all(
+        value for (name, value) in checks if !defer_budgets || name ∉ deferred
+    )
+    return (; passed, checks)
 end
 
 function stage_casa(
@@ -1604,6 +1609,7 @@ function run_casa!(
         result,
         model;
         fresh_fortran_daily = fresh_daily,
+        defer_budgets = !isnothing(configuration.shard_index),
     )
     model_report = only(report["model"])
     model_report["coverage"]["compared_cells"] =
