@@ -1270,11 +1270,8 @@ function NonfiniteObserver(
     scope,
 )
     variables = ObservedStateVariable[
-        ObservedStateVariable(
-            component,
-            variable,
-            "$component.$variable",
-        ) for component in propertynames(initial_state) for
+        ObservedStateVariable(component, variable, "$component.$variable")
+        for component in propertynames(initial_state) for
         variable in propertynames(getproperty(initial_state, component))
     ]
     sort!(variables; by = descriptor -> descriptor.name)
@@ -1330,12 +1327,12 @@ function read_nonfinite_evidence(path; model, scope)
     ))
     all(
         Set(keys(record)) == required &&
-        record["evidence_side"] == "julia" &&
-        record["cell_id"] isa Integer &&
-        record["first_nonfinite_step"] isa Integer &&
-        record["first_nonfinite_step"] > 0 &&
-        !isempty(record["first_nonfinite_variable"]) &&
-        tryparse(Dates.Date, record["first_nonfinite_date"]) !== nothing for
+            record["evidence_side"] == "julia" &&
+            record["cell_id"] isa Integer &&
+            record["first_nonfinite_step"] isa Integer &&
+            record["first_nonfinite_step"] > 0 &&
+            !isempty(record["first_nonfinite_variable"]) &&
+            tryparse(Dates.Date, record["first_nonfinite_date"]) !== nothing for
         record in records
     ) || error("Julia CASA nonfinite evidence is malformed")
     allunique(getindex.(records, "cell_id")) ||
@@ -1347,9 +1344,8 @@ end
 
 function observe_values!(observer, stage, step, variable, values)
     data = vec(parent(values))
-    length(data) == length(observer.cell_ids) || error(
-        "Julia nonfinite observer has incompatible $variable values",
-    )
+    length(data) == length(observer.cell_ids) ||
+        error("Julia nonfinite observer has incompatible $variable values")
     added = false
     date = nothing
     for position in eachindex(observer.cell_ids)
@@ -1371,8 +1367,7 @@ function observe_values!(observer, stage, step, variable, values)
                 "first_nonfinite_date" => date,
                 "first_nonfinite_step" => step,
                 "first_nonfinite_variable" => variable,
-                "reason" =>
-                    "native Julia CASA trajectory became nonfinite",
+                "reason" => "native Julia CASA trajectory became nonfinite",
             ),
         )
         observer.seen[position] = true
@@ -1604,8 +1599,8 @@ function run_selected_case(
                 concurrency_budget,
             ),
         carbon_budget,
-        nitrogen_budget = configuration == :carbon_nitrogen ? nitrogen_budget :
-                          nothing,
+        nitrogen_budget = configuration == :carbon_nitrogen ?
+                          nitrogen_budget : nothing,
         workflow_budget,
         prepare_stage! = prepare_selected_stage!,
         restore_passive! = configuration == :carbon_nitrogen ?

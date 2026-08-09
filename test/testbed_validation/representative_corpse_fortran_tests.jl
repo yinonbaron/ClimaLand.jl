@@ -54,7 +54,8 @@ function synthetic_fixture(root)
                     "repository_commit" =>
                         RepresentativeCORPSEFortran.SOURCE_COMMIT,
                 ),
-                "fixture" => Dict(name => record(path) for (name, path) in paths),
+                "fixture" =>
+                    Dict(name => record(path) for (name, path) in paths),
             );
             sorted = true,
         )
@@ -71,19 +72,17 @@ end
             data.fixture,
             data.scope,
             joinpath(root, "run");
-            meteorology_writer = (source, destination; selected_year) -> begin
-                push!(years, selected_year)
-                write(destination, "$selected_year\n")
-            end,
-            grid_writer = (source, destination) -> write(destination, "grid\n"),
+            meteorology_writer = (source, destination; selected_year) ->
+                begin
+                    push!(years, selected_year)
+                    write(destination, "$selected_year\n")
+                end,
+            grid_writer = (source, destination) ->
+                write(destination, "grid\n"),
         )
         workflow = TOML.parsefile(result.workflow_path)
-        @test getindex.(workflow["stage"], "name") == [
-            "prespin",
-            "spin",
-            "spin_continuation",
-            "historical",
-        ]
+        @test getindex.(workflow["stage"], "name") ==
+              ["prespin", "spin", "spin_continuation", "historical"]
         @test getindex.(workflow["stage"], "outputs") .|> length ==
               [11, 9, 9, 231]
         @test years == collect(1901:2014)
@@ -98,25 +97,39 @@ end
         executable = joinpath(root, "fcasacnp")
         write(executable, "fake shared executable")
         calls = Any[]
-        workflow_writer = (fixture, scope, output) -> begin
-            path = joinpath(output, "workflow.toml")
-            write(path, "schema_version = 1\n")
-            (; workflow_path = path, inputs = (; cell_ids = data.cells))
-        end
-        workflow_runner = (exe, workflow, output) -> begin
-            push!(calls, (:run, exe, workflow, output))
-            historical = joinpath(output, "stages", "04-historical")
-            mkpath(historical)
-            [(; status = :ran) for _ in 1:4]
-        end
-        boundary_scanner = (output, cells, observer) -> begin
-            push!(calls, (:boundaries, copy(cells)))
-            observer("prespin", 36500, "1901-12-31", Dict("state" => zeros(80)))
-        end
-        historical_scanner = (output, cells, observer) -> begin
-            push!(calls, (:historical, output, copy(cells)))
-            observer("historical", 1, "1901-01-01", Dict("state" => zeros(80)))
-        end
+        workflow_writer =
+            (fixture, scope, output) -> begin
+                path = joinpath(output, "workflow.toml")
+                write(path, "schema_version = 1\n")
+                (; workflow_path = path, inputs = (; cell_ids = data.cells))
+            end
+        workflow_runner =
+            (exe, workflow, output) -> begin
+                push!(calls, (:run, exe, workflow, output))
+                historical = joinpath(output, "stages", "04-historical")
+                mkpath(historical)
+                [(; status = :ran) for _ in 1:4]
+            end
+        boundary_scanner =
+            (output, cells, observer) -> begin
+                push!(calls, (:boundaries, copy(cells)))
+                observer(
+                    "prespin",
+                    36500,
+                    "1901-12-31",
+                    Dict("state" => zeros(80)),
+                )
+            end
+        historical_scanner =
+            (output, cells, observer) -> begin
+                push!(calls, (:historical, output, copy(cells)))
+                observer(
+                    "historical",
+                    1,
+                    "1901-01-01",
+                    Dict("state" => zeros(80)),
+                )
+            end
         observed = Any[]
         result = RepresentativeCORPSEFortran.run(;
             executable,

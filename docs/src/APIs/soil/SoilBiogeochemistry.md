@@ -31,6 +31,7 @@ ClimaLand.Soil.Biogeochemistry.CORPSE.CORPSESoilModelParameters
 ## Model-specific Types
 
 ```@docs
+ClimaLand.Soil.Biogeochemistry.AbstractNutrientMode
 ClimaLand.Soil.Biogeochemistry.MicrobeProduction
 ClimaLand.Soil.Biogeochemistry.SoilCO2FluxBC
 ClimaLand.Soil.Biogeochemistry.SoilO2FluxBC

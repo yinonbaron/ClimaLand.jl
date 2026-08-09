@@ -940,8 +940,7 @@ function wait_for_completed_year(
 end
 
 function prepare_fresh_annual(reference_path, fresh_path)
-    (ispath(fresh_path) || islink(fresh_path)) &&
-        rm(fresh_path; force = true)
+    (ispath(fresh_path) || islink(fresh_path)) && rm(fresh_path; force = true)
     cp(realpath(reference_path), fresh_path)
     islink(fresh_path) &&
         error("fresh annual reference must not be a symbolic link: $fresh_path")

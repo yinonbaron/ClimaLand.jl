@@ -158,8 +158,7 @@ function calibration_record(
                 "fortran_value" => expected[index],
                 "absolute_error" => errors[index],
                 "relative_error" =>
-                    iszero(references[index]) ?
-                    "undefined_zero_reference" :
+                    iszero(references[index]) ? "undefined_zero_reference" :
                     errors[index] / references[index],
             ),
             Dict(name => values[index] for (name, values) in coordinates),
@@ -213,9 +212,7 @@ function calibration_population(grid, reducer, coordinate)
     repeated_grid = repeat(grid, outer = length(coordinate))
     year_coordinate =
         schema == :fixed_daily ? 1900 .+ cld.(coordinate, 365) : coordinate
-    coordinates = Dict(
-        "year" => repeat(year_coordinate, inner = length(grid)),
-    )
+    coordinates = Dict("year" => repeat(year_coordinate, inner = length(grid)))
     schema == :fixed_daily && merge!(
         coordinates,
         Dict(
@@ -278,10 +275,14 @@ function reduced_calibration(julia_path, fortran_path, scope, grid)
                         expected = Float64.(fortran[variable][eligible, :])
                         size(actual) == size(expected) ||
                             error("$variable reduced shapes differ")
-                        coordinate = reducer == "fixed_daily_sample" ?
-                                     sample_days : years
-                        population =
-                            calibration_population(eligible_grid, reducer, coordinate)
+                        coordinate =
+                            reducer == "fixed_daily_sample" ?
+                            sample_days : years
+                        population = calibration_population(
+                            eligible_grid,
+                            reducer,
+                            coordinate,
+                        )
                         repeated_grid, coordinates, coordinate_schema =
                             population
                         length(repeated_grid) == length(actual) ||

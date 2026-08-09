@@ -66,9 +66,7 @@ function reference_grid(fortran_root, grid)
     by_id = Dict(parse(Int, strip(row.ijcam)) => row for row in rows)
     return map(grid) do point
         row = get(by_id, point.cell_id) do
-            error(
-                "MIMICS-C Fortran grid has no requested cell $(point.cell_id)",
-            )
+            error("MIMICS-C Fortran grid has no requested cell $(point.cell_id)")
         end
         merge(
             point,
@@ -389,7 +387,8 @@ function main(args = ARGS)
         fortran_root,
         output_path,
         ;
-        build_metadata_path = length(args) == 5 ? args[5] : joinpath(
+        build_metadata_path = length(args) == 5 ? args[5] :
+                              joinpath(
             fortran_root,
             "build",
             "build_metadata.toml",

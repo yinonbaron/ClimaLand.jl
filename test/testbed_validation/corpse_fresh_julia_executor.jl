@@ -70,9 +70,13 @@ function nonfinite_values(state, parameters)
     end
     for description in native_corpse().REDUCED_VARIABLES
         parts = native_corpse().reduced_field(description, state, parameters)
-        if any(index -> !isfinite(
-            description.scale * sum(part[index] for part in parts),
-        ), eachindex(first(parts)))
+        if any(
+            index ->
+                !isfinite(
+                    description.scale * sum(part[index] for part in parts),
+                ),
+            eachindex(first(parts)),
+        )
             combined = description.scale .* copy(first(parts))
             for part in parts[2:end]
                 combined .+= description.scale .* part
@@ -127,7 +131,8 @@ function execute(
     )
     setup = selected_corpse().load_complete_setup(collection)
     eligible = native_corpse().eligible_cell.(setup.grid)
-    count(eligible) == 78 || error("Representative CORPSE must have 78 eligible cells")
+    count(eligible) == 78 ||
+        error("Representative CORPSE must have 78 eligible cells")
 
     stoichiometry =
         native_casa().CarbonOnlyPlantStoichiometry(setup.grid, setup.parameters)
@@ -176,7 +181,8 @@ function execute(
         isfile(result.output) && rm(result.output)
         end_totals = selected_corpse().corpse_carbon_totals(result.state)
         workflow_inputs .+= end_totals.original .- start_totals.original
-        workflow_respiration .+= end_totals.cumulative .- start_totals.cumulative
+        workflow_respiration .+=
+            end_totals.cumulative .- start_totals.cumulative
         checkpoint = only(result.checkpoints)
         checkpoint_state, _ =
             ClimaLand.read_checkpoint(checkpoint; model = setup.model)
@@ -187,8 +193,10 @@ function execute(
             selected_corpse().corpse_carbon_totals(current_state),
         )
         conservation = selected_corpse().corpse_conservation(current_state)
-        handoff.verified || error("CORPSE $(stage.name) checkpoint handoff failed")
-        conservation.verified || error("CORPSE $(stage.name) conservation failed")
+        handoff.verified ||
+            error("CORPSE $(stage.name) checkpoint handoff failed")
+        conservation.verified ||
+            error("CORPSE $(stage.name) conservation failed")
         comparison = native_corpse().calibrated_boundary_summary(
             native_corpse().boundary_pairs(
                 current_state,
@@ -209,8 +217,9 @@ function execute(
     end
 
     final_totals = selected_corpse().corpse_carbon_totals(current_state)
-    residual = initial_totals.active .+ workflow_inputs .-
-               workflow_respiration .- final_totals.active
+    residual =
+        initial_totals.active .+ workflow_inputs .- workflow_respiration .-
+        final_totals.active
     maximum_residual = maximum(abs, residual)
     maximum_residual <= 2e-11 ||
         error("CORPSE full-workflow conservation tolerance exceeded")
@@ -225,9 +234,11 @@ function execute(
         reduced_reference,
         calibration,
     )
-    passed = all(
-        Pinned.stage_passed(report["comparison"]) for report in values(stage_reports)
-    ) && Pinned.reduced_passed(reduced_comparison)
+    passed =
+        all(
+            Pinned.stage_passed(report["comparison"]) for
+            report in values(stage_reports)
+        ) && Pinned.reduced_passed(reduced_comparison)
     coverage = Dict(
         "scope_cells" => 80,
         "eligible_cells" => 78,
@@ -251,7 +262,8 @@ function execute(
             "annual_summaries" => reduced_comparison["annual_mean"],
             "end_of_year" => reduced_comparison["end_of_year"],
             "annual_budgets" => reduced_comparison["annual_total"],
-            "fixed_daily_samples" => reduced_comparison["fixed_daily_sample"],
+            "fixed_daily_samples" =>
+                reduced_comparison["fixed_daily_sample"],
         ),
         "calibration" => Dict(
             "id" => calibration["calibration_id"],
@@ -263,7 +275,12 @@ function execute(
     open(report_path, "w") do io
         TOML.print(io, report; sorted = true)
     end
-    return (; passed, report = report_path, seconds = report["seconds"], coverage)
+    return (;
+        passed,
+        report = report_path,
+        seconds = report["seconds"],
+        coverage,
+    )
 end
 
 end

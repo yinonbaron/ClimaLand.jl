@@ -495,7 +495,11 @@ end
         ]) for index in 1:8
     ]
     assigned = [
-        VALIDATION_RUNNER_MODULE.execution_selection(scope, "CASA-C", config).cell_ids for config in shards
+        VALIDATION_RUNNER_MODULE.execution_selection(
+            scope,
+            "CASA-C",
+            config,
+        ).cell_ids for config in shards
     ]
 
     @test all(length(ids) == 10 for ids in assigned)

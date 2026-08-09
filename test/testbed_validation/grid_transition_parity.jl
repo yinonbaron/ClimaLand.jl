@@ -46,10 +46,11 @@ function read_casa_parameters(path)
             leaf_age = turnover[pft][8],
             fine_root_age = turnover[pft][10],
             carbon_nitrogen = Tuple(chemistry[pft][1:3]),
-            plant_carbon_nitrogen_maximum =
-                isnothing(nutrients) ? (NaN, NaN, NaN) : Tuple(
-                    inv(nutrients[pft][index]) for index in (1, 3, 5)
-                ),
+            plant_carbon_nitrogen_maximum = isnothing(nutrients) ?
+                                            (NaN, NaN, NaN) :
+                                            Tuple(
+                inv(nutrients[pft][index]) for index in (1, 3, 5)
+            ),
             nitrogen_fraction_to_litter = Tuple(chemistry[pft][4:6]),
             lignin_leaf = chemistry[pft][7],
             lignin_wood = chemistry[pft][8],
@@ -68,9 +69,9 @@ function read_casa_parameters(path)
             maximum_fine_litter = kinetics[pft][7],
             maximum_cwd = kinetics[pft][8],
             nitrogen_loss_fraction = isnothing(nutrients) ? NaN :
-                                       nutrients[pft][7],
+                                     nutrients[pft][7],
             nitrogen_leach_fraction = isnothing(nutrients) ? NaN :
-                                        10 * nutrients[pft][8] / DAYS_PER_YEAR,
+                                      10 * nutrients[pft][8] / DAYS_PER_YEAR,
         ) for pft in 1:18
     )
 end
@@ -85,12 +86,10 @@ function read_mimics_nitrogen_parameters(path)
         label = strip(fields[2])
         isempty(label) || (values[label] = value)
     end
-    density_label = only(
-        filter(label -> startswith(label, "densDep"), keys(values)),
-    )
+    density_label =
+        only(filter(label -> startswith(label, "densDep"), keys(values)))
     return MIMICS.NitrogenParameters{Float64}(;
-        nitrogen_use_efficiency =
-            Tuple(values["NUE($index)"] for index in 1:4),
+        nitrogen_use_efficiency = Tuple(values["NUE($index)"] for index in 1:4),
         microbial_carbon_nitrogen_ratio = (values["CNr"], values["CNk"]),
         carbon_nitrogen_modifier = values["cnModNum"],
         mineral_nitrogen_available_fraction = values["fracDINavailMIC"],
@@ -580,8 +579,7 @@ function compare_casa_cn_transitions(
                 )
                 litter_inputs = ntuple(
                     index ->
-                        next_litter_nitrogen[index] -
-                        litter_nitrogen[index] +
+                        next_litter_nitrogen[index] - litter_nitrogen[index] +
                         rates.litter[index] * litter_nitrogen[index],
                     3,
                 )
@@ -925,17 +923,17 @@ function mimics_cn_litter_quality(
         parameters.lignin_fine_root
     wood_ratio = parameters.carbon_nitrogen[2] * parameters.lignin_wood
     total_fine_litter =
-        mimics["cLitInput_metb"][day] +
-        mimics["cLitInput_struc"][day] - cwd_to_structural
+        mimics["cLitInput_metb"][day] + mimics["cLitInput_struc"][day] -
+        cwd_to_structural
     root_turnover =
-        casa["cfroot"][previous] /
-        (parameters.fine_root_age * DAYS_PER_YEAR)
+        casa["cfroot"][previous] / (parameters.fine_root_age * DAYS_PER_YEAR)
     leaf_turnover = total_fine_litter - root_turnover
     total = leaf_turnover + root_turnover + cwd_to_structural
     lignin_to_nitrogen = min(
         40.0,
         (
-            leaf_ratio * leaf_turnover + root_ratio * root_turnover +
+            leaf_ratio * leaf_turnover +
+            root_ratio * root_turnover +
             wood_ratio * cwd_to_structural
         ) / max(0.001, total),
     )
@@ -952,8 +950,7 @@ function compare_mimics_cn_transitions(
     maximum_days = 365,
 )
     carbon_parameters = read_mimics_parameters(mimics_parameter_path)
-    nitrogen_parameters =
-        read_mimics_nitrogen_parameters(mimics_parameter_path)
+    nitrogen_parameters = read_mimics_nitrogen_parameters(mimics_parameter_path)
     casa_parameters = read_casa_parameters(casa_parameter_path)
     soils = read_soil_parameters(soil_path)
     isnothing(selections) && (
@@ -994,8 +991,8 @@ function compare_mimics_cn_transitions(
                     mimics_model_parameters(carbon_parameters, pft, soil)
                 mimics = Dict(
                     name =>
-                        read_series(mimics_output, name, selection, days) for
-                    name in (
+                        read_series(mimics_output, name, selection, days)
+                    for name in (
                         carbon_names...,
                         nitrogen_names...,
                         "DIN",
@@ -1012,8 +1009,8 @@ function compare_mimics_cn_transitions(
                     )
                 )
                 casa = Dict(
-                    name => read_series(casa_output, name, selection, days) for
-                    name in (
+                    name => read_series(casa_output, name, selection, days)
+                    for name in (
                         "clitcwd",
                         "cleaf",
                         "cfroot",
@@ -1063,11 +1060,13 @@ function compare_mimics_cn_transitions(
                         soil.clay,
                     )
                     carbon = ntuple(
-                        index -> mimics[carbon_names[index]][day - 1] / 1000,
+                        index ->
+                            mimics[carbon_names[index]][day - 1] / 1000,
                         7,
                     )
                     nitrogen = ntuple(
-                        index -> mimics[nitrogen_names[index]][day - 1] / 1000,
+                        index ->
+                            mimics[nitrogen_names[index]][day - 1] / 1000,
                         7,
                     )
                     carbon_inputs = (
@@ -1081,10 +1080,9 @@ function compare_mimics_cn_transitions(
                     available_fraction =
                         nitrogen_parameters.mineral_nitrogen_available_fraction
                     mineral_nitrogen =
-                        available_fraction * (
-                            casa["nMineral"][day - 1] -
-                            casa["nMinLeach"][day]
-                        ) / 1000
+                        available_fraction *
+                        (casa["nMineral"][day - 1] - casa["nMinLeach"][day]) /
+                        1000
                     mapped = MIMICS.daily_carbon_nitrogen_map(
                         carbon_parameters,
                         nitrogen_parameters,

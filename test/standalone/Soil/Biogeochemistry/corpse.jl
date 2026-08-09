@@ -95,8 +95,7 @@ for FT in (Float32, Float64)
         @test dry.state[8] > cohort[8]
 
         litter_rate = StaticArrays.SVector(FT(1e-8), FT(2e-8), zero(FT))
-        exudate_rate =
-            StaticArrays.SVector(FT(3e-9), zero(FT), zero(FT))
+        exudate_rate = StaticArrays.SVector(FT(3e-9), zero(FT), zero(FT))
         fraction = FT(0.3)
         continuous = @inferred CORPSE.continuous_cohort_tendencies(
             parameters,
@@ -158,8 +157,7 @@ for FT in (Float32, Float64)
         substrate_fraction =
             (one(FT) - parameters.minimum_microbe_fraction) * fraction
         @test direct_input_effect[1:3] ≈
-              litter_rate .* substrate_fraction + exudate_rate rtol =
-            8eps(FT)
+              litter_rate .* substrate_fraction + exudate_rate rtol = 8eps(FT)
         @test direct_input_effect[4:6] == zero(litter_rate)
         @test direct_input_effect[7] ≈
               sum(litter_rate) * parameters.minimum_microbe_fraction * fraction rtol =
@@ -383,15 +381,15 @@ end
         CTS.step!(continuous_integrator)
         continuous_actual =
             map(ClimaLand.prognostic_vars(continuous_model)) do variable
-            Array(
-                parent(
-                    getproperty(
-                        continuous_integrator.u.corpse_soil,
-                        variable,
+                Array(
+                    parent(
+                        getproperty(
+                            continuous_integrator.u.corpse_soil,
+                            variable,
+                        ),
                     ),
-                ),
-            )[1]
-        end
+                )[1]
+            end
         continuous_expected = initial .+ hour .* continuous_fluxes[1:37]
         @test all(
             isapprox.(continuous_actual, continuous_expected; rtol = 32eps(FT)),
@@ -526,11 +524,8 @@ end
         initial_parts...,
         drivers...,
     )
-    legacy_fluxes = CORPSE.combined_carbon_fluxes(
-        parameters,
-        initial_parts...,
-        drivers...,
-    )
+    legacy_fluxes =
+        CORPSE.combined_carbon_fluxes(parameters, initial_parts..., drivers...)
     legacy_day = initial + FT(86400) * legacy_fluxes[1:37]
 
     function integrate_continuous_day(dt)
@@ -587,8 +582,9 @@ end
     )
     finest = solutions[end]
     relative_legacy_distance =
-        sum(abs(finest[index] - legacy_day[index]) for index in physical_indices) /
-        sum(abs(legacy_day[index]) for index in physical_indices)
+        sum(
+            abs(finest[index] - legacy_day[index]) for index in physical_indices
+        ) / sum(abs(legacy_day[index]) for index in physical_indices)
     @test relative_legacy_distance < 2e-5
     @test relative_legacy_distance > 1e-6
 end

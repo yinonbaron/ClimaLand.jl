@@ -164,8 +164,9 @@ function validate_gaps(gaps, cell_ids)
         get(gap, "model", nothing) == "MIMICS-CN" ||
             error("MIMICS-CN Eligibility Gap has the wrong model")
         cell_id = get(gap, "cell_id", nothing)
-        cell_id in cell_ids ||
-            error("MIMICS-CN Eligibility Gap is outside the supplied collection")
+        cell_id in cell_ids || error(
+            "MIMICS-CN Eligibility Gap is outside the supplied collection",
+        )
         get(gap, "reviewed", false) === true &&
             !isempty(strip(String(get(gap, "reason", "")))) ||
             error("MIMICS-CN Eligibility Gap is not reviewed")
@@ -214,8 +215,9 @@ function workflow_reference(
         error("Pinned MIMICS-CN oracle scope does not match the collection")
     cell_ids = Int.(get(reference, "cell_ids", Int[]))
     supplied_ids = Int.(getproperty.(collection.cells, :id))
-    cell_ids == supplied_ids ||
-        error("Pinned MIMICS-CN oracle cell IDs do not exactly match the supplied collection")
+    cell_ids == supplied_ids || error(
+        "Pinned MIMICS-CN oracle cell IDs do not exactly match the supplied collection",
+    )
     gap_ids = validate_gaps(eligibility_gaps, cell_ids)
     eligible_ids = filter(id -> id ∉ gap_ids, cell_ids)
     positions = findall(id -> id ∉ gap_ids, cell_ids)
@@ -281,24 +283,18 @@ function workflow_reference(
     budget = oracle["budget"]
     get(budget, "units", nothing) ==
     Dict("carbon" => "kg C", "nitrogen" => "kg N") &&
-        get(budget, "reducer", nothing) ==
-        "maximum_absolute_residual" || error(
-        "Pinned MIMICS-CN oracle has an incompatible budget reducer",
-    )
-    carbon_residual =
-        get(budget, "maximum_absolute_residual_kg_c", nothing)
-    nitrogen_residual =
-        get(budget, "maximum_absolute_residual_kg_n", nothing)
+        get(budget, "reducer", nothing) == "maximum_absolute_residual" ||
+        error("Pinned MIMICS-CN oracle has an incompatible budget reducer")
+    carbon_residual = get(budget, "maximum_absolute_residual_kg_c", nothing)
+    nitrogen_residual = get(budget, "maximum_absolute_residual_kg_n", nothing)
     all(
         value -> value isa Real && isfinite(value) && value >= 0,
         (carbon_residual, nitrogen_residual),
     ) || error("Pinned MIMICS-CN oracle has an invalid budget residual")
     validate_values(
         Dict(
-            "historical_residual_kg_c" =>
-                budget["historical_residual_kg_c"],
-            "historical_residual_kg_n" =>
-                budget["historical_residual_kg_n"],
+            "historical_residual_kg_c" => budget["historical_residual_kg_c"],
+            "historical_residual_kg_n" => budget["historical_residual_kg_n"],
         ),
         ("historical_residual_kg_c", "historical_residual_kg_n"),
         1,
@@ -334,7 +330,9 @@ function compare_payload(
     concurrency_budget = getfield(
         parentmodule(@__MODULE__),
         :TestbedReferenceCellComparisons,
-    ).ConcurrencyBudget(1),
+    ).ConcurrencyBudget(
+        1,
+    ),
 )
     indices =
         reference_indices isa AbstractDict ? (; by_id = reference_indices) :
@@ -448,11 +446,8 @@ function update_forcing!(forcing::PackedMIMICSForcing, stage, index, time)
     day == 1 || return nothing
     tracker = forcing.annual_npp_tracker
     annual_npp = vec(parent(forcing.buffers.annual_npp))
-    forced = view(
-        forcing.forced_annual_npp,
-        :,
-        year - first(HISTORICAL_YEARS) + 1,
-    )
+    forced =
+        view(forcing.forced_annual_npp, :, year - first(HISTORICAL_YEARS) + 1)
     if tracker.active_stage != stage.name
         tracker.active_stage = stage.name
         annual_npp .= forced
@@ -468,23 +463,18 @@ function update_forcing!(forcing::PackedMIMICSForcing, stage, index, time)
 end
 
 function load_setup(; collection)
-    cells = getfield(
-        parentmodule(@__MODULE__),
-        :TestbedReferenceCellComparisons,
-    )
+    cells =
+        getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
     return cells.with_fixture(collection) do fixture
-        grid = selected_casa.selected_grid(
-            fixture.files["grid"],
-            fixture.cell_ids,
-        )
+        grid =
+            selected_casa.selected_grid(fixture.files["grid"], fixture.cell_ids)
         soils = native_mimics.native_casa().read_soils(fixture.files["soil"])
         domain = native_mimics.native_casa().gridded_domain(length(grid))
         buffers = native_mimics.native_mimics().MIMICSBuffers(domain)
-        nitrogen_deposition =
-            native_mimics.native_casa().scalar_field(
-                domain,
-                zeros(length(grid)),
-            )
+        nitrogen_deposition = native_mimics.native_casa().scalar_field(
+            domain,
+            zeros(length(grid)),
+        )
         prespin = native_mimics.build_gridded_model(
             grid,
             soils,
@@ -576,10 +566,7 @@ function compare_historical_reference(
         Dict(
             name => vec(
                 Array(
-                    output[replace(name, "." => "__")][
-                        :,
-                        daily["sample_days"],
-                    ],
+                    output[replace(name, "." => "__")][:, daily["sample_days"]],
                 ),
             ) for name in DAILY_NAMES
         )
@@ -621,11 +608,9 @@ function compare_historical_reference(
         concurrency_budget,
     )
     return Dict(
-        "output" => Dict(
-            "records" => NCDatasets.NCDataset(path) do output
-                size(output["time"], 1)
-            end,
-        ),
+        "output" => Dict("records" => NCDatasets.NCDataset(path) do output
+            size(output["time"], 1)
+        end),
         "reference" => reference.path,
         "provenance" => reference.provenance,
         "fixed_daily_samples" => daily_report,
@@ -646,22 +631,17 @@ function historical_budget_values(boundaries, path, grid)
     nitrogen_stop = zeros(cell_count)
     for name in BOUNDARY_NAMES
         destination_start, destination_stop =
-            occursin(".n_", name) ?
-            (nitrogen_start, nitrogen_stop) :
+            occursin(".n_", name) ? (nitrogen_start, nitrogen_stop) :
             (carbon_start, carbon_stop)
         destination_start .+= boundaries["spin_continuation"][name]
         destination_stop .+= boundaries["historical"][name]
     end
     npp, respiration, n_input, n_output = NCDatasets.NCDataset(path) do output
         (
+            vec(sum(output["diagnostic__cnpp"][:, :]; dims = 2)) .*
+            native_mimics.DAY_SECONDS,
             vec(
-                sum(output["diagnostic__cnpp"][:, :]; dims = 2),
-            ) .* native_mimics.DAY_SECONDS,
-            vec(
-                sum(
-                    output["diagnostic__mimics_respiration"][:, :];
-                    dims = 2,
-                ),
+                sum(output["diagnostic__mimics_respiration"][:, :]; dims = 2),
             ) .* native_mimics.DAY_SECONDS,
             vec(
                 sum(
@@ -753,9 +733,8 @@ function stage_provenance(setup, stage)
                 MIMICS_PARAMETERS,
             ),
             "casa_source" => abspath(casa_path),
-            "casa_sha256" => native_mimics.native_workflow().sha256sum(
-                casa_path,
-            ),
+            "casa_sha256" =>
+                native_mimics.native_workflow().sha256sum(casa_path),
         ),
         "forcing" => [
             Dict(
@@ -776,17 +755,14 @@ function annotate_report!(
     eligibility_gaps,
 )
     report = TOML.parsefile(path)
-    for (name, units, suffix) in (
-        ("carbon_budget", "kg C", "kg_c"),
-        ("nitrogen_budget", "kg N", "kg_n"),
-    )
+    for (name, units, suffix) in
+        (("carbon_budget", "kg C", "kg_c"), ("nitrogen_budget", "kg N", "kg_n"))
         budget = report[name]
         stage_budgets = collect(values(budget["stage"]))
         budget["units"] = units
         budget["reducer"] = "maximum_absolute_residual"
-        budget["maximum_absolute_residual_$suffix"] = maximum(
-            abs(values["residual_$suffix"]) for values in stage_budgets
-        )
+        budget["maximum_absolute_residual_$suffix"] =
+            maximum(abs(values["residual_$suffix"]) for values in stage_budgets)
     end
     report["coverage"] = Dict(
         "scope_cell_ids" => getproperty.(scope_collection.cells, :id),
@@ -809,7 +785,9 @@ function run_selected_case(
     concurrency_budget = getfield(
         parentmodule(@__MODULE__),
         :TestbedReferenceCellComparisons,
-    ).ConcurrencyBudget(1),
+    ).ConcurrencyBudget(
+        1,
+    ),
     stages = (
         native_mimics.native_workflow().NativeStage(
             :prespin,
@@ -829,11 +807,7 @@ function run_selected_case(
             499;
             write_output = false,
         ),
-        native_mimics.native_workflow().NativeStage(
-            :historical,
-            114 * 365,
-            1,
-        ),
+        native_mimics.native_workflow().NativeStage(:historical, 114 * 365, 1),
     ),
     budget_rtol = 5e-12,
     compare_references = true,
@@ -857,10 +831,8 @@ function run_selected_case(
     else
         nothing
     end
-    cells = getfield(
-        parentmodule(@__MODULE__),
-        :TestbedReferenceCellComparisons,
-    )
+    cells =
+        getfield(parentmodule(@__MODULE__), :TestbedReferenceCellComparisons)
     scope_collection =
         isnothing(execution_cell_ids) ? collection :
         cells.subset(collection, execution_cell_ids)
@@ -900,10 +872,7 @@ function run_selected_case(
         update_forcing!(setup.forcing, stage, index, time)
     end
     function after_step!(stage, step, Y, p, _)
-        native_mimics.native_mimics().accumulate_annual_npp!(
-            annual_npp,
-            p,
-        )
+        native_mimics.native_mimics().accumulate_annual_npp!(annual_npp, p)
         native_mimics.accumulate_budget!(budget, stage, p)
         step == 1 && native_mimics.restore_plant_stoichiometry!(
             model_for_stage(stage),
@@ -948,14 +917,13 @@ function run_selected_case(
             historical_budget_values(boundary_snapshots, path, setup.grid)
         return isnothing(reference) ?
                Dict(
-            "output" => Dict(
-                "records" => NCDatasets.NCDataset(path) do output
-                    size(output["time"], 1)
-                end,
-            ),
+            "output" => Dict("records" => NCDatasets.NCDataset(path) do output
+                size(output["time"], 1)
+            end),
             "budget" => model_budget,
             "skipped" => "reference comparison disabled",
-        ) : compare_historical_reference(
+        ) :
+               compare_historical_reference(
             reference,
             path,
             model_budget,

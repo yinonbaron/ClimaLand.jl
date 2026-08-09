@@ -78,7 +78,7 @@ function expected_gaps(scope, model, cells)
     return [
         deepcopy(gap) for
         gap in scope.gaps if get(gap, "model", nothing) == model &&
-            get(gap, "cell_id", nothing) in cells
+        get(gap, "cell_id", nothing) in cells
     ]
 end
 
@@ -131,9 +131,9 @@ function validate_passive_evidence(passive, model, index, cell_count)
         fail("$model shard $index lacks passive-restoration evidence")
     multiplier = get(passive, "multiplier", nothing)
     multiplier isa Real &&
-    !(multiplier isa Bool) &&
-    isfinite(multiplier) &&
-    multiplier > 0 ||
+        !(multiplier isa Bool) &&
+        isfinite(multiplier) &&
+        multiplier > 0 ||
         fail("$model shard $index has an invalid passive multiplier")
     all(
         get(passive, key, nothing) === true for key in
@@ -147,11 +147,11 @@ function validate_passive_evidence(passive, model, index, cell_count)
         before = get(record, "before", nothing)
         after = get(record, "after", nothing)
         before isa AbstractVector &&
-        after isa AbstractVector &&
-        length(before) == cell_count &&
-        length(after) == cell_count &&
-        all(value -> value isa Real && isfinite(value), before) &&
-        all(value -> value isa Real && isfinite(value), after) ||
+            after isa AbstractVector &&
+            length(before) == cell_count &&
+            length(after) == cell_count &&
+            all(value -> value isa Real && isfinite(value), before) &&
+            all(value -> value isa Real && isfinite(value), after) ||
             fail("$model shard $index has invalid passive $element vectors")
         after == multiplier .* before ||
             fail("$model shard $index has inconsistent passive $element values")
@@ -238,8 +238,8 @@ function validate_shard_evidence(model_report, model, index, assigned)
     if model == "CORPSE"
         stages = get(evidence, "stage", nothing)
         stages isa AbstractDict &&
-        Set(String.(keys(stages))) ==
-        Set(("prespin", "spin", "spin_continuation", "historical")) ||
+            Set(String.(keys(stages))) ==
+            Set(("prespin", "spin", "spin_continuation", "historical")) ||
             fail("CORPSE shard $index has incomplete stage evidence")
         expected = Set((
             "checkpoint_sha256",
@@ -276,7 +276,8 @@ end
 function validate_report(report, scope, expected_models, shard_count)
     report isa AbstractDict || fail("shard report is not a TOML table")
     valid_integer(get(report, "schema_version", nothing)) &&
-    report["schema_version"] == 1 || fail("shard report schema is incompatible")
+        report["schema_version"] == 1 ||
+        fail("shard report schema is incompatible")
     get(report, "comparison_schema", nothing) == COMPARISON_SCHEMA ||
         fail("shard report comparison schema is incompatible")
     get(report, "reference_mode", nothing) == "pinned" ||
@@ -462,9 +463,9 @@ function recompute_budget_record!(record)
     adjustment_keys = filter(
         key ->
             occursin("_adjustment_", key) &&
-            !startswith(key, "bounded_state_adjustment_") &&
-            !startswith(key, "restart_") &&
-            !startswith(key, "passive_"),
+                !startswith(key, "bounded_state_adjustment_") &&
+                !startswith(key, "restart_") &&
+                !startswith(key, "passive_"),
         collect(keys(record)),
     )
     adjustment =
@@ -529,7 +530,7 @@ function merge_model(shards, scope)
         fail("$model shard reports have incompatible standard fields")
     shards_passed = all(
         get(shard.report, "outcome", nothing) == "passed" &&
-            get(shard.model_report, "outcome", nothing) == "passed" for
+        get(shard.model_report, "outcome", nothing) == "passed" for
         shard in shards
     )
     result = Dict{String, Any}(
@@ -653,7 +654,7 @@ function aggregate_shard_reports(
         all(
             artifact ->
                 artifact isa AbstractString &&
-                occursin(r"^[0-9a-f]{40}$", artifact),
+                    occursin(r"^[0-9a-f]{40}$", artifact),
             forcing_artifacts,
         ) || fail("model reports lack a shared forcing artifact identity")
         all(==(first(forcing_artifacts)), forcing_artifacts) ||

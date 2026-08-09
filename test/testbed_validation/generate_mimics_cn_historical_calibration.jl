@@ -27,30 +27,19 @@ sha256sum(path) =
 function units(reducer, name)
     state = name in Workflow.ANNUAL_STATE_NAMES
     element = name in Workflow.NITROGEN_NAMES ? "N" : "C"
-    reducer == "annual_total" &&
-        return "kg $element m^-2 year^-1"
-    reducer == "daily" && !state &&
-        return "kg $element m^-2 s^-1"
+    reducer == "annual_total" && return "kg $element m^-2 year^-1"
+    reducer == "daily" && !state && return "kg $element m^-2 s^-1"
     return "kg $element m^-2"
 end
 
 function comparison_semantics(section, name)
-    section == "budget" &&
-        return ("zero_centered_conservation_residual", false)
-    name in (
-        "diagnostic.mimics_overflow_r",
-        "diagnostic.mimics_overflow_k",
-    ) && return ("nonnegative_guard_residual", false)
+    section == "budget" && return ("zero_centered_conservation_residual", false)
+    name in ("diagnostic.mimics_overflow_r", "diagnostic.mimics_overflow_k") &&
+        return ("nonnegative_guard_residual", false)
     return ("mixed_absolute_relative", true)
 end
 
-function absolute_policy!(
-    record,
-    actual,
-    expected,
-    observations,
-    semantics,
-)
+function absolute_policy!(record, actual, expected, observations, semantics)
     actual_values = Float64.(actual)
     expected_values = Float64.(expected)
     errors = abs.(actual_values .- expected_values)
@@ -62,15 +51,10 @@ function absolute_policy!(
             floatmin(Float64),
         )
     atol = Calibration.SAFETY_FACTOR * raw_atol + float_padding
-    active_tolerance =
-        256eps(Float64) * max(abs(raw_atol), floatmin(Float64))
+    active_tolerance = 256eps(Float64) * max(abs(raw_atol), floatmin(Float64))
     active = findall(
-        error -> isapprox(
-            error,
-            raw_atol;
-            atol = active_tolerance,
-            rtol = 0,
-        ),
+        error ->
+            isapprox(error, raw_atol; atol = active_tolerance, rtol = 0),
         errors,
     )
     record["comparison_semantics"] = semantics
@@ -102,21 +86,10 @@ function calibration_record(
     observations,
 )
     semantics, relative = comparison_semantics(section, name)
-    record = Calibration.calibration_record(
-        actual,
-        expected;
-        units,
-        observations,
-    )
-    relative &&
-        return merge!(record, Dict("comparison_semantics" => semantics))
-    return absolute_policy!(
-        record,
-        actual,
-        expected,
-        observations,
-        semantics,
-    )
+    record =
+        Calibration.calibration_record(actual, expected; units, observations)
+    relative && return merge!(record, Dict("comparison_semantics" => semantics))
+    return absolute_policy!(record, actual, expected, observations, semantics)
 end
 
 function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
@@ -125,10 +98,7 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
         year in Workflow.HISTORICAL_YEARS for cell_id in cell_ids
     ]
     annual_actual = NCDatasets.NCDataset(output_path) do output
-        Workflow.selected_casa.reduced_annual_values(
-            output,
-            oracle["annual"],
-        )
+        Workflow.selected_casa.reduced_annual_values(output, oracle["annual"])
     end
     annual = Dict(
         reducer => Dict(
@@ -140,8 +110,7 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
                 units = units(reducer, name),
                 observations = annual_observations,
             ) for (name, expected) in variables
-        ) for (reducer, variables) in
-        (
+        ) for (reducer, variables) in (
             reducer => oracle["annual"][reducer] for
             reducer in ("annual_mean", "end_of_year", "annual_total")
         )
@@ -151,8 +120,7 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
         (;
             cell_id,
             sample_day,
-            year = first(Workflow.HISTORICAL_YEARS) +
-                   (sample_day - 1) ÷ 365,
+            year = first(Workflow.HISTORICAL_YEARS) + (sample_day - 1) ÷ 365,
             day_of_year = mod1(sample_day, 365),
             get(coordinates, cell_id, (;))...,
         ) for sample_day in sample_days for cell_id in cell_ids
@@ -160,9 +128,7 @@ function historical_values(output_path, oracle, cell_ids; coordinates = Dict())
     daily_actual = NCDatasets.NCDataset(output_path) do output
         Dict(
             name => vec(
-                Array(
-                    output[replace(name, "." => "__")][:, sample_days],
-                ),
+                Array(output[replace(name, "." => "__")][:, sample_days]),
             ) for name in Workflow.DAILY_NAMES
         )
     end
@@ -208,24 +174,21 @@ function write_calibration(output_path, report_path, oracle_path, path)
                 merge((; cell_id), get(coordinates, cell_id, (;))) for
                 cell_id in cell_ids
             ],
-        ) for name in
-        ("historical_residual_kg_c", "historical_residual_kg_n")
+        ) for
+        name in ("historical_residual_kg_c", "historical_residual_kg_n")
     )
     all(
-        record["finite_pair_count"] == 80 * 114 for
-        reducer in values(annual) for record in values(reducer)
+        record["finite_pair_count"] == 80 * 114 for reducer in values(annual)
+        for record in values(reducer)
     ) || error("historical annual calibration population is incomplete")
-    all(
-        record["finite_pair_count"] == 80 * 84 for
-        record in values(daily)
-    ) || error("historical daily calibration population is incomplete")
+    all(record["finite_pair_count"] == 80 * 84 for record in values(daily)) ||
+        error("historical daily calibration population is incomplete")
     all(record["finite_pair_count"] == 80 for record in values(budget)) ||
         error("historical budget calibration population is incomplete")
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
     document = Dict(
         "schema_version" => 1,
-        "calibration_id" =>
-            "mimics-cn-current-julia-fresh-fortran-representative-history-v1",
+        "calibration_id" => "mimics-cn-current-julia-fresh-fortran-representative-history-v1",
         "model" => "MIMICS-CN",
         "scope" => reference["scope"],
         "cell_ids" => cell_ids,
@@ -234,12 +197,9 @@ function write_calibration(output_path, report_path, oracle_path, path)
             "error" => "e_i = abs(Julia_i - Fortran_i)",
             "reference_magnitude" => "x_i = abs(Fortran_i)",
             "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
-            "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for zero-centered conservation residuals and nonnegative overflow guard residuals whose near-zero reference does not define a multiplicative scale",
-            "safety_margin" =>
-                "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
-            "nonfinite" =>
-                "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
+            "selection" => "choose the smallest r >= 0 minimizing a(r) + r*mean(x); use r = 0 for zero-centered conservation residuals and nonnegative overflow guard residuals whose near-zero reference does not define a multiplicative scale",
+            "safety_margin" => "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
+            "nonfinite" => "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
         ),
         "source_provenance" => Dict(
             "git_revision_basis" =>
@@ -273,9 +233,8 @@ function write_calibration(output_path, report_path, oracle_path, path)
                     reference["provenance"]["fortran_source_revision"],
                 "scope_manifest_sha256" =>
                     reference["provenance"]["scope_manifest_sha256"],
-                "fresh_historical_source_sha256" => reference["provenance"][
-                    "fresh_historical_source_sha256"
-                ],
+                "fresh_historical_source_sha256" =>
+                    reference["provenance"]["fresh_historical_source_sha256"],
             ),
         ),
         "annual" => annual,

@@ -87,8 +87,7 @@ end
         litter = calibration["reducer"][reducer]["LitterLayer_CO2"]
         @test litter["derived_policy"]["rtol"] < 1e-3
         @test maximum(
-            abs(outlier["julia_value"]) for
-            outlier in litter["top_outlier"]
+            abs(outlier["julia_value"]) for outlier in litter["top_outlier"]
         ) > 0
     end
     mktempdir() do directory
@@ -99,8 +98,7 @@ end
             end
             return path
         end
-        for source in
-            ("runner_source", "calibration_source", "scope_manifest")
+        for source in ("runner_source", "calibration_source", "scope_manifest")
             stale = deepcopy(calibration)
             stale["provenance"][source]["sha256"] = repeat("0", 64)
             @test_throws ErrorException NativeCORPSE.calibration_policy(
@@ -113,9 +111,8 @@ end
             write_policy("wrong_method", wrong_method),
         )
         floored = deepcopy(calibration)
-        floored["reducer"]["annual_total"]["LitterLayer_CO2"][
-            "derived_policy"
-        ]["absolute_floor"] = 1e-6
+        floored["reducer"]["annual_total"]["LitterLayer_CO2"]["derived_policy"]["absolute_floor"] =
+            1e-6
         @test_throws ErrorException NativeCORPSE.calibration_policy(
             write_policy("scientific_floor", floored),
         )
@@ -167,15 +164,10 @@ end
             NativeCORPSE.REDUCED_FLUX_VARIABLES,
         ),
     )
-    respiration_fluxes = [
-        ntuple(
-            index -> index == 38 ? 10.0 : index in (9, 18) ? 2.0 : 0.0,
-            39,
-        ),
-    ]
-    respiration_state = ConstantCORPSEState(
-        ConstantCORPSEFields([0.0], respiration_fluxes),
-    )
+    respiration_fluxes =
+        [ntuple(index -> index == 38 ? 10.0 : index in (9, 18) ? 2.0 : 0.0, 39)]
+    respiration_state =
+        ConstantCORPSEState(ConstantCORPSEFields([0.0], respiration_fluxes))
     @test only(
         NativeCORPSE.reduced_field(
             litter_respiration,
@@ -325,9 +317,7 @@ end
             [1901, 1902],
         )
     @test getproperty.(annual_grid, :cell_id) == [1, 2, 1, 2]
-    @test annual_coordinates == Dict(
-        "year" => [1901, 1901, 1902, 1902],
-    )
+    @test annual_coordinates == Dict("year" => [1901, 1901, 1902, 1902])
     @test annual_schema == :annual
     daily_grid, daily_coordinates, daily_schema =
         CORPSECalibration.calibration_population(
@@ -369,7 +359,8 @@ end
             mkpath(stage_root)
             paths = Dict(
                 "casa_boundary" => joinpath(stage_root, "casa_final.csv"),
-                "corpse_boundary" => joinpath(stage_root, "corpse_final.csv"),
+                "corpse_boundary" =>
+                    joinpath(stage_root, "corpse_final.csv"),
                 "metadata" => joinpath(stage_root, "stage_metadata.toml"),
             )
             foreach(path -> write(path, stage_name), values(paths))
@@ -382,8 +373,10 @@ end
         end
         boundary_calibration = Dict(
             "provenance" => Dict(
-                "fortran_reconstruction_report" =>
-                    record(report, "fortran/reconstruction_report.toml"),
+                "fortran_reconstruction_report" => record(
+                    report,
+                    "fortran/reconstruction_report.toml",
+                ),
                 "fortran_stage" => stage_records,
             ),
         )

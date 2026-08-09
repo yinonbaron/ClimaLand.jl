@@ -449,18 +449,12 @@ end
     )
     annual = Dict(
         "years" => [1901, 1902],
-        "annual_mean" => Dict(
-            "casa_soil.c_soil_slow" => [1.0, 2.0, Inf, 1.0, 2.0, Inf],
-        ),
+        "annual_mean" =>
+            Dict("casa_soil.c_soil_slow" => [1.0, 2.0, Inf, 1.0, 2.0, Inf]),
         "annual_total" => Dict("diagnostic.cgpp" => ones(6)),
     )
 
-    records = first_fortran_nonfinites(
-        boundaries,
-        annual,
-        daily,
-        cell_ids,
-    )
+    records = first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
 
     @test getindex.(records, "cell_id") == cell_ids
     @test getindex.(records, "first_nonfinite_stage") ==
@@ -500,13 +494,11 @@ end
                 "forcing" => Dict(
                     "filename" => basename(fixture_file),
                     "bytes" => filesize(fixture_file),
-                    "sha256" =>
-                        TestbedNativeWorkflow.sha256sum(fixture_file),
+                    "sha256" => TestbedNativeWorkflow.sha256sum(fixture_file),
                 ),
             ),
             "cell" => [
-                Dict("id" => id, "pft" => 1, "reasons" => ["synthetic"]) for
-                id in 1:80
+                Dict("id" => id, "pft" => 1, "reasons" => ["synthetic"]) for id in 1:80
             ],
         )
         open(fixture_path, "w") do io
@@ -589,12 +581,11 @@ end
             reference_template;
             build_metadata_path,
             oracle_path = joinpath(directory, "oracle-blocked.toml"),
-            reference_builder = (args...; kwargs...) -> (
-                oracle_path = nothing,
-                nonfinite_records = nonfinite,
+            reference_builder = (args...; kwargs...) ->
+                (oracle_path = nothing, nonfinite_records = nonfinite),
+            julia_runner = (args...; kwargs...) -> error(
+                "Julia must not run after Fortran nonfinite evidence",
             ),
-            julia_runner = (args...; kwargs...) ->
-                error("Julia must not run after Fortran nonfinite evidence"),
         )
         @test blocked.nonfinite_records == nonfinite
         @test isnothing(blocked.oracle_path)
@@ -609,8 +600,7 @@ end
                 "first_nonfinite_date" => "1901-01-02",
                 "first_nonfinite_step" => 2,
                 "first_nonfinite_variable" => "casa_plant.c_leaf",
-                "reason" =>
-                    "native Julia CASA trajectory became nonfinite",
+                "reason" => "native Julia CASA trajectory became nonfinite",
             ),
         ]
         throwing_runner = function (output_root; nonfinite_path, kwargs...)
@@ -686,12 +676,7 @@ end
             casa_plant = (c_leaf = [1.0, 2.0, 3.0],),
             casa_soil = (c_soil_slow = [4.0, 5.0, 6.0],),
         )
-        diagnostics = (
-            (
-                name = "diagnostic__cgpp",
-                compute = (_, p) -> p.gpp,
-            ),
-        )
+        diagnostics = ((name = "diagnostic__cgpp", compute = (_, p) -> p.gpp),)
         path = joinpath(directory, "nonfinite_results.toml")
         observer = TestbedSelectedCASAWorkflow.NonfiniteObserver(
             [101, 202, 303],
@@ -716,11 +701,8 @@ end
         @test getindex.(records, "first_nonfinite_date") ==
               ["1901-01-03", "1901-01-02", "1901-01-02"]
         @test getindex.(records, "first_nonfinite_step") == [3, 2, 2]
-        @test getindex.(records, "first_nonfinite_variable") == [
-            "casa_soil.c_soil_slow",
-            "casa_plant.c_leaf",
-            "diagnostic.cgpp",
-        ]
+        @test getindex.(records, "first_nonfinite_variable") ==
+              ["casa_soil.c_soil_slow", "casa_plant.c_leaf", "diagnostic.cgpp"]
         @test isfile(path)
         document = TOML.parsefile(path)
         @test document["schema_version"] == 1

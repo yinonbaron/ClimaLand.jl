@@ -20,8 +20,7 @@ function mimics_cn_test_collection(ids = [11, 22])
                 id,
                 index,
                 ["test cell $id"],
-            ) for
-            (index, id) in enumerate(ids)
+            ) for (index, id) in enumerate(ids)
         ],
         Dict{String, Any}(),
         Dict{String, String}(),
@@ -37,20 +36,13 @@ function mimics_cn_test_policy()
             stage in SelectedMIMICSCN.STAGE_NAMES
         ),
         "fresh_fortran_annual" => Dict(
-            "annual_mean" =>
-                tolerance(SelectedMIMICSCN.ANNUAL_STATE_NAMES),
-            "end_of_year" =>
-                tolerance(SelectedMIMICSCN.ANNUAL_STATE_NAMES),
-            "annual_total" =>
-                tolerance(SelectedMIMICSCN.ANNUAL_FLUX_NAMES),
+            "annual_mean" => tolerance(SelectedMIMICSCN.ANNUAL_STATE_NAMES),
+            "end_of_year" => tolerance(SelectedMIMICSCN.ANNUAL_STATE_NAMES),
+            "annual_total" => tolerance(SelectedMIMICSCN.ANNUAL_FLUX_NAMES),
         ),
-        "fresh_fortran_daily" =>
-            tolerance(SelectedMIMICSCN.DAILY_NAMES),
+        "fresh_fortran_daily" => tolerance(SelectedMIMICSCN.DAILY_NAMES),
         "fresh_fortran_budget" =>
-            tolerance((
-                "historical_residual_kg_c",
-                "historical_residual_kg_n",
-            )),
+            tolerance(("historical_residual_kg_c", "historical_residual_kg_n")),
     )
 end
 
@@ -109,10 +101,7 @@ function write_mimics_cn_test_reference(callback, reference)
 end
 
 @testset "MIMICS-CN calibration has no scientific absolute floor" begin
-    zero = MIMICSCNCalibration.calibrated_envelope(
-        zeros(3),
-        zeros(3),
-    )
+    zero = MIMICSCNCalibration.calibrated_envelope(zeros(3), zeros(3))
     @test zero.raw_atol == 0.0
     @test zero.raw_rtol == 0.0
     @test zero.atol == zero.float_padding
@@ -133,10 +122,7 @@ end
     )
     @test fitted.raw_atol >= 0
     @test fitted.raw_rtol >= 0
-    @test all(
-        fitted.errors .<=
-        fitted.atol .+ fitted.rtol .* fitted.references,
-    )
+    @test all(fitted.errors .<= fitted.atol .+ fitted.rtol .* fitted.references)
     @test_throws ErrorException MIMICSCNCalibration.calibrated_envelope(
         [1.0, Inf],
         [1.0, 2.0],
@@ -145,14 +131,10 @@ end
 
 @testset "MIMICS-CN guard residuals use absolute comparison semantics" begin
     for section in ("daily", "annual_total")
-        for name in (
-            "diagnostic.mimics_overflow_r",
-            "diagnostic.mimics_overflow_k",
-        )
-            @test HistoricalCalibration.comparison_semantics(
-                section,
-                name,
-            ) == ("nonnegative_guard_residual", false)
+        for name in
+            ("diagnostic.mimics_overflow_r", "diagnostic.mimics_overflow_k")
+            @test HistoricalCalibration.comparison_semantics(section, name) ==
+                  ("nonnegative_guard_residual", false)
         end
     end
     @test HistoricalCalibration.comparison_semantics(
@@ -174,8 +156,7 @@ end
     @test absolute["derived_policy"]["raw_atol"] == 10.0
     @test absolute["derived_policy"]["raw_rtol"] == 0.0
     @test absolute["derived_policy"]["validation_failed_pairs"] == 0
-    @test absolute["active_constraint"]["observation"] ==
-          [Dict("cell_id" => 2)]
+    @test absolute["active_constraint"]["observation"] == [Dict("cell_id" => 2)]
 end
 
 @testset "MIMICS-CN consumes only fitted calibration policies" begin
@@ -207,22 +188,15 @@ end
         "end_of_year",
         "mimics_soil.n_soil_available",
     ) == "kg N m^-2"
-    @test HistoricalCalibration.units(
-        "annual_total",
-        "diagnostic.cnpp",
-    ) == "kg C m^-2 year^-1"
-    @test HistoricalCalibration.units(
-        "daily",
-        "diagnostic.n_deposition",
-    ) == "kg N m^-2 s^-1"
+    @test HistoricalCalibration.units("annual_total", "diagnostic.cnpp") ==
+          "kg C m^-2 year^-1"
+    @test HistoricalCalibration.units("daily", "diagnostic.n_deposition") ==
+          "kg N m^-2 s^-1"
 end
 
 @testset "MIMICS-CN boundary populations are immutable and reviewed" begin
-    population_path = joinpath(
-        @__DIR__,
-        "validation",
-        "mimics_cn_boundary_populations.toml",
-    )
+    population_path =
+        joinpath(@__DIR__, "validation", "mimics_cn_boundary_populations.toml")
     scope_path =
         joinpath(@__DIR__, "validation", "scopes", "representative.toml")
     population = TOML.parsefile(population_path)
@@ -285,11 +259,8 @@ end
 end
 
 @testset "frozen MIMICS-CN calibrations cover both populations" begin
-    boundary_path = joinpath(
-        @__DIR__,
-        "validation",
-        "mimics_cn_boundary_calibration.toml",
-    )
+    boundary_path =
+        joinpath(@__DIR__, "validation", "mimics_cn_boundary_calibration.toml")
     historical_path = joinpath(
         @__DIR__,
         "validation",
@@ -301,18 +272,16 @@ end
     @test boundary["union_cell_count"] == 852
     @test Set(keys(boundary["population_validation"])) ==
           Set(("random_pft_800", "representative"))
-    @test boundary["source_provenance"]["population"]["random_pft_800"][
-        "eligible_cell_count"
-    ] == 790
-    @test boundary["source_provenance"]["population"]["representative"][
-        "eligible_cell_count"
-    ] == 80
+    @test boundary["source_provenance"]["population"]["random_pft_800"]["eligible_cell_count"] ==
+          790
+    @test boundary["source_provenance"]["population"]["representative"]["eligible_cell_count"] ==
+          80
     @test boundary["deduplication"]["overlapping_cell_count"] == 18
     @test boundary["deduplication"]["duplicate_pair_count"] == 18 * 4 * 24
     @test all(
-        record["failed_pairs"] == 0 for population in
-        values(boundary["population_validation"]) for stage in
-        values(population) for record in values(stage)
+        record["failed_pairs"] == 0 for
+        population in values(boundary["population_validation"]) for
+        stage in values(population) for record in values(stage)
     )
     @test all(
         record["finite_pair_count"] == 852 &&
@@ -324,8 +293,7 @@ end
                 ("cell_id", "latitude", "longitude", "pft"),
             ),
             record["top_outlier"],
-        ) for stage in values(boundary["variable"]) for
-        record in values(stage)
+        ) for stage in values(boundary["variable"]) for record in values(stage)
     )
 
     annual = [
@@ -364,15 +332,11 @@ end
         ),
         (
             "nonnegative_guard_residual",
-            historical["annual"]["annual_total"][
-                "diagnostic.mimics_overflow_r"
-            ],
+            historical["annual"]["annual_total"]["diagnostic.mimics_overflow_r"],
         ),
         (
             "nonnegative_guard_residual",
-            historical["annual"]["annual_total"][
-                "diagnostic.mimics_overflow_k"
-            ],
+            historical["annual"]["annual_total"]["diagnostic.mimics_overflow_k"],
         ),
         (
             "nonnegative_guard_residual",
@@ -411,13 +375,17 @@ end
         @test document["source_provenance"]["calibration"]["sha256"] ==
               BoundaryCalibration.sha256sum(joinpath(@__DIR__, calibration))
     end
-    @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(boundary_path, String))
-    @test !occursin(r"/Users/|/private/tmp|absolute_floor", read(historical_path, String))
-
-    policy = MIMICSCNCalibration.comparison_policy(
-        boundary_path,
-        historical_path,
+    @test !occursin(
+        r"/Users/|/private/tmp|absolute_floor",
+        read(boundary_path, String),
     )
+    @test !occursin(
+        r"/Users/|/private/tmp|absolute_floor",
+        read(historical_path, String),
+    )
+
+    policy =
+        MIMICSCNCalibration.comparison_policy(boundary_path, historical_path)
     @test isnothing(SelectedMIMICSCN.validate_policy(policy))
 
     mktempdir() do directory
@@ -470,9 +438,8 @@ end
         @test rejects(invalid_boundary, historical)
 
         invalid_boundary = deepcopy(boundary)
-        invalid_boundary["source_provenance"]["population"]["representative"][
-            "eligible_cell_count"
-        ] = 79
+        invalid_boundary["source_provenance"]["population"]["representative"]["eligible_cell_count"] =
+            79
         @test rejects(invalid_boundary, historical)
 
         invalid_boundary = deepcopy(boundary)
@@ -481,9 +448,8 @@ end
         @test rejects(invalid_boundary, historical)
 
         invalid_historical = deepcopy(historical)
-        invalid_historical["source_provenance"]["fresh_fortran_oracle"][
-            "scope_manifest_sha256"
-        ] = repeat("0", 64)
+        invalid_historical["source_provenance"]["fresh_fortran_oracle"]["scope_manifest_sha256"] =
+            repeat("0", 64)
         @test rejects(boundary, invalid_historical)
     end
 end
@@ -508,18 +474,11 @@ end
             (; cell_id = 11, longitude_index = 1, latitude_index = 1),
         ]
         values = NCDatasets.NCDataset(path) do dataset
-            GenerateMIMICSCN.reference_matrix(
-                dataset,
-                path,
-                "pool",
-                grid,
-            )
+            GenerateMIMICSCN.reference_matrix(dataset, path, "pool", grid)
         end
         @test size(values) == (2, 365)
-        @test values[1, :] ==
-              reshape(1.0:(3 * 2 * 365), 3, 2, 365)[3, 2, :]
-        @test values[2, :] ==
-              reshape(1.0:(3 * 2 * 365), 3, 2, 365)[1, 1, :]
+        @test values[1, :] == reshape(1.0:(3 * 2 * 365), 3, 2, 365)[3, 2, :]
+        @test values[2, :] == reshape(1.0:(3 * 2 * 365), 3, 2, 365)[1, 1, :]
     end
 end
 
@@ -528,16 +487,11 @@ end
     years = length(SelectedMIMICSCN.HISTORICAL_YEARS)
     boundary = Dict(
         stage => Dict(
-            name => zeros(points) for
-            name in SelectedMIMICSCN.BOUNDARY_NAMES
-        ) for
-        stage in ("spin_continuation", "historical")
+            name => zeros(points) for name in SelectedMIMICSCN.BOUNDARY_NAMES
+        ) for stage in ("spin_continuation", "historical")
     )
     nitrogen_name = first(
-        filter(
-            name -> occursin(".n_", name),
-            SelectedMIMICSCN.BOUNDARY_NAMES,
-        ),
+        filter(name -> occursin(".n_", name), SelectedMIMICSCN.BOUNDARY_NAMES),
     )
     boundary["historical"][nitrogen_name][1] = 1.0
     deposition = zeros(points, years)
@@ -553,10 +507,7 @@ end
             "diagnostic.n_gaseous_loss" => zeros(points * years),
         ),
     )
-    grid = [
-        (; area_m2 = 1.0, active = true),
-        (; area_m2 = 1.0, active = false),
-    ]
+    grid = [(; area_m2 = 1.0, active = true), (; area_m2 = 1.0, active = false)]
 
     budget = GenerateMIMICSCN.budget_values(boundary, annual, grid)
 
@@ -575,8 +526,7 @@ end
         @test loaded.cell_ids == [11, 22]
         @test loaded.eligible_ids == [11, 22]
         @test isempty(loaded.eligibility_gaps)
-        @test loaded.oracle["budget"]["reducer"] ==
-              "maximum_absolute_residual"
+        @test loaded.oracle["budget"]["reducer"] == "maximum_absolute_residual"
         @test loaded.oracle["budget"]["units"] ==
               Dict("carbon" => "kg C", "nitrogen" => "kg N")
         @test length(loaded.oracle["daily"]["sample_days"]) == 84
@@ -674,8 +624,7 @@ end
         @test !report["all_match"]
         @test only(report["cell_failures"])["cell_id"] == 22
         @test report["reducer"] == "maximum_absolute_residual"
-        @test report["units"] ==
-              Dict("carbon" => "kg C", "nitrogen" => "kg N")
+        @test report["units"] == Dict("carbon" => "kg C", "nitrogen" => "kg N")
     end
 end
 
@@ -727,18 +676,8 @@ end
         getproperty.(core.cells[1:2], :id),
     )
     stages = (
-        TestbedNativeWorkflow.NativeStage(
-            :prespin,
-            2,
-            1;
-            write_output = false,
-        ),
-        TestbedNativeWorkflow.NativeStage(
-            :spin,
-            2,
-            1;
-            write_output = false,
-        ),
+        TestbedNativeWorkflow.NativeStage(:prespin, 2, 1; write_output = false),
+        TestbedNativeWorkflow.NativeStage(:spin, 2, 1; write_output = false),
         TestbedNativeWorkflow.NativeStage(
             :spin_continuation,
             2,
@@ -764,8 +703,7 @@ end
         @test report["coverage"]["compared_cells"] == 1
         @test isempty(report["coverage"]["eligibility_gaps"])
         @test report["carbon_budget"]["all_close"]
-        @test report["carbon_budget"]["reducer"] ==
-              "maximum_absolute_residual"
+        @test report["carbon_budget"]["reducer"] == "maximum_absolute_residual"
         @test report["carbon_budget"]["units"] == "kg C"
         @test isfinite(
             report["carbon_budget"]["maximum_absolute_residual_kg_c"],

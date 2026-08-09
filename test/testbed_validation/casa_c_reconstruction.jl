@@ -743,14 +743,16 @@ function annual_mean(variable, time_dimension)
     indices = ntuple(_ -> Colon(), ndims(variable))
     raw = variable.var[indices...]
     fill_value =
-        haskey(variable.attrib, "_FillValue") ?
-        variable.attrib["_FillValue"] : nothing
+        haskey(variable.attrib, "_FillValue") ? variable.attrib["_FillValue"] :
+        nothing
     valid = isnothing(fill_value) ? trues(size(raw)) : raw .!= fill_value
-    valid_count = dropdims(sum(valid; dims = time_dimension); dims = time_dimension)
-    averaged = dropdims(
-        sum(ifelse.(valid, Float64.(raw), 0.0); dims = time_dimension);
-        dims = time_dimension,
-    ) ./ max.(valid_count, 1)
+    valid_count =
+        dropdims(sum(valid; dims = time_dimension); dims = time_dimension)
+    averaged =
+        dropdims(
+            sum(ifelse.(valid, Float64.(raw), 0.0); dims = time_dimension);
+            dims = time_dimension,
+        ) ./ max.(valid_count, 1)
     output = if eltype(raw) <: Integer
         round.(eltype(raw), averaged)
     else

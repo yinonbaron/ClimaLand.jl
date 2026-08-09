@@ -11,7 +11,8 @@ function fake_worker_command(
 )
     project = dirname(Base.active_project())
     worker = joinpath(@__DIR__, "fake_model_worker.jl")
-    return model -> `$(Base.julia_cmd()) --startup-file=no --project=$project $worker $model $(delays[model]) $(get(behaviors, model, "pass")) $directory`
+    return model ->
+        `$(Base.julia_cmd()) --startup-file=no --project=$project $worker $model $(delays[model]) $(get(behaviors, model, "pass")) $directory`
 end
 
 @testset "Model worker crashes are isolated and fail the aggregate" begin
@@ -50,8 +51,7 @@ end
 end
 
 @testset "Model process selection and concurrency are bounded" begin
-    @test ModelProcesses.select_models("all") ==
-          collect(ModelProcesses.MODELS)
+    @test ModelProcesses.select_models("all") == collect(ModelProcesses.MODELS)
     @test ModelProcesses.select_models("CASA-CN,CORPSE") ==
           ["CORPSE", "CASA-CN"]
     @test ModelProcesses.default_worker_count(; cpu_threads = 3) == 3
@@ -77,9 +77,7 @@ end
             fake_worker_command(
                 directory,
                 delays;
-                behaviors = Dict(
-                    "MIMICS-C" => "wait:MIMICS-CN.started.toml",
-                ),
+                behaviors = Dict("MIMICS-C" => "wait:MIMICS-CN.started.toml"),
             );
             workers = 2,
             worker_stdout = devnull,
@@ -92,9 +90,9 @@ end
         @test all(outcome -> outcome.outcome == "passed", result.outcomes)
         @test all(outcome -> outcome.seconds > 0, result.outcomes)
         records = Dict(
-            model => TOML.parsefile(
-                joinpath(directory, "$model.finished.toml"),
-            ) for model in ModelProcesses.MODELS
+            model =>
+                TOML.parsefile(joinpath(directory, "$model.finished.toml"))
+            for model in ModelProcesses.MODELS
         )
         @test all(
             record ->
@@ -107,9 +105,7 @@ end
                     record["veclib_maximum_threads_environment"] == "1",
             values(records),
         )
-        events = [
-            (record["started_ns"], 1) for record in values(records)
-        ]
+        events = [(record["started_ns"], 1) for record in values(records)]
         append!(
             events,
             [(record["finished_ns"], -1) for record in values(records)],

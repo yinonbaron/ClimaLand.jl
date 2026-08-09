@@ -35,11 +35,8 @@ end
 end
 
 @testset "CORPSE finite trajectory observations are allocation-free" begin
-    observer = FreshCORPSEWorker.TrajectoryObserver(
-        "julia",
-        [51, 532],
-        [51, 532],
-    )
+    observer =
+        FreshCORPSEWorker.TrajectoryObserver("julia", [51, 532], [51, 532])
     cost = trajectory_observer_cost(observer, 10_000)
     @test cost.bytes == 0
     @test cost.seconds < 1.0

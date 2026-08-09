@@ -32,8 +32,7 @@ if mode == "build"
 elseif mode == "worker"
     _, model, run_directory, build_directory, audit_directory, behavior =
         ARGS[1:6]
-    scope_manifest_sha256 =
-        length(ARGS) == 7 ? ARGS[7] : repeat("c", 64)
+    scope_manifest_sha256 = length(ARGS) == 7 ? ARGS[7] : repeat("c", 64)
     isfile(joinpath(build_directory, "build_metadata.toml")) ||
         error("fake worker started before the shared build")
     open(joinpath(audit_directory, "$model.toml"), "w") do io

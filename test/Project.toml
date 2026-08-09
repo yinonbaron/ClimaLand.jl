@@ -32,6 +32,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
 Aqua = "0.8"

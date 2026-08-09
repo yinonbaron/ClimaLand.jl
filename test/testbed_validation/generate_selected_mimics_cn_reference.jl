@@ -54,14 +54,10 @@ function reference_grid(fortran_root, grid)
     rows = Native.native_casa().parse_rows(
         joinpath(fortran_root, "stages", "01-prespin", "grid.csv"),
     )
-    by_id = Dict(
-        parse(Int, strip(row.ijcam)) => row for row in rows
-    )
+    by_id = Dict(parse(Int, strip(row.ijcam)) => row for row in rows)
     return map(grid) do point
         row = get(by_id, point.cell_id) do
-            error(
-                "MIMICS-CN Fortran grid has no requested cell $(point.cell_id)",
-            )
+            error("MIMICS-CN Fortran grid has no requested cell $(point.cell_id)")
         end
         merge(
             point,
@@ -105,8 +101,7 @@ function boundary_values(fortran_root, cell_ids)
             scale = source == :casa ? 1 / 1000 : 1.0
             values["$(component).$(variable)"] = finite_vector(
                 [
-                    scale *
-                    parse(Float64, rows[index][columns[fortran_name]]) for
+                    scale * parse(Float64, rows[index][columns[fortran_name]]) for
                     index in indices
                 ],
                 "boundary.$stage.$fortran_name",
@@ -140,8 +135,9 @@ function reference_matrix(dataset, path, name, grid)
         )
     end
     selected = Fixtures.selected_values(dataset[name], locations)
-    ndims(selected) == 2 ||
-        error("MIMICS-CN Fortran oracle has unexpected dimensions at $path:$name")
+    ndims(selected) == 2 || error(
+        "MIMICS-CN Fortran oracle has unexpected dimensions at $path:$name",
+    )
     raw = permutedims(selected)
     any(ismissing, raw) &&
         error("MIMICS-CN Fortran oracle is missing $path:$name")
@@ -168,11 +164,9 @@ function historical_values(fortran_root, grid)
         name => zeros(points * year_count) for
         name in Workflow.ANNUAL_FLUX_NAMES
     )
-    daily =
-        Dict(name => zeros(points * 84) for name in Workflow.DAILY_NAMES)
-    local_days = vcat(
-        (collect(start:(start + 6)) for start in (1, 91, 182, 274))...,
-    )
+    daily = Dict(name => zeros(points * 84) for name in Workflow.DAILY_NAMES)
+    local_days =
+        vcat((collect(start:(start + 6)) for start in (1, 91, 182, 274))...)
     sampled_years = Dict(1901 => 0, 1957 => 1, 2014 => 2)
     sources = Dict{String, String}()
     for (year_index, year) in enumerate(Workflow.HISTORICAL_YEARS)
@@ -197,8 +191,7 @@ function historical_values(fortran_root, grid)
                     Native.HISTORICAL_VARIABLES
                     dataset = source == :casa ? casa : mimics
                     path = paths[source]
-                    raw =
-                        reference_matrix(dataset, path, fortran_name, grid)
+                    raw = reference_matrix(dataset, path, fortran_name, grid)
                     name = replace(native_name, "__" => ".")
                     if scale == 1000.0
                         annual_mean[name][annual_destination] .=
@@ -212,9 +205,9 @@ function historical_values(fortran_root, grid)
                     haskey(sampled_years, year) || continue
                     sample = sampled_years[year]
                     daily_destination =
-                        (sample * points * length(local_days) + 1):(
-                            (sample + 1) * points * length(local_days)
-                        )
+                        (sample * points * length(local_days) + 1):((sample + 1) * points * length(
+                            local_days,
+                        ))
                     canonical_scale =
                         scale == 1000.0 ? 1 / 1000 :
                         1 / (1000 * Native.DAY_SECONDS)
@@ -246,18 +239,13 @@ function budget_values(boundary, annual, grid)
     nitrogen_stop = zeros(cell_count)
     for name in Workflow.BOUNDARY_NAMES
         start, stop =
-            occursin(".n_", name) ?
-            (nitrogen_start, nitrogen_stop) :
+            occursin(".n_", name) ? (nitrogen_start, nitrogen_stop) :
             (carbon_start, carbon_stop)
         start .+= boundary["spin_continuation"][name]
         stop .+= boundary["historical"][name]
     end
     annual_total = annual["annual_total"]
-    npp = reshape(
-        annual_total["diagnostic.cnpp"],
-        cell_count,
-        years,
-    )
+    npp = reshape(annual_total["diagnostic.cnpp"], cell_count, years)
     respiration = reshape(
         annual_total["diagnostic.mimics_respiration"],
         cell_count,
@@ -265,11 +253,7 @@ function budget_values(boundary, annual, grid)
     )
     carbon_residual =
         getproperty.(grid, :area_m2) .*
-        (
-            carbon_stop .-
-            carbon_start .-
-            vec(sum(npp .- respiration; dims = 2))
-        )
+        (carbon_stop .- carbon_start .- vec(sum(npp .- respiration; dims = 2)))
     n_input = reshape(
         annual_total["diagnostic.n_deposition"] .+
         annual_total["diagnostic.n_fixation"],
@@ -284,10 +268,8 @@ function budget_values(boundary, annual, grid)
         years,
     )
     nitrogen_residual =
-        getproperty.(grid, :area_m2) .*
-        (
-            nitrogen_stop .-
-            nitrogen_start .-
+        getproperty.(grid, :area_m2) .* (
+            nitrogen_stop .- nitrogen_start .-
             vec(sum(n_input .- n_output; dims = 2))
         )
     return Dict(
@@ -295,8 +277,7 @@ function budget_values(boundary, annual, grid)
         "reducer" => "maximum_absolute_residual",
         "maximum_absolute_residual_kg_c" => maximum(abs, carbon_residual),
         "historical_residual_kg_c" => carbon_residual,
-        "maximum_absolute_residual_kg_n" =>
-            maximum(abs, nitrogen_residual),
+        "maximum_absolute_residual_kg_n" => maximum(abs, nitrogen_residual),
         "historical_residual_kg_n" => nitrogen_residual,
     )
 end
@@ -318,10 +299,8 @@ function write_reference(
     scope = TOML.parsefile(scope_manifest_path)
     Int.(scope["cell_ids"]) == cell_ids ||
         error("MIMICS-CN oracle collection does not match the Scope Manifest")
-    grid = Workflow.selected_casa.selected_grid(
-        collection.files["grid"],
-        cell_ids,
-    )
+    grid =
+        Workflow.selected_casa.selected_grid(collection.files["grid"], cell_ids)
     parameters = Native.native_casa().read_pft_parameters(
         collection.files["casa_c_parameters"],
     )
@@ -332,9 +311,8 @@ function write_reference(
     boundary, boundary_sources = boundary_values(fortran_root, cell_ids)
     annual, daily, historical_sources =
         historical_values(fortran_root, reference_grid(fortran_root, grid))
-    workflow = TOML.parsefile(
-        joinpath(fortran_root, "configuration", "workflow.toml"),
-    )
+    workflow =
+        TOML.parsefile(joinpath(fortran_root, "configuration", "workflow.toml"))
     document = Dict(
         "schema_version" => 1,
         "model" => "MIMICS-CN",
@@ -389,8 +367,7 @@ function main(args = ARGS)
         fortran_root,
         output_path,
         ;
-        build_metadata_path = length(args) == 5 ?
-                              args[5] :
+        build_metadata_path = length(args) == 5 ? args[5] :
                               joinpath(
             fortran_root,
             "build",

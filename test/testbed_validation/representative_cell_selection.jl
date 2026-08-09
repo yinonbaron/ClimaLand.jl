@@ -59,9 +59,10 @@ selected_fixtures() =
 const SMOKE_FIXTURE_MANIFEST =
     joinpath(@__DIR__, "fixtures", "selected_cells", "fixture.toml")
 
-sha256sum(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256sum(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function fixture_provenance()
     source_fixture = TOML.parsefile(SMOKE_FIXTURE_MANIFEST)
@@ -153,8 +154,8 @@ function select_representative_cells(
     active = filter(
         candidate ->
             candidate.active &&
-            candidate.pft ∉ (13, 15, 17) &&
-            candidate.cell_id ∉ fixed,
+                candidate.pft ∉ (13, 15, 17) &&
+                candidate.cell_id ∉ fixed,
         ordered,
     )
     population = Dict{Int, Int}()
@@ -334,9 +335,9 @@ function representative_candidates(source_paths, grid_path, soil_path)
             cell_id,
             pft = grid[cell_id].pft,
             active = !location.missing &&
-                     grid[cell_id].pft ∉ (13, 15, 17) &&
-                     finite &&
-                     forcing_features.gpp_median > 0,
+                         grid[cell_id].pft ∉ (13, 15, 17) &&
+                         finite &&
+                         forcing_features.gpp_median > 0,
             features,
         )
     end

@@ -60,8 +60,8 @@ end
         TestbedNativeWorkflow.add_term!(stable, daily_input_kg_n)
     end
 
-    @test abs(naive - saved_external_input_kg_n) /
-          saved_external_input_kg_n > 5e-12
+    @test abs(naive - saved_external_input_kg_n) / saved_external_input_kg_n >
+          5e-12
     @test isapprox(
         TestbedNativeWorkflow.compensated_value(stable),
         saved_external_input_kg_n;
@@ -215,8 +215,7 @@ end
                 require_archive = true,
             )
         end
-        report["historical_comparison"]["published_archive"]["all_match"] =
-            true
+        report["historical_comparison"]["published_archive"]["all_match"] = true
         archive_only_report = joinpath(output_root, "archive_only_report.toml")
         report["historical_comparison"]["fresh_fortran"] =
             Dict("required" => false, "status" => "not_available")

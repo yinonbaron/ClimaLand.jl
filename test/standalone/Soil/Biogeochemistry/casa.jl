@@ -194,12 +194,20 @@ for FT in (Float32, Float64)
             FT(280),
         )
         nitrogen = @inferred CASA.nitrogen_tendencies(nitrogen_arguments...)
-        @test nitrogen_kernel_allocations(nitrogen_arguments...) == 0
+        nitrogen_allocations =
+            nitrogen_kernel_allocations(nitrogen_arguments...)
+        # Julia 1.10 boxes this 13-value immutable result; later compilers elide it.
+        if VERSION < v"1.11"
+            @test nitrogen_allocations <= sizeof(nitrogen) + 16
+        else
+            @test nitrogen_allocations == 0
+        end
         nitrogen_stock_change =
             sum(nitrogen.litter) + sum(nitrogen.soil) + nitrogen.mineral
-        @test nitrogen_stock_change + nitrogen.gaseous_loss +
-              nitrogen.leaching + uptake ≈
-              sum(litter_nitrogen_inputs) + deposition + fixation atol =
+        @test nitrogen_stock_change +
+              nitrogen.gaseous_loss +
+              nitrogen.leaching +
+              uptake ≈ sum(litter_nitrogen_inputs) + deposition + fixation atol =
             32eps(FT)
 
         moisture_values = map(
@@ -230,12 +238,9 @@ end
         cue_microbial_to_passive = 1.0,
         cue_slow_to_passive = 0.45,
     )
-    transfers =
-        CASA.transfer_fractions(transfer_parameters, 0.21805, 0.13224)
-    litter_base_rates =
-        (1 / (365 * 0.04), 1 / (365 * 0.23), 1 / (365 * 0.824))
-    soil_base_rates =
-        (1 / (365 * 0.137), 1 / (365 * 5), 1 / (365 * 222.22))
+    transfers = CASA.transfer_fractions(transfer_parameters, 0.21805, 0.13224)
+    litter_base_rates = (1 / (365 * 0.04), 1 / (365 * 0.23), 1 / (365 * 0.824))
+    soil_base_rates = (1 / (365 * 0.137), 1 / (365 * 5), 1 / (365 * 222.22))
     minimum_ratios = (1 / 8, 1 / 20, 1 / 20)
     maximum_ratios = (1 / 6.17, 1 / 16.63, 1 / 16.63)
 
@@ -245,27 +250,31 @@ end
         daily_nitrogen_inputs = fill((0.0, 0.0, 0.0), 365)
         for day in 2:365
             litter_carbon = ntuple(
-                pool -> value(("clitmetb", "clitstr", "clitcwd")[pool], day - 1),
+                pool -> value(
+                    ("clitmetb", "clitstr", "clitcwd")[pool],
+                    day - 1,
+                ),
                 3,
             )
             soil_carbon = ntuple(
-                pool ->
-                    value(
-                        ("csoilmic", "csoilslow", "csoilpass")[pool],
-                        day - 1,
-                    ),
+                pool -> value(
+                    ("csoilmic", "csoilslow", "csoilpass")[pool],
+                    day - 1,
+                ),
                 3,
             )
             litter_nitrogen = ntuple(
-                pool -> value(("nlitmetb", "nlitstr", "nlitcwd")[pool], day - 1),
+                pool -> value(
+                    ("nlitmetb", "nlitstr", "nlitcwd")[pool],
+                    day - 1,
+                ),
                 3,
             )
             soil_nitrogen = ntuple(
-                pool ->
-                    value(
-                        ("nsoilmic", "nsoilslow", "nsoilpass")[pool],
-                        day - 1,
-                    ),
+                pool -> value(
+                    ("nsoilmic", "nsoilslow", "nsoilpass")[pool],
+                    day - 1,
+                ),
                 3,
             )
             mineral_nitrogen = value("nMineral", day - 1)
@@ -305,7 +314,8 @@ end
                 2.0,
             )
             expected_litter = ntuple(
-                pool -> value(("nlitmetb", "nlitstr", "nlitcwd")[pool], day),
+                pool ->
+                    value(("nlitmetb", "nlitstr", "nlitcwd")[pool], day),
                 3,
             )
             # The legacy `nLitInptStruc` diagnostic is not a valid oracle:
@@ -342,16 +352,15 @@ end
             )
             predicted_soil = soil_nitrogen .+ tendencies.soil
             expected_soil = ntuple(
-                pool ->
-                    value(
-                        ("nsoilmic", "nsoilslow", "nsoilpass")[pool],
-                        day,
-                    ),
+                pool -> value(
+                    ("nsoilmic", "nsoilslow", "nsoilpass")[pool],
+                    day,
+                ),
                 3,
             )
             @test all(isapprox.(predicted_soil, expected_soil; rtol = 3e-6))
-            @test mineral_nitrogen + tendencies.mineral ≈
-                  value("nMineral", day) rtol = 3e-6
+            @test mineral_nitrogen + tendencies.mineral ≈ value("nMineral", day) rtol =
+                3e-6
             for (field, variable) in (
                 (:litter_mineralization, "nLitMineralization"),
                 (:soil_mineralization, "nSoilMineralization"),
@@ -366,21 +375,19 @@ end
         end
 
         seconds_per_day = 86400.0
-        parameters = CASA.CASASoilModelParameters{
-            Float64,
-            typeof(transfer_parameters),
-        }(;
-            q10 = 1.72,
-            litter_optimum = 0.4,
-            soil_optimum = 0.10343498,
-            porosity = 0.41312,
-            clay = 0.21805,
-            silt = 0.13224,
-            freezing_temperature = 273.15,
-            litter_base_rates = litter_base_rates ./ seconds_per_day,
-            soil_base_rates = soil_base_rates ./ seconds_per_day,
-            transfers = transfer_parameters,
-        )
+        parameters =
+            CASA.CASASoilModelParameters{Float64, typeof(transfer_parameters)}(;
+                q10 = 1.72,
+                litter_optimum = 0.4,
+                soil_optimum = 0.10343498,
+                porosity = 0.41312,
+                clay = 0.21805,
+                silt = 0.13224,
+                freezing_temperature = 273.15,
+                litter_base_rates = litter_base_rates ./ seconds_per_day,
+                soil_base_rates = soil_base_rates ./ seconds_per_day,
+                transfers = transfer_parameters,
+            )
         nitrogen_parameters = CASA.CASANitrogenParameters{Float64}(;
             limitation_minimum = 0.5e-3,
             limitation_maximum = 2e-3,
@@ -396,8 +403,7 @@ end
         carbon_rate(t, pool) =
             daily_carbon_inputs[driver_day(t)][pool] * 1e-3 / seconds_per_day
         nitrogen_rate(t, pool) =
-            daily_nitrogen_inputs[driver_day(t)][pool] * 1e-3 /
-            seconds_per_day
+            daily_nitrogen_inputs[driver_day(t)][pool] * 1e-3 / seconds_per_day
         drivers = CASA.PrescribedDrivers(
             t -> value("tsoilC", driver_day(t)) + 273.15,
             t -> value("thetaLiq", driver_day(t)) * parameters.porosity,
@@ -411,7 +417,8 @@ end
             t -> nitrogen_rate(t, 3),
             t -> value("nMinDep", driver_day(t)) * 1e-3 / seconds_per_day,
             t -> value("nMinFix", driver_day(t)) * 1e-3 / seconds_per_day,
-            t -> value("nMinUptake", driver_day(t)) * 1e-3 / seconds_per_day,
+            t ->
+                value("nMinUptake", driver_day(t)) * 1e-3 / seconds_per_day,
         )
         domain = Point(; z_sfc = 0.0, context = ClimaComms.context())
         model = CASA.CASASoilModel{Float64}(;
@@ -461,8 +468,7 @@ end
         one_step = map(ClimaLand.prognostic_vars(model)) do name
             Array(parent(getproperty(integrator.u.casa_soil, name)))[1]
         end
-        expected_one_step =
-            map(name -> value(name, 2) * 1e-3, output_names)
+        expected_one_step = map(name -> value(name, 2) * 1e-3, output_names)
         for (candidate, reference) in zip(one_step, expected_one_step)
             @test candidate ≈ reference rtol = 5e-5 atol = 2e-8
         end
@@ -526,10 +532,16 @@ end
             limitation_maximum = FT(2e-3),
             maximum_fine_litter = FT(0.157),
             maximum_cwd = FT(0.107),
-            soil_nitrogen_ratio_minimum =
-                (inv(FT(8)), inv(FT(20)), inv(FT(20))),
-            soil_nitrogen_ratio_maximum =
-                (inv(FT(6.17)), inv(FT(16.63)), inv(FT(16.63))),
+            soil_nitrogen_ratio_minimum = (
+                inv(FT(8)),
+                inv(FT(20)),
+                inv(FT(20)),
+            ),
+            soil_nitrogen_ratio_maximum = (
+                inv(FT(6.17)),
+                inv(FT(16.63)),
+                inv(FT(16.63)),
+            ),
             loss_threshold = FT(2e-3),
             loss_fraction = FT(0.05),
             leach_rate = FT(10 * 0.05 / 365) / day,
@@ -596,9 +608,10 @@ end
             name in ClimaLand.prognostic_vars(model)[7:13]
         )
         nitrogen_fluxes = p.casa_soil.nitrogen_fluxes[]
-        @test nitrogen_tendency + nitrogen_fluxes[12] +
-              nitrogen_fluxes[13] + uptake ≈
-              sum(nitrogen_inputs) + deposition + fixation atol =
+        @test nitrogen_tendency +
+              nitrogen_fluxes[12] +
+              nitrogen_fluxes[13] +
+              uptake ≈ sum(nitrogen_inputs) + deposition + fixation atol =
             64eps(FT) * sum(nitrogen_inputs)
 
         problem = CTS.ODEProblem(
@@ -616,9 +629,7 @@ end
         CTS.step!(integrator)
         @test all(
             isfinite(
-                Array(
-                    parent(getproperty(integrator.u.casa_soil, name)),
-                )[1],
+                Array(parent(getproperty(integrator.u.casa_soil, name)))[1],
             ) for name in ClimaLand.prognostic_vars(model)
         )
         if FT == Float32
@@ -651,10 +662,8 @@ end
                 limitation_maximum = FT(4e-3),
                 maximum_fine_litter = nitrogen_parameters.maximum_fine_litter,
                 maximum_cwd = nitrogen_parameters.maximum_cwd,
-                soil_nitrogen_ratio_minimum =
-                    nitrogen_parameters.soil_nitrogen_ratio_minimum,
-                soil_nitrogen_ratio_maximum =
-                    nitrogen_parameters.soil_nitrogen_ratio_maximum,
+                soil_nitrogen_ratio_minimum = nitrogen_parameters.soil_nitrogen_ratio_minimum,
+                soil_nitrogen_ratio_maximum = nitrogen_parameters.soil_nitrogen_ratio_maximum,
                 loss_threshold = nitrogen_parameters.loss_threshold,
                 loss_fraction = nitrogen_parameters.loss_fraction,
                 leach_rate = nitrogen_parameters.leach_rate,

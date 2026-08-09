@@ -17,7 +17,8 @@ import TOML
             report = TOML.parsefile(result.report)
 
             @test report["initialization_comparison"]["all_match"]
-            @test getproperty.(result.stages, :name) == getproperty.(
+            @test getproperty.(result.stages, :name) ==
+                  getproperty.(
                 TestbedSelectedCASAWorkflow.COMPLETE_STAGES,
                 :name,
             )
@@ -53,8 +54,8 @@ import TOML
             )
             @test sample_count == 84
             @test all(
-                metric["compared_values"] == sample_count * length(expected_ids) for
-                metric in values(
+                metric["compared_values"] ==
+                sample_count * length(expected_ids) for metric in values(
                     report["historical_comparison"]["selected_dates"]["variable"],
                 )
             )

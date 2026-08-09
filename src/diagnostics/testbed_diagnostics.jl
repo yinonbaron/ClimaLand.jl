@@ -391,8 +391,8 @@ function testbed_diagnostic_names(model::ClimaLand.AbstractModel)
     auxiliary_variables = ClimaLand.auxiliary_vars(model)
     specs = filter(TESTBED_DIAGNOSTICS) do spec
         spec.component == component && (
-            spec.source == :state ?
-            spec.variable in state_variables : spec.variable in auxiliary_variables
+            spec.source == :state ? spec.variable in state_variables :
+            spec.variable in auxiliary_variables
         )
     end
     return map(spec -> spec.short_name, specs)

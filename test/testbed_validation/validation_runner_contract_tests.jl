@@ -17,9 +17,8 @@ function write_contract_forcing_bundle(root)
                 "selection" => Dict(
                     "scope_manifest_sha256" =>
                         ContractRunner.sha256sum(CONTRACT_SCOPE_PATH),
-                    "representative_cell_ids" => Int.(
-                        TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],
-                    ),
+                    "representative_cell_ids" =>
+                        Int.(TOML.parsefile(CONTRACT_SCOPE_PATH)["cell_ids"],),
                 ),
             );
             sorted = true,
@@ -116,7 +115,8 @@ function run_injected_representative(
             end
             gaps = filter(
                 gap ->
-                    gap["model"] == "CORPSE" && Int(gap["cell_id"]) in assigned,
+                    gap["model"] == "CORPSE" &&
+                        Int(gap["cell_id"]) in assigned,
                 get(scope, "eligibility_gaps", Any[]),
             )
             return (;

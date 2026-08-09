@@ -530,8 +530,7 @@ partially updated pool and no loss is capped using a numerical timestep.
             parameters.protected_decomposition_factor,
         ) / seconds_per_year
     end
-    total_decomposition =
-        unprotected_decomposition + protected_decomposition
+    total_decomposition = unprotected_decomposition + protected_decomposition
 
     turnover = max(
         zero(living_microbe),
@@ -554,16 +553,18 @@ partially updated pool and no loss is capped using a numerical timestep.
 
     protected_turnover =
         protected / parameters.protected_turnover_time / seconds_per_year
-    protection = if sum(unprotected) > zero(temperature) &&
-                    cohort_volume > zero(temperature)
-        parameters.protection_rate .* parameters.protection_species .* qmax .*
-        unprotected / seconds_per_year
-    else
-        zero(unprotected)
-    end
+    protection =
+        if sum(unprotected) > zero(temperature) &&
+           cohort_volume > zero(temperature)
+            parameters.protection_rate .* parameters.protection_species .*
+            qmax .* unprotected / seconds_per_year
+        else
+            zero(unprotected)
+        end
 
     microbial_litter_input =
-        sum(litter_input) * parameters.minimum_microbe_fraction *
+        sum(litter_input) *
+        parameters.minimum_microbe_fraction *
         litter_fraction
     substrate_input =
         litter_input .* (
@@ -572,9 +573,7 @@ partially updated pool and no loss is capped using a numerical timestep.
         ) + exudate_input
     dead_microbe_input = turnover * parameters.turnover_efficiency
     unprotected_tendency =
-        substrate_input -
-        unprotected_decomposition -
-        protection +
+        substrate_input - unprotected_decomposition - protection +
         protected_turnover
     unprotected_tendency = Base.setindex(
         unprotected_tendency,
@@ -585,8 +584,7 @@ partially updated pool and no loss is capped using a numerical timestep.
         protection - protected_decomposition - protected_turnover
     microbe_tendency =
         microbial_litter_input +
-        sum(parameters.uptake_efficiency .* total_decomposition) -
-        turnover
+        sum(parameters.uptake_efficiency .* total_decomposition) - turnover
     respiration =
         sum(
             (one(temperature) .- parameters.uptake_efficiency) .*
@@ -741,10 +739,9 @@ not depend on or encode a numerical timestep.
     cwd_tendency = litter_cwd_input - cwd_loss
 
     total_labile =
-        root_labile_input +
-        (
-            parameters.litter_option == 1 ?
-            leaf_labile_input : zero(leaf_labile_input)
+        root_labile_input + (
+            parameters.litter_option == 1 ? leaf_labile_input :
+            zero(leaf_labile_input)
         )
     exudate = min(exudate_labile_input, total_labile)
     total_labile -= exudate
@@ -769,8 +766,7 @@ not depend on or encode a numerical timestep.
             zero(leaf_labile_input),
         )
     end
-    exudate_input =
-        StaticArrays.SVector(exudate, zero(exudate), zero(exudate))
+    exudate_input = StaticArrays.SVector(exudate, zero(exudate), zero(exudate))
     no_exudate = zero(exudate_input)
     air_filled_porosity = max(
         zero(liquid_saturation),

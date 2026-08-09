@@ -22,8 +22,7 @@ function default_worker_count(; cpu_threads = Sys.CPU_THREADS)
 end
 
 function worker_count(value)
-    value isa Bool &&
-        throw(ArgumentError("workers must be a positive integer"))
+    value isa Bool && throw(ArgumentError("workers must be a positive integer"))
     count = value isa Integer ? Int(value) : tryparse(Int, value)
     isnothing(count) &&
         throw(ArgumentError("workers must be a positive integer"))
@@ -69,10 +68,10 @@ function run_model_workers(
                 process = run(
                     pipeline(
                         ignorestatus(command);
-                        stdout =
-                            isnothing(worker_log) ? worker_stdout : worker_log,
-                        stderr =
-                            isnothing(worker_log) ? worker_stderr : worker_log,
+                        stdout = isnothing(worker_log) ? worker_stdout :
+                                 worker_log,
+                        stderr = isnothing(worker_log) ? worker_stderr :
+                                 worker_log,
                     );
                     wait = false,
                 )
@@ -109,7 +108,8 @@ function run_model_workers(
         code = worker.process.exitcode
         signal = worker.process.termsignal
         passed = success(worker.process)
-        passed && !isnothing(worker.worker_log_path) &&
+        passed &&
+            !isnothing(worker.worker_log_path) &&
             rm(worker.worker_log_path)
         completed[model] = (;
             model,

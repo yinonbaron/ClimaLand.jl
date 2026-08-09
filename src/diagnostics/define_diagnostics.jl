@@ -1270,7 +1270,10 @@ function define_diagnostics!(
         component = getproperty(land_model, component_name)
         component_diags = get_possible_diagnostics(component)
         if !(requested_diags isa Val)
-            filter!(diagnostic -> diagnostic in requested_diags, component_diags)
+            filter!(
+                diagnostic -> diagnostic in requested_diags,
+                component_diags,
+            )
         end
         define_diagnostics!(component, component_diags)
     end

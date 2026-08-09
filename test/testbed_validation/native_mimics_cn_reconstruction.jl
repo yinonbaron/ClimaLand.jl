@@ -929,21 +929,18 @@ function budget_report(budget, stage, initial_state, final_state, element; rtol)
     name = stage.name
     prefix = element == :carbon ? "c_" : "n_"
     units = element == :carbon ? "kg_c" : "kg_n"
-    input =
-        native_workflow().compensated_value(
-            element == :carbon ? budget.carbon_input[name] :
-            budget.nitrogen_input[name],
-        )
-    output =
-        native_workflow().compensated_value(
-            element == :carbon ? budget.carbon_output[name] :
-            budget.nitrogen_output[name],
-        )
-    adjustment =
-        native_workflow().compensated_value(
-            element == :carbon ? budget.carbon_adjustment[name] :
-            budget.nitrogen_adjustment[name],
-        )
+    input = native_workflow().compensated_value(
+        element == :carbon ? budget.carbon_input[name] :
+        budget.nitrogen_input[name],
+    )
+    output = native_workflow().compensated_value(
+        element == :carbon ? budget.carbon_output[name] :
+        budget.nitrogen_output[name],
+    )
+    adjustment = native_workflow().compensated_value(
+        element == :carbon ? budget.carbon_adjustment[name] :
+        budget.nitrogen_adjustment[name],
+    )
     start_stock = selected_casa().area_weighted_stock(
         initial_state,
         budget.area_m2,
@@ -1029,7 +1026,11 @@ function write_report(
     return path
 end
 
-function require_acceptance!(path; require_fresh = true, require_archive = false)
+function require_acceptance!(
+    path;
+    require_fresh = true,
+    require_archive = false,
+)
     report = TOML.parsefile(path)
     checks = Dict(
         "boundary comparisons" => all(

@@ -18,8 +18,10 @@ import NCDatasets
 import SHA
 
 const Harness = getfield(parentmodule(@__MODULE__), :TestbedReferenceHarness)
-const Fixtures = getfield(parentmodule(@__MODULE__), :TestbedSelectedCellFixtures)
-const Selected = getfield(parentmodule(@__MODULE__), :GenerateSelectedCORPSEReference)
+const Fixtures =
+    getfield(parentmodule(@__MODULE__), :TestbedSelectedCellFixtures)
+const Selected =
+    getfield(parentmodule(@__MODULE__), :GenerateSelectedCORPSEReference)
 const Reduced =
     getfield(parentmodule(@__MODULE__), :GenerateRepresentativeCORPSEReference)
 const SOURCE_COMMIT = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
@@ -72,9 +74,10 @@ const BOUNDARY_END = Dict(
 output_name(prefix, year, daily = 0) =
     "$(prefix)_pool_flux_$(lpad(year, 4, '0'))$(daily == 1 ? "_daily" : "").nc"
 
-sha256sum(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256sum(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function fixture_inputs(fixture_manifest, scope_manifest)
     fixture = TOML.parsefile(fixture_manifest)
@@ -93,8 +96,11 @@ function fixture_inputs(fixture_manifest, scope_manifest)
     get(selection, "scope_manifest_sha256", nothing) ==
     sha256sum(scope_manifest) ||
         error("Representative fixture scope checksum differs")
-    get(get(fixture, "source", Dict{String, Any}()), "repository_commit", nothing) ==
-    SOURCE_COMMIT || error("Representative fixture source commit differs")
+    get(
+        get(fixture, "source", Dict{String, Any}()),
+        "repository_commit",
+        nothing,
+    ) == SOURCE_COMMIT || error("Representative fixture source commit differs")
     files = Fixtures.verified_fixture_paths(fixture_manifest, fixture)
     required = Set((
         "forcing",
@@ -244,7 +250,8 @@ function read_csv(path)
     rows = map(lines[2:end]) do line
         values = strip.(split(line, ','; keepempty = true))
         isempty(last(values)) && pop!(values)
-        length(values) == length(header) || error("CSV column mismatch: $path")
+        length(values) == length(header) ||
+            error("CSV column mismatch: $path")
         values
     end
     return (; header, rows)
@@ -265,7 +272,8 @@ function boundary_values(stage_root, cell_ids)
             column == id_index && continue
             parsed = tryparse.(Float64, getindex.(ordered, column))
             any(isnothing, parsed) && continue
-            values["$prefix.$name"] = Float64[something(value) for value in parsed]
+            values["$prefix.$name"] =
+                Float64[something(value) for value in parsed]
         end
     end
     return values
@@ -273,7 +281,8 @@ end
 
 function scan_boundaries(run_root, cell_ids, observer)
     for (index, stage) in enumerate(STAGES[1:3])
-        root = joinpath(run_root, "stages", "$(lpad(index, 2, '0'))-$(stage.name)")
+        root =
+            joinpath(run_root, "stages", "$(lpad(index, 2, '0'))-$(stage.name)")
         step, date = BOUNDARY_END[stage.name]
         observer(stage.name, step, date, boundary_values(root, cell_ids))
     end
@@ -298,7 +307,9 @@ function scan_historical(historical_root, cell_ids, observer)
             prefix => Reduced.daily_path(historical_root, prefix, year) for
             prefix in ("casaclm", "corpse")
         )
-        datasets = Dict(prefix => NCDatasets.NCDataset(path) for (prefix, path) in paths)
+        datasets = Dict(
+            prefix => NCDatasets.NCDataset(path) for (prefix, path) in paths
+        )
         try
             series = Dict(
                 name => Reduced.selected_series(
@@ -313,7 +324,10 @@ function scan_historical(historical_root, cell_ids, observer)
                     "historical",
                     step,
                     noleap_date(year, day),
-                    Dict(name => view(values, :, day) for (name, values) in series),
+                    Dict(
+                        name => view(values, :, day) for
+                        (name, values) in series
+                    ),
                 )
             end
         finally
@@ -354,17 +368,23 @@ function run(;
     isfile(executable) || error("shared CORPSE executable is missing")
     isempty(readdir(mkpath(output_root))) ||
         error("CORPSE Fortran output directory must be empty")
-    specification = workflow_writer(fixture_manifest, scope_manifest, output_root)
+    specification =
+        workflow_writer(fixture_manifest, scope_manifest, output_root)
     specification.inputs.cell_ids == cell_ids ||
         error("CORPSE Fortran runner did not receive the exact scope order")
-    results = workflow_runner(executable, specification.workflow_path, output_root)
+    results =
+        workflow_runner(executable, specification.workflow_path, output_root)
     all(result.status in (:ran, :reused, :recovered) for result in results) ||
         error("Representative CORPSE Fortran workflow did not finish")
     boundary_scanner(output_root, cell_ids, observer)
     historical_root = joinpath(output_root, "stages", "04-historical")
     historical_scanner(historical_root, cell_ids, observer)
     write_reconstruction_report(output_root)
-    return (; cell_ids = copy(cell_ids), boundary_root = output_root, historical_root)
+    return (;
+        cell_ids = copy(cell_ids),
+        boundary_root = output_root,
+        historical_root,
+    )
 end
 
 end

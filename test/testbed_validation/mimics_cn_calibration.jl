@@ -5,10 +5,8 @@ import TOML
 import SHA
 
 const SAFETY_FACTOR = 1.05
-const BOUNDARY_CALIBRATION_ID =
-    "mimics-cn-current-julia-fresh-fortran-800-representative-union-boundary-v1"
-const HISTORICAL_CALIBRATION_ID =
-    "mimics-cn-current-julia-fresh-fortran-representative-history-v1"
+const BOUNDARY_CALIBRATION_ID = "mimics-cn-current-julia-fresh-fortran-800-representative-union-boundary-v1"
+const HISTORICAL_CALIBRATION_ID = "mimics-cn-current-julia-fresh-fortran-representative-history-v1"
 const METHOD_FIELDS = Set((
     "error",
     "nonfinite",
@@ -17,10 +15,8 @@ const METHOD_FIELDS = Set((
     "safety_margin",
     "selection",
 ))
-const POPULATION_SIZES = Dict(
-    "random_pft_800" => (800, 790),
-    "representative" => (80, 80),
-)
+const POPULATION_SIZES =
+    Dict("random_pft_800" => (800, 790), "representative" => (80, 80))
 const STAGES = Set(("prespin", "spin", "spin_continuation", "historical"))
 
 sha256sum(path) = bytes2hex(SHA.sha256(read(path)))
@@ -31,8 +27,7 @@ is_git_revision(value) =
 
 function validate_method(document, location)
     method = get(document, "method", nothing)
-    method isa AbstractDict ||
-        error("$location calibration method is missing")
+    method isa AbstractDict || error("$location calibration method is missing")
     Set(keys(method)) == METHOD_FIELDS ||
         error("$location calibration method fields are invalid")
     all(value -> value isa AbstractString && !isempty(value), values(method)) ||
@@ -110,9 +105,8 @@ function validate_boundary(document)
         get(population, "cell_count", nothing) == cell_count &&
             get(population, "eligible_cell_count", nothing) == eligible_count ||
             error("boundary $name population count is invalid")
-        is_git_revision(
-            get(population, "fortran_source_revision", nothing),
-        ) || error("boundary $name Fortran revision is invalid")
+        is_git_revision(get(population, "fortran_source_revision", nothing)) ||
+            error("boundary $name Fortran revision is invalid")
         for key in ("cell_ids_sha256",)
             validate_digest(
                 get(population, key, nothing),
@@ -153,18 +147,14 @@ function validate_boundary(document)
             all(
                 record ->
                     get(record, "finite_pair_count", nothing) ==
-                    eligible_count &&
-                        get(record, "failed_pairs", nothing) == 0,
+                    eligible_count && get(record, "failed_pairs", nothing) == 0,
                 values(records),
             ) || error("boundary $name $stage validation is invalid")
         end
     end
 
-    population_path = joinpath(
-        @__DIR__,
-        "validation",
-        "mimics_cn_boundary_populations.toml",
-    )
+    population_path =
+        joinpath(@__DIR__, "validation", "mimics_cn_boundary_populations.toml")
     scope_path =
         joinpath(@__DIR__, "validation", "scopes", "representative.toml")
     validate_local_source(
@@ -181,8 +171,7 @@ function validate_boundary(document)
     )
     for key in ("normal_casa_parameters", "mimics_parameters")
         record = get(provenance, key, nothing)
-        record isa AbstractDict ||
-            error("boundary $key provenance is missing")
+        record isa AbstractDict || error("boundary $key provenance is missing")
         validate_digest(
             get(record, "sha256", nothing),
             "boundary $key provenance",
@@ -212,10 +201,7 @@ function validate_historical(document)
         error("historical Fortran oracle provenance is missing")
     get(oracle, "id", nothing) == "pinned_mimics_cn_representative_oracle" ||
         error("historical Fortran oracle id is invalid")
-    validate_digest(
-        get(oracle, "sha256", nothing),
-        "historical Fortran oracle",
-    )
+    validate_digest(get(oracle, "sha256", nothing), "historical Fortran oracle")
     get(oracle, "scope_manifest_sha256", nothing) == sha256sum(scope_path) ||
         error("historical Fortran oracle scope hash is stale")
     is_git_revision(get(oracle, "fortran_source_revision", nothing)) ||
@@ -238,8 +224,10 @@ function validate_historical(document)
 end
 
 function right_derivative(relative, errors, references, absolute_floor)
-    maximum_residual =
-        maximum(errors[index] - relative * references[index] for index in eachindex(errors))
+    maximum_residual = maximum(
+        errors[index] - relative * references[index] for
+        index in eachindex(errors)
+    )
     maximum_value = max(absolute_floor, maximum_residual)
     derivative =
         maximum_value == absolute_floor ? Statistics.mean(references) : -Inf
@@ -279,12 +267,7 @@ function calibrated_envelope(actual, expected)
     relative = 0.0
     if right_derivative(relative, errors, references, 0.0) < 0
         upper = eps(Float64)
-        while right_derivative(
-            upper,
-            errors,
-            references,
-            0.0,
-        ) < 0
+        while right_derivative(upper, errors, references, 0.0) < 0
             upper *= 2
             isfinite(upper) ||
                 error("unable to bracket MIMICS-CN relative tolerance")
@@ -292,12 +275,7 @@ function calibrated_envelope(actual, expected)
         lower = 0.0
         for _ in 1:256
             middle = (lower + upper) / 2
-            if right_derivative(
-                middle,
-                errors,
-                references,
-                0.0,
-            ) < 0
+            if right_derivative(middle, errors, references, 0.0) < 0
                 lower = middle
             else
                 upper = middle
@@ -337,8 +315,7 @@ function distribution(values)
 end
 
 function observation_record(observations, index)
-    isnothing(observations) &&
-        return Dict("observation_index" => index)
+    isnothing(observations) && return Dict("observation_index" => index)
     value = observations[index]
     return Dict(String(name) => field for (name, field) in pairs(value))
 end
@@ -349,10 +326,8 @@ function calibration_record(actual, expected; units, observations = nothing)
         error("MIMICS-CN calibration observation metadata is not aligned")
     envelope = calibrated_envelope(actual, expected)
     nonzero = findall(value -> !iszero(value), envelope.references)
-    relative_errors =
-        envelope.errors[nonzero] ./ envelope.references[nonzero]
-    residuals =
-        envelope.errors .- envelope.raw_rtol .* envelope.references
+    relative_errors = envelope.errors[nonzero] ./ envelope.references[nonzero]
+    residuals = envelope.errors .- envelope.raw_rtol .* envelope.references
     maximum_residual = maximum(residuals)
     active_tolerance =
         256eps(Float64) * max(abs(maximum_residual), floatmin(Float64))
@@ -379,8 +354,7 @@ function calibration_record(actual, expected; units, observations = nothing)
                     envelope.errors[index] / envelope.references[index],
             ),
             observation_record(observations, index),
-        ) for (rank, index) in
-        enumerate(order[1:min(6, length(order))])
+        ) for (rank, index) in enumerate(order[1:min(6, length(order))])
     ]
     return Dict(
         "finite_pair_count" => length(actual),
@@ -423,8 +397,10 @@ function policy_record(record, location)
     policy = get(record, "derived_policy", Dict{String, Any}())
     atol = get(policy, "atol", nothing)
     rtol = get(policy, "rtol", nothing)
-    all(value -> value isa Real && isfinite(value) && value >= 0, (atol, rtol)) ||
-        error("$location has an invalid derived policy")
+    all(
+        value -> value isa Real && isfinite(value) && value >= 0,
+        (atol, rtol),
+    ) || error("$location has an invalid derived policy")
     get(policy, "validation_failed_pairs", 1) == 0 ||
         error("$location does not enclose its calibration population")
     return Dict("atol" => atol, "rtol" => rtol)
@@ -448,18 +424,14 @@ function comparison_policy(boundary_path, historical_path)
     return Dict(
         "fresh_fortran_boundary" => Dict(
             stage => Dict(
-                name => policy_record(
-                    record,
-                    "boundary.$stage.$name",
-                ) for (name, record) in variables
+                name => policy_record(record, "boundary.$stage.$name")
+                for (name, record) in variables
             ) for (stage, variables) in boundary_values
         ),
         "fresh_fortran_annual" => Dict(
             reducer => Dict(
-                name => policy_record(
-                    record,
-                    "annual.$reducer.$name",
-                ) for (name, record) in variables
+                name => policy_record(record, "annual.$reducer.$name")
+                for (name, record) in variables
             ) for (reducer, variables) in annual_values
         ),
         "fresh_fortran_daily" => Dict(

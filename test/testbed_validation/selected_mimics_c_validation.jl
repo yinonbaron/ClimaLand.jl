@@ -17,8 +17,7 @@ const YEARS = 1901:2014
 const POINTS = 80
 # The pinned Fortran reads desorpQ10/desorpTref unconditionally, so only the
 # MIMICS_mod5_GSWP3_JAMES table can drive it.
-const MIMICS_PARAMETER_SHA256 =
-    "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+const MIMICS_PARAMETER_SHA256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
 const STAGE_SPECS = (
     (
         name = "prespin",
@@ -46,9 +45,10 @@ const STAGE_SPECS = (
     ),
 )
 
-sha256sum(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256sum(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function prepare_inputs(selected_root; fixture_root = FIXTURE_ROOT)
     mkpath(selected_root)
@@ -143,8 +143,9 @@ function write_workflow(
     controls = joinpath(configuration, "controls")
     selected_root = joinpath(run_root, "selected_inputs")
     mkpath(controls)
-    forcing_root = prepare ? prepare_inputs(selected_root; fixture_root) :
-                   joinpath(selected_root, "forcing")
+    forcing_root =
+        prepare ? prepare_inputs(selected_root; fixture_root) :
+        joinpath(selected_root, "forcing")
     common = static_inputs(
         source_root,
         selected_root,

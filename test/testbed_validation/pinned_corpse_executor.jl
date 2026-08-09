@@ -252,8 +252,8 @@ function execute(
     else
         assigned = Int.(cell_ids)
         !isempty(assigned) &&
-        assigned == sort(unique(assigned)) &&
-        all(id -> id in scope.cell_ids, assigned) || throw(
+            assigned == sort(unique(assigned)) &&
+            all(id -> id in scope.cell_ids, assigned) || throw(
             ArgumentError("cell_ids must be a sorted nonempty scope subset"),
         )
         assigned

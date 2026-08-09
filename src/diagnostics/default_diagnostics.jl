@@ -564,9 +564,11 @@ function get_possible_diagnostics(model::BucketModel)
     ]
 end
 
-get_possible_diagnostics(model::CASAPlantModel) = testbed_diagnostic_names(model)
+get_possible_diagnostics(model::CASAPlantModel) =
+    testbed_diagnostic_names(model)
 get_possible_diagnostics(model::CASASoilModel) = testbed_diagnostic_names(model)
-get_possible_diagnostics(model::MIMICSSoilModel) = testbed_diagnostic_names(model)
+get_possible_diagnostics(model::MIMICSSoilModel) =
+    testbed_diagnostic_names(model)
 get_possible_diagnostics(::CORPSESoilModel) =
     testbed_diagnostic_names(:corpse_soil)
 

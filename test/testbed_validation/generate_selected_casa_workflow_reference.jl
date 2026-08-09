@@ -47,8 +47,7 @@ must never be applied to a carbon-nitrogen run.
 function policy_budget_rtol(model)
     policy = TOML.parsefile(COMPARISON_POLICY_PATH)
     rules = get(get(policy, "model", Dict{String, Any}()), model, nothing)
-    rules isa AbstractDict ||
-        error("Comparison Policy has no $model rules")
+    rules isa AbstractDict || error("Comparison Policy has no $model rules")
     budget_rtol = get(rules, "budget_rtol", nothing)
     budget_rtol isa Real && isfinite(budget_rtol) && budget_rtol >= 0 ||
         error("Comparison Policy has an invalid $model budget rtol")
@@ -322,9 +321,8 @@ function measured_boundary_tolerance(path, julia, fortran)
     tolerance = calibrated_fortran_tolerance(path)
     for (stage, variables) in tolerance
         for (name, values) in variables
-            values["measured_maximum_absolute_error"] = maximum(
-                abs.(julia[stage][name] .- fortran[stage][name]),
-            )
+            values["measured_maximum_absolute_error"] =
+                maximum(abs.(julia[stage][name] .- fortran[stage][name]))
         end
     end
     return tolerance
@@ -518,7 +516,8 @@ function representative_collection(fixture_manifest_path, scope_manifest_path)
     scope_ids = Int.(get(scope, "cell_ids", Int[]))
     get(scope, "schema_version", nothing) == 1 &&
         get(scope, "name", nothing) == "representative" &&
-        length(scope_ids) == 80 && length(unique(scope_ids)) == 80 || error(
+        length(scope_ids) == 80 &&
+        length(unique(scope_ids)) == 80 || error(
         "CASA fresh worker requires the immutable 80-cell Representative scope",
     )
     selection = get(fixture, "selection", Dict{String, Any}())
@@ -583,14 +582,14 @@ function first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
 
     if !isempty(daily)
         sample_days = Int.(get(daily, "sample_days", Int[]))
-        issorted(sample_days) || error("Fresh Fortran daily samples are unordered")
+        issorted(sample_days) ||
+            error("Fresh Fortran daily samples are unordered")
         for day_index in eachindex(sample_days)
             date = string(
                 Dates.Date(1901, 1, 1) + Dates.Day(sample_days[day_index] - 1),
             )
-            for variable in sort!(
-                setdiff(String.(collect(keys(daily))), ["sample_days"]),
-            )
+            for variable in
+                sort!(setdiff(String.(collect(keys(daily))), ["sample_days"]))
                 values = daily[variable]
                 length(values) == length(cell_ids) * length(sample_days) ||
                     error(
@@ -612,9 +611,8 @@ function first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
         years = Int.(get(annual, "years", Int[]))
         issorted(years) || error("Fresh Fortran annual samples are unordered")
         for year_index in eachindex(years)
-            for reducer in sort!(
-                setdiff(String.(collect(keys(annual))), ["years"]),
-            )
+            for reducer in
+                sort!(setdiff(String.(collect(keys(annual))), ["years"]))
                 variables = annual[reducer]
                 variables isa AbstractDict ||
                     error("Fresh Fortran annual.$reducer is malformed")
@@ -625,9 +623,7 @@ function first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
                     )
                     offset = (year_index - 1) * length(cell_ids)
                     inspect_values!(
-                        @view(
-                            values[(offset + 1):(offset + length(cell_ids))]
-                        ),
+                        @view(values[(offset + 1):(offset + length(cell_ids))]),
                         "historical",
                         "$(years[year_index])-12-31",
                         "$reducer.$variable",
@@ -666,8 +662,7 @@ function first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
     )
     records = Dict{String, Any}[]
     for candidate in candidates
-        if isempty(records) ||
-           records[end]["cell_id"] != candidate["cell_id"]
+        if isempty(records) || records[end]["cell_id"] != candidate["cell_id"]
             push!(records, candidate)
         end
     end
@@ -698,8 +693,7 @@ function refresh_representative_fortran_reference(
         error("CASA reference template differs from the Representative scope")
     configurations = get(reference, "configuration", Dict{String, Any}())
     name = String(configuration)
-    haskey(configurations, name) ||
-        error("CASA reference template lacks $name")
+    haskey(configurations, name) || error("CASA reference template lacks $name")
 
     indices = source_indices(fortran_root, cell_ids)
     boundaries = fortran_boundaries(fortran_root, configuration, indices)
@@ -711,10 +705,8 @@ function refresh_representative_fortran_reference(
         fortran_daily(fortran_root, cell_ids) : Dict{String, Any}()
     nonfinite_records =
         first_fortran_nonfinites(boundaries, annual, daily, cell_ids)
-    isempty(nonfinite_records) || return (
-        oracle_path = nothing,
-        nonfinite_records,
-    )
+    isempty(nonfinite_records) ||
+        return (oracle_path = nothing, nonfinite_records)
 
     refreshed = deepcopy(reference)
     configuration_reference = refreshed["configuration"][name]
@@ -724,8 +716,8 @@ function refresh_representative_fortran_reference(
         "historical" => daily,
     )
     calibration_path =
-        configuration == :carbon_only ?
-        CASA_C_CALIBRATION_PATH : CASA_CN_CALIBRATION_PATH
+        configuration == :carbon_only ? CASA_C_CALIBRATION_PATH :
+        CASA_CN_CALIBRATION_PATH
     configuration_reference["tolerance"]["fresh_fortran_boundary"] =
         measured_boundary_tolerance(
             calibration_path,
@@ -794,10 +786,8 @@ function finish_representative_worker(
     isdir(fortran_root) || error("Fresh Fortran run root is missing")
     isfile(reference_template) || error("CASA reference template is missing")
     isfile(build_metadata_path) || error("Shared build metadata is missing")
-    collection = representative_collection(
-        fixture_manifest_path,
-        scope_manifest_path,
-    )
+    collection =
+        representative_collection(fixture_manifest_path, scope_manifest_path)
     built = reference_builder(
         configuration,
         collection,
@@ -867,8 +857,7 @@ function finish_representative_worker(
     end
     report_path = getproperty(julia, :report)
     isfile(report_path) || error("Fresh CASA Julia report is missing")
-    return (
-        ;
+    return (;
         oracle_path,
         julia,
         report_path,

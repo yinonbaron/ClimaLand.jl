@@ -142,9 +142,8 @@ function extract_fixture(
     cell_id,
     ;
     output_artifact_id = "casa_c_output",
-    output_member =
-        "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/" *
-        "casaclm_pool_flux_1901_1905_daily.nc",
+    output_member = "CASACNP_mod5_GSWP3_Conly/OUTPUT_C/HIST/" *
+                    "casaclm_pool_flux_1901_1905_daily.nc",
     script = "extract_fixture.jl",
 )
     mkpath(destination)
@@ -376,9 +375,8 @@ function main(args)
             args[6],
             parse(Int, args[7]);
             output_artifact_id = "casa_cn_output",
-            output_member =
-                "CASACNP_mod5_GSWP3_exudate0_cwdN/OUTPUT_CN/HIST/" *
-                "casaclm_pool_flux_1901_1905_daily.nc",
+            output_member = "CASACNP_mod5_GSWP3_exudate0_cwdN/OUTPUT_CN/HIST/" *
+                            "casaclm_pool_flux_1901_1905_daily.nc",
             script = "extract_fixture.jl casa-cn",
         )
         return 0
@@ -399,8 +397,7 @@ function main(args)
             args[4],
             parse(Int, args[5]);
             output_artifact_id = "mimics_cn_output",
-            output_root =
-                "MIMICS_mod5_GSWP3_KO4_exudate0_cwdN/OUTPUT_CN/HIST",
+            output_root = "MIMICS_mod5_GSWP3_KO4_exudate0_cwdN/OUTPUT_CN/HIST",
             script = "extract_fixture.jl mimics-cn",
         )
         return 0

@@ -35,11 +35,9 @@ sha256sum(path) =
         bytes2hex(SHA.sha256(io))
     end
 
-source_record(path) =
-    Dict("sha256" => sha256sum(path))
+source_record(path) = Dict("sha256" => sha256sum(path))
 
-units(variable) =
-    startswith(String(variable), "n_") ? "kg N m^-2" : "kg C m^-2"
+units(variable) = startswith(String(variable), "n_") ? "kg N m^-2" : "kg C m^-2"
 
 function boundary_pairs(
     state,
@@ -48,7 +46,8 @@ function boundary_pairs(
     grid;
     reference_grid_path = joinpath(dirname(casa_path), "grid.csv"),
 )
-    casa_columns, casa_rows = Native.native_mimics().read_boundary_csv(casa_path)
+    casa_columns, casa_rows =
+        Native.native_mimics().read_boundary_csv(casa_path)
     mimics_columns, mimics_rows =
         Native.native_mimics().read_boundary_csv(mimics_path)
     length(casa_rows) == length(mimics_rows) ||
@@ -60,9 +59,7 @@ function boundary_pairs(
     )
     indices = map(grid) do point
         get(by_id, point.cell_id) do
-            error(
-                "MIMICS-CN boundary reference lacks cell $(point.cell_id)",
-            )
+            error("MIMICS-CN boundary reference lacks cell $(point.cell_id)")
         end
     end
     return Dict(
@@ -94,8 +91,8 @@ function boundary_pairs(
                 ],
                 units = units(variable),
             )
-        end for (fortran_name, source, component, variable) in
-        Native.BOUNDARY_VARIABLES
+        end for
+        (fortran_name, source, component, variable) in Native.BOUNDARY_VARIABLES
     )
 end
 
@@ -121,15 +118,13 @@ function validate_exclusions(records, cell_ids)
                 String(get(record, "first_nonfinite_date", "")),
             ) ||
             error("MIMICS-CN boundary exclusion lacks first-failure evidence")
-        cell_id in ids &&
-            error("MIMICS-CN boundary exclusion is duplicated")
+        cell_id in ids && error("MIMICS-CN boundary exclusion is duplicated")
         push!(ids, cell_id)
     end
     return ids, records
 end
 
-cell_ids_sha256(cell_ids) =
-    bytes2hex(SHA.sha256(join(string.(cell_ids), ",")))
+cell_ids_sha256(cell_ids) = bytes2hex(SHA.sha256(join(string.(cell_ids), ",")))
 
 function compatible_duplicate(left, right)
     return left.observation == right.observation
@@ -148,18 +143,18 @@ function population_contract(
         error("boundary population manifest is not for MIMICS-CN")
     scope = TOML.parsefile(scope_manifest_path)
     records = if label == "representative"
-        Int.(scope["cell_ids"]) == cell_ids ||
-            error("representative boundary population does not match its Scope Manifest")
+        Int.(scope["cell_ids"]) == cell_ids || error(
+            "representative boundary population does not match its Scope Manifest",
+        )
         [
-            gap for gap in get(
-                scope,
-                "eligibility_gaps",
-                Dict{String, Any}[],
-            ) if get(gap, "model", nothing) == "MIMICS-CN"
+            gap for
+            gap in get(scope, "eligibility_gaps", Dict{String, Any}[]) if
+            get(gap, "model", nothing) == "MIMICS-CN"
         ]
     else
         candidates = [
-            population for population in population_manifest["population"] if
+            population for
+            population in population_manifest["population"] if
             population["label"] == label
         ]
         length(candidates) == 1 ||
@@ -199,17 +194,14 @@ function failed_pairs(record, pairs, eligible)
     for index in eachindex(pairs.actual)
         pairs.observations[index].cell_id in eligible || continue
         error_value = abs(pairs.actual[index] - pairs.expected[index])
-        limit =
-            policy["atol"] +
-            policy["rtol"] * abs(pairs.expected[index])
+        limit = policy["atol"] + policy["rtol"] * abs(pairs.expected[index])
         failures += error_value > limit
     end
     return failures
 end
 
 function checkpoint_path(output_root, stage)
-    directory =
-        joinpath(output_root, "stages", stage, "checkpoints", stage)
+    directory = joinpath(output_root, "stages", stage, "checkpoints", stage)
     return only(
         filter(
             path -> endswith(path, ".hdf5"),
@@ -236,8 +228,7 @@ function write_calibration(
 )
     isempty(population_specs) &&
         error("MIMICS-CN boundary calibration requires a population")
-    soil_path =
-        joinpath(source_root, "GRID_CN", "gridinfo_soil_CLM5_GSWP3.csv")
+    soil_path = joinpath(source_root, "GRID_CN", "gridinfo_soil_CLM5_GSWP3.csv")
     normal_path =
         joinpath(source_root, "GRID_CN", "pftlookup_igbp_updated4_exud0.csv")
     mimics_path = joinpath(
@@ -259,28 +250,35 @@ function write_calibration(
     maximum_duplicate_julia_delta = 0.0
     maximum_duplicate_fortran_delta = 0.0
     for specification in population_specs
-        haskey(specification, "exclusions") &&
-            error("runtime boundary population specifications cannot declare exclusions")
+        haskey(specification, "exclusions") && error(
+            "runtime boundary population specifications cannot declare exclusions",
+        )
         label = String(specification["label"])
         haskey(populations, label) &&
             error("MIMICS-CN boundary population label is duplicated")
         grid_path = String(specification["grid_path"])
         reference_root = String(specification["fortran_root"])
         output_root = String(specification["julia_output_root"])
-        fortran_workflow_path = String(get(
-            specification,
-            "fortran_workflow_path",
-            joinpath(reference_root, "configuration", "workflow.toml"),
-        ))
-        fortran_build_path = String(get(
-            specification,
-            "fortran_build_metadata_path",
-            joinpath(reference_root, "build", "build_metadata.toml"),
-        ))
-        isfile(fortran_workflow_path) ||
-            error("MIMICS-CN boundary population lacks Fortran workflow provenance")
-        isfile(fortran_build_path) ||
-            error("MIMICS-CN boundary population lacks Fortran build provenance")
+        fortran_workflow_path = String(
+            get(
+                specification,
+                "fortran_workflow_path",
+                joinpath(reference_root, "configuration", "workflow.toml"),
+            ),
+        )
+        fortran_build_path = String(
+            get(
+                specification,
+                "fortran_build_metadata_path",
+                joinpath(reference_root, "build", "build_metadata.toml"),
+            ),
+        )
+        isfile(fortran_workflow_path) || error(
+            "MIMICS-CN boundary population lacks Fortran workflow provenance",
+        )
+        isfile(fortran_build_path) || error(
+            "MIMICS-CN boundary population lacks Fortran build provenance",
+        )
         fortran_workflow = TOML.parsefile(fortran_workflow_path)
         fortran_source_revision =
             String(get(fortran_workflow, "source_commit", ""))
@@ -377,9 +375,8 @@ function write_calibration(
                             cell_id,
                             stage,
                             variable = name,
-                            side =
-                                !isfinite(values.actual[index]) ?
-                                "julia" : "fortran",
+                            side = !isfinite(values.actual[index]) ?
+                                   "julia" : "fortran",
                         )
                         push!(observed_nonfinite, item)
                         cell_id in excluded || push!(unreviewed_nonfinite, item)
@@ -422,9 +419,9 @@ function write_calibration(
             evidence = filter(
                 item ->
                     item.cell_id == cell_id &&
-                    item.stage == record["first_nonfinite_stage"] &&
-                    item.variable == record["first_nonfinite_variable"] &&
-                    item.side == record["evidence_side"],
+                        item.stage == record["first_nonfinite_stage"] &&
+                        item.variable == record["first_nonfinite_variable"] &&
+                        item.side == record["evidence_side"],
                 observed_nonfinite,
             )
             isempty(evidence) && error(
@@ -453,11 +450,10 @@ function write_calibration(
                 get!(first_failure, item.cell_id, item)
             end
             error(
-                "eligible MIMICS-CN boundary pairs are nonfinite: " *
-                join(
+                "eligible MIMICS-CN boundary pairs are nonfinite: " * join(
                     (
-                        "cell $(item.cell_id) $(item.stage).$(item.variable) ($(item.side))" for
-                        item in sort!(
+                        "cell $(item.cell_id) $(item.stage).$(item.variable) ($(item.side))"
+                        for item in sort!(
                             collect(values(first_failure));
                             by = item -> item.cell_id,
                         )
@@ -481,13 +477,14 @@ function write_calibration(
     variables = Dict(
         stage => Dict(
             name => begin
-                pairs = sort!(collect(values(by_cell)); by = x -> x.observation.cell_id)
+                pairs = sort!(
+                    collect(values(by_cell));
+                    by = x -> x.observation.cell_id,
+                )
                 Calibration.calibration_record(
                     getproperty.(pairs, :actual),
                     getproperty.(pairs, :expected);
-                    units = units(
-                        Symbol(last(split(name, "."))),
-                    ),
+                    units = units(Symbol(last(split(name, ".")))),
                     observations = getproperty.(pairs, :observation),
                 )
             end for (name, by_cell) in stage_pairs
@@ -523,8 +520,7 @@ function write_calibration(
     repo_root = normpath(joinpath(@__DIR__, "..", ".."))
     document = Dict(
         "schema_version" => 1,
-        "calibration_id" =>
-            "mimics-cn-current-julia-fresh-fortran-800-representative-union-boundary-v1",
+        "calibration_id" => "mimics-cn-current-julia-fresh-fortran-800-representative-union-boundary-v1",
         "model" => "MIMICS-CN",
         "source" => "fresh_fortran_compatible_population_union",
         "union_cell_count" => maximum(
@@ -535,21 +531,16 @@ function write_calibration(
             "error" => "e_i = abs(Julia_i - Fortran_i)",
             "reference_magnitude" => "x_i = abs(Fortran_i)",
             "raw_absolute" => "a(r) = max(0, max_i(e_i - r*x_i))",
-            "selection" =>
-                "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
-            "safety_margin" =>
-                "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
-            "nonfinite" =>
-                "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
+            "selection" => "choose the smallest r >= 0 minimizing a(r) + r*mean(x)",
+            "safety_margin" => "multiply raw atol and rtol by 1.05, then add 64eps(Float64) times the maximum observed Julia/Fortran magnitude to atol",
+            "nonfinite" => "fail calibration; exclusions require a reviewed Scope Manifest Eligibility Gap",
         ),
         "deduplication" => Dict(
-            "rule" =>
-                "one pair per cell/stage/variable; overlapping population metadata must match exactly, the first population is retained, and compatibility requires zero failed pairs when the fitted policy is applied independently to both complete populations",
+            "rule" => "one pair per cell/stage/variable; overlapping population metadata must match exactly, the first population is retained, and compatibility requires zero failed pairs when the fitted policy is applied independently to both complete populations",
             "overlapping_cell_count" => length(overlapping_cell_ids),
             "overlapping_cell_ids" => sort!(collect(overlapping_cell_ids)),
             "duplicate_pair_count" => duplicate_pair_count,
-            "maximum_julia_absolute_delta" =>
-                maximum_duplicate_julia_delta,
+            "maximum_julia_absolute_delta" => maximum_duplicate_julia_delta,
             "maximum_fortran_absolute_delta" =>
                 maximum_duplicate_fortran_delta,
         ),

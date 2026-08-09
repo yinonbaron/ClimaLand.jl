@@ -814,11 +814,9 @@ function boundary_summary(pairs)
 end
 
 has_scientific_floor(::Any) = false
-has_scientific_floor(values::AbstractVector) =
-    any(has_scientific_floor, values)
+has_scientific_floor(values::AbstractVector) = any(has_scientific_floor, values)
 has_scientific_floor(values::AbstractDict) = any(
-    occursin("floor", lowercase(string(key))) || has_scientific_floor(value)
-    for (key, value) in values
+    occursin("floor", lowercase(string(key))) || has_scientific_floor(value) for (key, value) in values
 )
 
 function calibration_policy(path)
@@ -861,8 +859,7 @@ function calibration_policy(path)
         "safety_margin",
         "selection",
     )) || error("calibration method schema differs")
-    method["acceptance"] ==
-        "e_i <= atol + rtol*x_i for every eligible pair" &&
+    method["acceptance"] == "e_i <= atol + rtol*x_i for every eligible pair" &&
         method["coefficient_constraints"] ==
         "fit atol >= 0 and rtol >= 0 solely from observed errors and absolute Fortran reference magnitudes" &&
         method["error"] == "e_i = abs(Julia_i - Fortran_i)" &&
@@ -1050,27 +1047,20 @@ function verify_boundary_reference(calibration, reference_root)
     provenance = get(calibration, "provenance", Dict{String, Any}())
     verify(record, path, id) = begin
         get(record, "id", nothing) == id ||
-            error("Fortran boundary reference identifier differs for $id")
-        get(record, "sha256", nothing) ==
-        native_workflow().sha256sum(path) ||
-            error("Fortran boundary reference hash differs for $id")
+        error("Fortran boundary reference identifier differs for $id")
+        get(record, "sha256", nothing) == native_workflow().sha256sum(path) ||
+        error("Fortran boundary reference hash differs for $id")
     end
     verify(
-        get(
-            provenance,
-            "fortran_reconstruction_report",
-            Dict{String, Any}(),
-        ),
+        get(provenance, "fortran_reconstruction_report", Dict{String, Any}()),
         joinpath(reference_root, "reconstruction_report.toml"),
         "fortran/reconstruction_report.toml",
     )
-    stage_provenance =
-        get(provenance, "fortran_stage", Dict{String, Any}())
+    stage_provenance = get(provenance, "fortran_stage", Dict{String, Any}())
     for stage in canonical_stages()
         name = String(stage.name)
         records = get(stage_provenance, name, Dict{String, Any}())
-        stage_root =
-            joinpath(reference_root, "stages", stage_directory(stage))
+        stage_root = joinpath(reference_root, "stages", stage_directory(stage))
         for (key, filename) in (
             "casa_boundary" => "casa_final.csv",
             "corpse_boundary" => "corpse_final.csv",
@@ -1232,8 +1222,9 @@ function run_gridded_case(
                     selected_corpse().corpse_carbon_totals(current_state),
                 )
             end
-            restart_transform.verified ||
-                error("CORPSE $(stage.name) restart transform is not conservative")
+            restart_transform.verified || error(
+                "CORPSE $(stage.name) restart transform is not conservative",
+            )
             stage_start_totals =
                 selected_corpse().corpse_carbon_totals(current_state)
             stage_root = joinpath(output_root, "stages", String(stage.name))
@@ -1269,8 +1260,9 @@ function run_gridded_case(
                 selected_corpse().corpse_carbon_totals(current_state),
             )
             conservation = selected_corpse().corpse_conservation(current_state)
-            handoff.verified ||
-                error("CORPSE $(stage.name) checkpoint handoff is not conservative")
+            handoff.verified || error(
+                "CORPSE $(stage.name) checkpoint handoff is not conservative",
+            )
             conservation.verified ||
                 error("CORPSE $(stage.name) state violates conservation")
             comparison =
