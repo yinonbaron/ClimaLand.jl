@@ -52,6 +52,11 @@ function valid_cohort(::Type{FT}) where {FT}
     )
 end
 
+function compiler_allocation_limit(julia_1_10_limit)
+    # Julia 1.10 boxes large immutable results and intermediates.
+    return VERSION < v"1.11" ? julia_1_10_limit : 0
+end
+
 for FT in (Float32, Float64)
     @testset "CORPSE carbon kernels, FT = $FT" begin
         parameters = corpse_carbon_parameters(FT)
@@ -66,7 +71,7 @@ for FT in (Float32, Float64)
             FT(0.05),
             FT(0.15),
         )
-        @test @allocated(
+        mapped_allocations = @allocated(
             CORPSE.update_cohort(
                 parameters,
                 cohort,
@@ -76,7 +81,8 @@ for FT in (Float32, Float64)
                 FT(0.05),
                 FT(0.15),
             )
-        ) == 0
+        )
+        @test mapped_allocations <= compiler_allocation_limit(160)
         @test CORPSE.cohort_carbon(mapped.state) ≈ CORPSE.cohort_carbon(cohort) rtol =
             16eps(FT)
         @test mapped.state[9] == cohort[9]
@@ -121,7 +127,7 @@ for FT in (Float32, Float64)
             FT(0.05),
             FT(0.15),
         )
-        @test @allocated(
+        continuous_allocations = @allocated(
             CORPSE.continuous_cohort_tendencies(
                 parameters,
                 cohort,
@@ -134,7 +140,8 @@ for FT in (Float32, Float64)
                 FT(0.05),
                 FT(0.15),
             )
-        ) == 0
+        )
+        @test continuous_allocations <= compiler_allocation_limit(160)
         input_rate = sum(litter_rate) * fraction + sum(exudate_rate)
         @test sum(continuous.state[1:7]) + continuous.respiration ≈ input_rate rtol =
             64eps(FT)
@@ -186,9 +193,10 @@ for FT in (Float32, Float64)
             environment,
         )
         CORPSE.daily_carbon_map(parameters, states, inputs, environment)
-        @test @allocated(
+        day_allocations = @allocated(
             CORPSE.daily_carbon_map(parameters, states, inputs, environment)
-        ) == 0
+        )
+        @test day_allocations <= compiler_allocation_limit(352)
         previous_carbon = sum(CORPSE.cohort_carbon.(states))
         input_carbon = sum(root_litter) + sum(leaf_litter) + sum(exudate)
         @test sum(CORPSE.cohort_carbon.(day.state)) ≈
@@ -512,13 +520,14 @@ end
         drivers...,
     )
     CORPSE.continuous_carbon_fluxes(parameters, initial_parts..., drivers...)
-    @test @allocated(
+    continuous_flux_allocations = @allocated(
         CORPSE.continuous_carbon_fluxes(
             parameters,
             initial_parts...,
             drivers...,
         )
-    ) == 0
+    )
+    @test continuous_flux_allocations <= compiler_allocation_limit(1536)
     @test continuous_fluxes == CORPSE.continuous_carbon_fluxes(
         parameters,
         initial_parts...,
