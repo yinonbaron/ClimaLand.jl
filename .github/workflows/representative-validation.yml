@@ -37,7 +37,7 @@ jobs:
             slug: casa-cn
             reference_artifact: representative_casa_cn_reference
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    timeout-minutes: 180
+    timeout-minutes: 100
     env:
       JULIA_NUM_THREADS: '1'
       MODEL: ${{ matrix.target.model }}
@@ -46,7 +46,7 @@ jobs:
       SHARD_INDEX: ${{ matrix.shard }}
       SHARD_COUNT: '8'
       OPENBLAS_NUM_THREADS: '1'
-      CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '7200'
+      CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '4800'
       VALIDATION_OUTPUT: validation-output
     steps:
       - uses: actions/checkout@v7
@@ -108,8 +108,8 @@ jobs:
             2>&1 | tee "${VALIDATION_OUTPUT}/logs/validation-runner.log" &
           validation_pid=$!
           while kill -0 "${validation_pid}" 2>/dev/null; do
-            if (( SECONDS >= 3600 )); then
-              echo "::warning title=Representative shard exceeded its provisional performance budget::${MODEL} shard ${SHARD_INDEX}/${SHARD_COUNT} has run for more than one hour."
+            if (( SECONDS >= 4200 )); then
+              echo "::warning title=Representative shard exceeded its measured performance budget::${MODEL} shard ${SHARD_INDEX}/${SHARD_COUNT} has run for more than 70 minutes."
               break
             fi
             sleep 30
@@ -188,7 +188,7 @@ jobs:
     needs: representative-shard
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3

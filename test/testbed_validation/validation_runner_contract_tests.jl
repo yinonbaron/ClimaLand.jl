@@ -483,12 +483,14 @@ end
     report["outcome"] = "passed"
     @test ContractRunner.annotate_performance_budget!(
         report,
-        3600.1;
+        4200.1;
         io = messages,
     )
     @test report["outcome"] == "passed"
     @test report["performance_budget"]["exceeded"]
-    @test occursin("::warning::", String(take!(messages)))
+    warning = String(take!(messages))
+    @test occursin("::warning::", warning)
+    @test occursin("70-minute performance budget", warning)
 end
 
 @testset "Validation Runner reports injected Representative model outcomes" begin

@@ -734,11 +734,12 @@ the bound forcing artifact.
 The runner enforces a hard process deadline of two hours by default and records
 `timed_out` for every model still running when it fires.
 `CLIMALAND_VALIDATION_TIMEOUT_SECONDS` adjusts that deadline up to six hours;
-values outside `(0, 21600]` are rejected. The CI shard jobs conservatively keep
-the 7,200-second runner deadline and a 180-minute Actions timeout, with a
-provisional warning after 3,600 seconds. These are pending measurement from the
-first clean GitHub-hosted 40-job run and must not be interpreted as measured
-shard requirements.
+values outside `(0, 21600]` are rejected. The CI shard jobs use a measured
+4,800-second runner deadline and 100-minute Actions timeout, with a diagnostic
+warning after 4,200 seconds. The aggregation job has a 30-minute timeout. These
+limits come from the first clean GitHub-hosted 40-job run; its measured timings
+and headroom are recorded in
+[`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md).
 
 ### Reference publication
 

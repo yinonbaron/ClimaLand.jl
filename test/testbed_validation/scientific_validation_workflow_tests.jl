@@ -46,8 +46,8 @@ const REPRESENTATIVE_VALIDATION_WORKFLOW = normpath(
     @test length(findall(r"^\s+- model:"m, workflow)) == 5
     @test occursin("runs-on: ubuntu-latest", workflow)
     @test occursin("version: '1.12'", workflow)
-    @test occursin("timeout-minutes: 180", workflow)
-    @test occursin("CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '7200'", workflow)
+    @test occursin("timeout-minutes: 100", workflow)
+    @test occursin("CLIMALAND_VALIDATION_TIMEOUT_SECONDS: '4800'", workflow)
 
     cache = findfirst("Cache Julia depot and validation artifacts", workflow)
     @test occursin("JULIA_NUM_THREADS: '1'", workflow)
@@ -81,7 +81,7 @@ const REPRESENTATIVE_VALIDATION_WORKFLOW = normpath(
         workflow,
     )
     @test occursin("if: steps.stage_artifacts.outcome == 'success'", workflow)
-    @test occursin("SECONDS >= 3600", workflow)
+    @test occursin("SECONDS >= 4200", workflow)
     @test occursin("::warning", workflow)
     @test occursin("name: Upload compact shard report", workflow)
     @test occursin(
@@ -106,6 +106,7 @@ const REPRESENTATIVE_VALIDATION_WORKFLOW = normpath(
         r"aggregate-validation:\s+name: Representative scientific validation\s+needs: representative-shard\s+if:.*always\(\)"s,
         workflow,
     )
+    @test occursin(r"aggregate-validation:.*timeout-minutes: 30"s, workflow)
     @test occursin("pattern: representative-validation-shard-*", workflow)
     @test !occursin("merge-multiple: true", workflow)
     @test occursin("merge-multiple: false", workflow)

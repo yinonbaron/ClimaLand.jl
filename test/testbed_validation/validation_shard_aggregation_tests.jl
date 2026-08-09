@@ -2,6 +2,8 @@ using Test
 import SHA
 import TOML
 
+include(joinpath(@__DIR__, "validation_runner.jl"))
+const TimeoutShardRunner = TestbedValidationRunner
 include(joinpath(@__DIR__, "validation_shard_aggregation.jl"))
 const ShardAggregation = TestbedValidationShardAggregation
 
@@ -475,6 +477,37 @@ end
         "CASA-CN shard 1 nitrogen budget is missing",
         sprint(showerror, aggregation_error(incomplete_casa_cn)),
     )
+    mktempdir() do output
+        TimeoutShardRunner.write_timeout_report(
+            [
+                "--scope",
+                "representative",
+                "--models",
+                "CORPSE",
+                "--reference",
+                "pinned",
+                "--shard-index",
+                "2",
+                "--shard-count",
+                "8",
+                "--workers",
+                "1",
+                "--output",
+                output,
+            ],
+            output,
+            4800.0,
+            time(),
+        )
+        timed_out = deepcopy(complete)
+        timed_out[2] =
+            TOML.parsefile(joinpath(output, "validation_report.toml"))
+        @test timed_out[2]["outcome"] == "timed_out"
+        @test occursin(
+            "CORPSE shard 2 lacks detailed shard evidence",
+            sprint(showerror, aggregation_error(timed_out)),
+        )
+    end
     failed = deepcopy(complete)
     failed[2]["outcome"] = "failed"
     failed_model = failed[2]["model"][1]

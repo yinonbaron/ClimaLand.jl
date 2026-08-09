@@ -104,7 +104,7 @@ const TIMEOUT_OVERRIDE = "CLIMALAND_VALIDATION_TIMEOUT_SECONDS"
 const FRESH_SOURCE_OVERRIDE = "CLIMALAND_VALIDATION_FORTRAN_SOURCE"
 const CORPSE_FORCING_OVERRIDE = "CLIMALAND_VALIDATION_CORPSE_FORCING"
 const CHILD_PROCESS = "CLIMALAND_VALIDATION_RUNNER_CHILD"
-const PERFORMANCE_BUDGET_SECONDS = 3600.0
+const PERFORMANCE_BUDGET_SECONDS = 4200.0
 const DEFAULT_TIMEOUT_SECONDS = 7200.0
 # Canonical five-worker Representative runs can exceed the default budget on
 # slower shared filesystems, so an explicit override may raise the deadline.
@@ -2294,7 +2294,7 @@ function annotate_performance_budget!(report, seconds; io = stderr)
     )
     println(
         io,
-        "::warning::Representative validation exceeded its one-hour performance budget ($(round(seconds; digits = 3)) seconds)",
+        "::warning::Representative validation exceeded its 70-minute performance budget ($(round(seconds; digits = 3)) seconds)",
     )
     return true
 end
