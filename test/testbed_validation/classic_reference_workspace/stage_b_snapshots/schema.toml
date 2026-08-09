@@ -1,0 +1,544 @@
+endianness = "little"
+required_snapshot_metadata = ["site", "transition", "time_start", "time_end", "deltat_days", "source_commit", "source_sha256", "patch_sha256", "executable_sha256", "job_options_sha256", "model_parameters_sha256", "initialization_sha256"]
+schema_version = 1
+scope = "CLASSIC Stage B mineral-soil carbon"
+site = "DE-Hai"
+storage_order = "fortran_column_major"
+
+[dimensions]
+parameter_class = 15
+pft = 12
+pft_and_bare = 13
+q10_parameter = 4
+scalar = 1
+soil_layer = 20
+tile = 1
+
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "audit.hetrores"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare"]
+dtype = "float64"
+name = "audit.hetrsveg"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "audit.humiftrs"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "audit.humtrsvg"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13, 20]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "audit.litres"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "audit.ltresveg"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13, 20]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "audit.scresveg"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13, 20]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "audit.socres"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "audit.soilresp"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "audit.turbation_delta_litter"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "audit.turbation_delta_soil"
+phase = "audit"
+role = "audit_diagnostic"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft"]
+dtype = "float64"
+name = "forcing.fcancmx"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 12]
+units = "1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "forcing.fg"
+phase = "forcing"
+role = "external_forcing"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "forcing.max_annual_active_layer"
+phase = "forcing"
+role = "external_forcing"
+shape = [1]
+units = "m"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_disturbance_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_disturbance_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_mortality_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_mortality_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_turnover_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.post_resp_turnover_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_competition_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_competition_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_harvest_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_harvest_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_land_use_delta_litter"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "forcing.pre_resp_land_use_delta_soil"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 13, 20]
+units = "kg C m-2 step-1"
+[[field]]
+dimensions = ["tile"]
+dtype = "float64"
+name = "forcing.rmr"
+phase = "forcing"
+role = "external_forcing"
+shape = [1]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "pft"]
+dtype = "float64"
+name = "forcing.rmrveg"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 12]
+units = "umol CO2 m-2 s-1"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "forcing.tbar"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 20]
+units = "K"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "forcing.thice"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 20]
+units = "m3 m-3"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "forcing.thliq"
+phase = "forcing"
+role = "external_forcing"
+shape = [1, 20]
+units = "m3 m-3"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "intermediate.after_pool_update_litrmass"
+phase = "intermediate_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "intermediate.after_pool_update_soilcmas"
+phase = "intermediate_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "intermediate.before_turbation_litrmass"
+phase = "intermediate_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "intermediate.before_turbation_soilcmas"
+phase = "intermediate_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "post.litrmass"
+phase = "post_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "post.soilcmas"
+phase = "post_state"
+role = "reference_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "pre.litrmass"
+phase = "pre_state"
+role = "owned_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+dtype = "float64"
+name = "pre.soilcmas"
+phase = "pre_state"
+role = "owned_state"
+shape = [1, 13, 20]
+units = "kg C m-2"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "static.bi"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.biodiffus"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "m2 d-1"
+[[field]]
+dimensions = ["parameter_class"]
+dtype = "float64"
+name = "static.bsratelt"
+phase = "forcing"
+role = "parameter"
+shape = [15]
+units = "kg C kgC-1 yr-1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.bsratelt_g"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "kg C kgC-1 yr-1"
+[[field]]
+dimensions = ["parameter_class"]
+dtype = "float64"
+name = "static.bsratesc"
+phase = "forcing"
+role = "parameter"
+shape = [15]
+units = "kg C kgC-1 yr-1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.bsratesc_g"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "kg C kgC-1 yr-1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.cryodiffus"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "m2 d-1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.deltat"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "d"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "static.delzw"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "m"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.frozered"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["parameter_class"]
+dtype = "float64"
+name = "static.humicfac"
+phase = "forcing"
+role = "parameter"
+shape = [15]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.humicfac_bg"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "int32"
+name = "static.isand"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.kterm"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "int32"
+name = "static.mineral_mask"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "static.psisat"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "m"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.r_depthredu"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "m"
+[[field]]
+dimensions = ["pft"]
+dtype = "int32"
+name = "static.sort"
+phase = "forcing"
+role = "parameter"
+shape = [12]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "int32"
+name = "static.spinfast"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["q10_parameter"]
+dtype = "float64"
+name = "static.tanhq10"
+phase = "forcing"
+role = "parameter"
+shape = [4]
+units = "1"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.tcrit"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "degC"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.tfrez"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "K"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "static.thpor"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "m3 m-3"
+[[field]]
+dimensions = ["scalar"]
+dtype = "int32"
+name = "static.turbation_on"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"
+[[field]]
+dimensions = ["soil_layer"]
+dtype = "float64"
+name = "static.zbot"
+phase = "forcing"
+role = "parameter"
+shape = [20]
+units = "m"
+[[field]]
+dimensions = ["tile", "soil_layer"]
+dtype = "float64"
+name = "static.zbotw"
+phase = "forcing"
+role = "parameter"
+shape = [1, 20]
+units = "m"
+[[field]]
+dimensions = ["scalar"]
+dtype = "float64"
+name = "static.zero"
+phase = "forcing"
+role = "parameter"
+shape = [1]
+units = "1"

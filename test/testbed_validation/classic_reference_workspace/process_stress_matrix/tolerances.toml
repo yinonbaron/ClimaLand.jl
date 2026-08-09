@@ -1,0 +1,158 @@
+oracle_contract = "stage_b_v5"
+rationale = "Per-field absolute ceilings are ten times the largest measured Float64 error across accepted DE-Hai, canonical GF-Guy, and source-proven BR-Sa1 seasonal replays; BR-Sa1 is additionally bound to its compiler/libm gate-refinement receipt; fields measured exactly remain exact."
+schema_version = 1
+
+[[field]]
+absolute_tolerance = 3.164135620181696e-14
+family = "state"
+name = "reference.after_pool_update_litrmass"
+observed_maximum_absolute_error = 3.164135620181696e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.881784197001252e-15
+family = "state"
+name = "reference.after_pool_update_soilcmas"
+observed_maximum_absolute_error = 8.881784197001252e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.164135620181696e-14
+family = "state"
+name = "reference.before_turbation_litrmass"
+observed_maximum_absolute_error = 3.164135620181696e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.881784197001252e-15
+family = "state"
+name = "reference.before_turbation_soilcmas"
+observed_maximum_absolute_error = 8.881784197001252e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.164135620181696e-14
+family = "state"
+name = "reference.post_litrmass"
+observed_maximum_absolute_error = 3.164135620181696e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.881784197001252e-15
+family = "state"
+name = "reference.post_soilcmas"
+observed_maximum_absolute_error = 8.881784197001252e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.108624468950438e-14
+family = "flux"
+name = "audit.hetrores"
+observed_maximum_absolute_error = 3.1086244689504383e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 9.769962616701378e-14
+family = "flux"
+name = "audit.hetrsveg"
+observed_maximum_absolute_error = 9.769962616701378e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 1.4432899320127035e-14
+family = "flux"
+name = "audit.humiftrs"
+observed_maximum_absolute_error = 1.4432899320127035e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.881784197001252e-15
+family = "flux"
+name = "audit.humtrsvg"
+observed_maximum_absolute_error = 8.881784197001252e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.108624468950438e-14
+family = "flux"
+name = "audit.litres"
+observed_maximum_absolute_error = 3.1086244689504383e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 0.0
+family = "flux"
+name = "audit.litter_clamp_correction"
+observed_maximum_absolute_error = 0.0
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.441691376337985e-14
+family = "flux"
+name = "audit.ltresveg"
+observed_maximum_absolute_error = 3.4416913763379853e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 2.220446049250313e-15
+family = "flux"
+name = "audit.scresveg"
+observed_maximum_absolute_error = 2.220446049250313e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.3306690738754696e-15
+family = "flux"
+name = "audit.socres"
+observed_maximum_absolute_error = 3.3306690738754696e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 0.0
+family = "flux"
+name = "audit.soil_clamp_correction"
+observed_maximum_absolute_error = 0.0
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.469446951953614e-17
+family = "flux"
+name = "audit.soilresp"
+observed_maximum_absolute_error = 3.469446951953614e-18
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 3.0531133177191805e-15
+family = "flux"
+name = "audit.turbation_delta_litter"
+observed_maximum_absolute_error = 3.0531133177191805e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.881784197001252e-15
+family = "flux"
+name = "audit.turbation_delta_soil"
+observed_maximum_absolute_error = 8.881784197001252e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 8.049116928532385e-15
+family = "flux"
+name = "audit.turbation_litter_column_residual"
+observed_maximum_absolute_error = 8.049116928532385e-16
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 2.1094237467877974e-14
+family = "flux"
+name = "audit.turbation_soil_column_residual"
+observed_maximum_absolute_error = 2.1094237467877974e-15
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 1.6504972302072707e-13
+family = "drift"
+name = "accumulated_drift"
+
+observed_maximum_absolute_error = 1.6504972302072707e-14
+safety_factor = 10.0
+[[field]]
+absolute_tolerance = 1.0639926439903746e-13
+family = "budget"
+name = "carbon_closure"
+observed_maximum_absolute_error = 1.0639926439903746e-14
+safety_factor = 10.0
+
+[[measurement_receipt]]
+evidence_id = "issue-102-de-hai-trajectory-v2/replay_receipt_atol_1e-13.toml"
+site = "DE-Hai"
+sha256 = "7c0152c5c986ee68fa8abb7c7da5f4c363127f17d3c4f7436d9b5a2c487e1e3a"
+[[measurement_receipt]]
+evidence_id = "issue-106-process-matrix/measurements/GF-Guy.canonical.replay_receipt.toml"
+site = "GF-Guy"
+sha256 = "8bc7b3ac47145a004fcd8e3c2146557208c409dcdb668d6efb2a9d00ce46bcfb"
+[[measurement_receipt]]
+evidence_id = "issue-103-br-sa1-split-gate-v2/capture/evidence/replay_receipt.toml"
+gate_refinement_evidence_id = "issue-103-br-sa1-split-gate-v2/BR-Sa1.gate-refinement.toml"
+site = "BR-Sa1"
+sha256 = "549c1b543de221038b41b6ae58545b352b1837bd1c1c450794a2e8747ca61650"
+gate_refinement_sha256 = "9c227924ccdf851bece77ba6f582845d3e3442770c128692957fdfb335c7b880"

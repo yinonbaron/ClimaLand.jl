@@ -53,7 +53,8 @@ export SoilCO2ModelParameters,
     SoilDrivers,
     CASA,
     MIMICS,
-    CORPSE
+    CORPSE,
+    CLASSIC
 
 "Compile-time nutrient configuration for standalone biogeochemistry models."
 abstract type AbstractNutrientMode end
@@ -1211,6 +1212,7 @@ end
 include("./casa.jl")
 include("./mimics.jl")
 include("./corpse.jl")
+include("./classic.jl")
 include("./co2_parameterizations.jl")
 
 end # module

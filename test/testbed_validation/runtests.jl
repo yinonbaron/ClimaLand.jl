@@ -9,6 +9,7 @@ include("classic_reference_workspace/de_hai/compare_de_hai_output_tests.jl")
 run(
     `bash $(joinpath(@__DIR__, "classic_reference_workspace", "de_hai", "runner_tests.sh"))`,
 )
+include("classic_reference_workspace/runtests.jl")
 include("extract_fixture.jl")
 include("selected_cell_fixtures.jl")
 include("representative_cell_selection.jl")

@@ -199,3 +199,6 @@ end
 @safetestset "Testbed candidate reconstruction" begin
     include("testbed_validation/candidate_runtests.jl")
 end
+@safetestset "CLASSIC biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/classic.jl")
+end

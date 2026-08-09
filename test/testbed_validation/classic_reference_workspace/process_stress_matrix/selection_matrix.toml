@@ -1,0 +1,169 @@
+schema_version = 1
+
+[acceptance]
+blocked_reason = "pending direct user approval to record the independent-root archive manifest and promote scientific acceptance status"
+required_oracle_contract = "stage_b_v5"
+seasonal_parity_claimed = false
+status = "blocked"
+
+[criteria.cold_freeze_thaw]
+freeze_thaw_transition_count_min = 10
+mean_air_temperature_max_c = 10.0
+minimum_air_temperature_max_c = -10.0
+subzero_day_fraction_min = 0.1
+
+[criteria.seasonal_dry]
+dry_month_fraction_min = 0.25
+maximum_dry_spell_min_days = 30
+mean_air_temperature_min_c = 15.0
+
+[criteria.tropical_warm_wet]
+absolute_latitude_max_deg = 23.5
+annual_precipitation_min_mm = 1500.0
+dry_month_fraction_max = 0.25
+mean_air_temperature_min_c = 20.0
+
+[criteria.wet_mineral]
+absolute_latitude_min_deg = 23.5
+annual_precipitation_min_mm = 1000.0
+dry_month_fraction_max = 0.2
+initial_mineral_liquid_water_min_m3_m3 = 0.25
+mineral_layer_fraction_min = 0.8
+
+[inventory]
+input_receipts_sha256 = "1e24da51bd80a288d84bd57fc93c434d016937d586b12c4541b3f73e554503d6"
+site_count = 59
+site_list_sha256 = "2587c348b3791f48de619decfa5d2f122549ef62c357bc0c9c99a983a96183c4"
+site_metrics_sha256 = "685c8203e23cddea2ffa5ed3ee66c547c3cf21ba9b5130306b6f86b981f7705b"
+
+[provenance]
+campaign_summary_sha256 = "e49baf594785cd756273c9a3a93b09628d5ae8ecb47e5d4e0796bed21c1e3678"
+container_archive_sha256 = "f5083d3cac1b8dd1d790cabf72652d37275de7ef20ac93246999bc0d26372b8e"
+container_doi = "10.5281/zenodo.18201505"
+input_archive_sha256 = "e16d10e5731b6ac8b447bc2388a7d740f21742ee20ba8cc64ca354fa7652a70f"
+input_doi = "10.5281/zenodo.18202323"
+metric_generator = "generate_matrix.jl"
+metric_generator_sha256 = "28a21c158e7250e4ec166076ddb78e1213c07a263f91359a8ccf830631564d6b"
+source_archive_sha256 = "8b7a9b7bc50c4b63bdb4aad9e5037406b919100616684a2c1c8c738b6ebe7ef8"
+source_doi = "10.5281/zenodo.18188101"
+
+[[selection]]
+class = "tropical_warm_wet"
+criteria_passed = true
+selection_rule = "first deterministic rank among qualifying unused sites"
+site = "GF-Guy"
+
+    [selection.metrics]
+    absolute_latitude_deg = 5.27
+    active_layer_count = 18
+    air_temperature_max_c = 31.74
+    air_temperature_mean_c = 25.613541
+    air_temperature_min_c = 20.42
+    annual_precipitation_mean_mm = 3110.493273
+    biome = "EBF"
+    configured_end_year = 2014
+    configured_start_year = 2004
+    dry_month_fraction = 0.113636
+    freeze_thaw_transition_count = 0
+    has_mineral_layers = true
+    initial_mineral_liquid_water_mean_m3_m3 = 0.276273
+    latitude_deg = 5.27
+    maximum_dry_spell_days = 49
+    mineral_layer_count = 18
+    mineral_layer_fraction = 1.0
+    record_count = 192864
+    records_per_day = 48
+    site = "GF-Guy"
+    source_kind = "released_configuration_and_forcing"
+    subzero_day_fraction = 0.0
+    year_count = 11
+[[selection]]
+class = "seasonal_dry"
+criteria_passed = true
+selection_rule = "first deterministic rank among qualifying unused sites"
+site = "SD-Dem"
+
+    [selection.metrics]
+    absolute_latitude_deg = 13.3
+    active_layer_count = 18
+    air_temperature_max_c = 42.937
+    air_temperature_mean_c = 27.361534
+    air_temperature_min_c = 5.422
+    annual_precipitation_mean_mm = 284.94
+    biome = "SAV"
+    configured_end_year = 2009
+    configured_start_year = 2005
+    dry_month_fraction = 0.733333
+    freeze_thaw_transition_count = 0
+    has_mineral_layers = true
+    initial_mineral_liquid_water_mean_m3_m3 = 0.066402
+    latitude_deg = 13.3
+    maximum_dry_spell_days = 234
+    mineral_layer_count = 18
+    mineral_layer_fraction = 1.0
+    record_count = 87648
+    records_per_day = 48
+    site = "SD-Dem"
+    source_kind = "released_configuration_and_forcing"
+    subzero_day_fraction = 0.0
+    year_count = 5
+[[selection]]
+class = "wet_mineral"
+criteria_passed = true
+selection_rule = "first deterministic rank among qualifying unused sites"
+site = "US-MMS"
+
+    [selection.metrics]
+    absolute_latitude_deg = 39.3232
+    active_layer_count = 17
+    air_temperature_max_c = 39.17
+    air_temperature_mean_c = 12.445492
+    air_temperature_min_c = -23.31
+    annual_precipitation_mean_mm = 1084.916158
+    biome = "DBF"
+    configured_end_year = 2017
+    configured_start_year = 1999
+    dry_month_fraction = 0.105263
+    freeze_thaw_transition_count = 530
+    has_mineral_layers = true
+    initial_mineral_liquid_water_mean_m3_m3 = 0.289895
+    latitude_deg = 39.3232
+    maximum_dry_spell_days = 39
+    mineral_layer_count = 17
+    mineral_layer_fraction = 1.0
+    record_count = 166560
+    records_per_day = 24
+    site = "US-MMS"
+    source_kind = "released_configuration_and_forcing"
+    subzero_day_fraction = 0.144669
+    year_count = 19
+[[selection]]
+class = "cold_freeze_thaw"
+criteria_passed = true
+selection_rule = "first deterministic rank among qualifying unused sites"
+site = "CA-Cbo"
+
+    [selection.metrics]
+    absolute_latitude_deg = 44.3167
+    active_layer_count = 20
+    air_temperature_max_c = 35.539
+    air_temperature_mean_c = 7.778877
+    air_temperature_min_c = -29.61
+    annual_precipitation_mean_mm = 928.316593
+    biome = "DBF"
+    configured_end_year = 2020
+    configured_start_year = 1994
+    dry_month_fraction = 0.015432
+    freeze_thaw_transition_count = 844
+    has_mineral_layers = true
+    initial_mineral_liquid_water_mean_m3_m3 = 0.256792
+    latitude_deg = 44.3167
+    maximum_dry_spell_days = 21
+    mineral_layer_count = 20
+    mineral_layer_fraction = 1.0
+    record_count = 473376
+    records_per_day = 48
+    site = "CA-Cbo"
+    source_kind = "released_configuration_and_forcing"
+    subzero_day_fraction = 0.262726
+    year_count = 27
