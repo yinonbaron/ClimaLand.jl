@@ -11,6 +11,8 @@ using ClimaLand.Domains: Plane, Point
 import ClimaTimeSteppers as CTS
 
 include("../../testbed_validation/model_architecture.jl")
+include("../../allocation_test_utils.jl")
+using .AllocationTestUtils: allocated_bytes
 
 const CASA = Vegetation.CASA
 const FORWARD_EULER = CTS.ExplicitAlgorithm(
@@ -162,21 +164,15 @@ end
         ample = CASA.nitrogen_supply(CASA.LegacyDaily(), ample_arguments...)
         @test ample == (npp_scalar = one(FT), labile_fraction = zero(FT))
 
-        continuous =
-            @inferred CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
-        CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
+        continuous_arguments = (CASA.ContinuousRate(), arguments...)
+        continuous = @inferred CASA.nitrogen_supply(continuous_arguments...)
         @test continuous == (npp_scalar = one(FT), labile_fraction = zero(FT))
-        @test @allocated(
-            CASA.nitrogen_supply(CASA.ContinuousRate(), arguments...)
-        ) == 0
+        @test allocated_bytes(CASA.nitrogen_supply, continuous_arguments) == 0
 
-        inferred =
-            @inferred CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
-        CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
+        legacy_arguments = (CASA.LegacyDaily(), arguments...)
+        inferred = @inferred CASA.nitrogen_supply(legacy_arguments...)
         @test inferred == supply
-        @test @allocated(
-            CASA.nitrogen_supply(CASA.LegacyDaily(), arguments...)
-        ) == 0
+        @test allocated_bytes(CASA.nitrogen_supply, legacy_arguments) == 0
 
         zero_flux_arguments =
             Base.setindex(Base.setindex(arguments, zero(FT), 4), zero(FT), 8)
@@ -288,18 +284,18 @@ end
         )
         packed =
             @inferred CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
-        CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
-        @test @allocated(
-            CASA.packed_carbon_nitrogen_fluxes(packed_arguments...)
+        @test allocated_bytes(
+            CASA.packed_carbon_nitrogen_fluxes,
+            packed_arguments,
         ) == 0
         continuous_packed_arguments =
             Base.setindex(packed_arguments, CASA.ContinuousRate(), 1)
         continuous_packed = @inferred CASA.packed_carbon_nitrogen_fluxes(
             continuous_packed_arguments...,
         )
-        CASA.packed_carbon_nitrogen_fluxes(continuous_packed_arguments...)
-        @test @allocated(
-            CASA.packed_carbon_nitrogen_fluxes(continuous_packed_arguments...)
+        @test allocated_bytes(
+            CASA.packed_carbon_nitrogen_fluxes,
+            continuous_packed_arguments,
         ) == 0
         unrestricted = CASA.packed_carbon_fluxes(
             CASA.LegacyDaily(),
@@ -578,8 +574,9 @@ end
         initial[5:7]...,
     )
     @test legacy_carbon_kernel == legacy_carbon
-    @test @allocated(
-        CASA.packed_carbon_fluxes(
+    @test allocated_bytes(
+        CASA.packed_carbon_fluxes,
+        (
             CASA.LegacyDaily(),
             parameters,
             initial[1:4]...,
@@ -591,7 +588,7 @@ end
             one(FT),
             zero(FT),
             initial[5:7]...,
-        )
+        ),
     ) == 0
     legacy_nitrogen_kernel = @inferred CASA.packed_nitrogen_fluxes(
         CASA.LegacyDaily(),
@@ -604,8 +601,9 @@ end
         legacy_carbon,
     )
     @test legacy_nitrogen_kernel == legacy_nitrogen
-    @test @allocated(
-        CASA.packed_nitrogen_fluxes(
+    @test allocated_bytes(
+        CASA.packed_nitrogen_fluxes,
+        (
             CASA.LegacyDaily(),
             nitrogen_parameters,
             initial[1:3]...,
@@ -614,7 +612,7 @@ end
             zero(FT),
             zero(FT),
             legacy_carbon,
-        )
+        ),
     ) == 0
     continuous_nitrogen_kernel = @inferred CASA.packed_nitrogen_fluxes(
         CASA.ContinuousRate(),
@@ -627,8 +625,9 @@ end
         continuous_carbon,
     )
     @test continuous_nitrogen_kernel == continuous_nitrogen
-    @test @allocated(
-        CASA.packed_nitrogen_fluxes(
+    @test allocated_bytes(
+        CASA.packed_nitrogen_fluxes,
+        (
             CASA.ContinuousRate(),
             nitrogen_parameters,
             initial[1:3]...,
@@ -637,7 +636,7 @@ end
             zero(FT),
             zero(FT),
             continuous_carbon,
-        )
+        ),
     ) == 0
 
     edge_leaf_carbon = FT(0.003)
@@ -757,46 +756,6 @@ end
     @test p.casa_plant.carbon_fluxes[][17] > first_maintenance
 end
 
-function packed_flux_allocations(
-    parameters,
-    carbon,
-    gpp,
-    air_temperature,
-    soil_temperature,
-    water_stress,
-    phase,
-    npp_scalar,
-    labile_fraction,
-)
-    CASA.packed_carbon_fluxes(
-        parameters,
-        carbon...,
-        gpp,
-        air_temperature,
-        soil_temperature,
-        water_stress,
-        phase,
-        npp_scalar,
-        labile_fraction,
-    )
-    return @allocated CASA.packed_carbon_fluxes(
-        parameters,
-        carbon...,
-        gpp,
-        air_temperature,
-        soil_temperature,
-        water_stress,
-        phase,
-        npp_scalar,
-        labile_fraction,
-    )
-end
-
-function nitrogen_flux_allocations(arguments...)
-    CASA.nitrogen_fluxes(arguments...)
-    return @allocated CASA.nitrogen_fluxes(arguments...)
-end
-
 for FT in (Float32, Float64)
     @testset "CASA plant kernels, FT = $FT" begin
         parameters = plant_parameters(FT)
@@ -909,14 +868,13 @@ for FT in (Float32, Float64)
         )
         @test packed_fluxes ==
               CASA.packed_carbon_fluxes(parameters, carbon..., args[3:end]...)
-        @test packed_flux_allocations(args...) == 0
-        @test @allocated(
-            CASA.packed_carbon_fluxes(
-                CASA.ContinuousRate(),
-                parameters,
-                carbon...,
-                args[3:end]...,
-            )
+        @test allocated_bytes(
+            CASA.packed_carbon_fluxes,
+            (parameters, carbon..., args[3:end]...),
+        ) == 0
+        @test allocated_bytes(
+            CASA.packed_carbon_fluxes,
+            (CASA.ContinuousRate(), parameters, carbon..., args[3:end]...),
         ) == 0
         @test sum(fluxes.allocation) ≈ one(FT) atol = 4eps(FT)
         @test sum(fluxes.tendencies[1:3]) ≈ fluxes.npp - sum(fluxes.turnover) atol =
@@ -953,29 +911,35 @@ for FT in (Float32, Float64)
             limitation,
             limitation,
         )
-        @test nitrogen_flux_allocations(
-            nitrogen_parameters,
-            carbon[1:3],
-            plant_nitrogen,
-            fluxes.npp,
-            fluxes.allocation,
-            plant_rates,
-            FT(1e-3),
-            limitation,
-            limitation,
+        @test allocated_bytes(
+            CASA.nitrogen_fluxes,
+            (
+                nitrogen_parameters,
+                carbon[1:3],
+                plant_nitrogen,
+                fluxes.npp,
+                fluxes.allocation,
+                plant_rates,
+                FT(1e-3),
+                limitation,
+                limitation,
+            ),
         ) == 0
-        @test nitrogen_flux_allocations(
-            nitrogen_parameters,
-            carbon[1:3],
-            plant_nitrogen,
-            fluxes.npp,
-            fluxes.allocation,
-            plant_rates,
-            FT(1e-3),
-            limitation,
-            limitation,
-            nitrogen.metabolic_fractions,
-            FT(1e-10 / 1000 / 86400),
+        @test allocated_bytes(
+            CASA.nitrogen_fluxes,
+            (
+                nitrogen_parameters,
+                carbon[1:3],
+                plant_nitrogen,
+                fluxes.npp,
+                fluxes.allocation,
+                plant_rates,
+                FT(1e-3),
+                limitation,
+                limitation,
+                nitrogen.metabolic_fractions,
+                FT(1e-10 / 1000 / 86400),
+            ),
         ) == 0
         @test sum(nitrogen.tendencies) + sum(nitrogen.litter) ≈ nitrogen.uptake atol =
             16eps(FT)

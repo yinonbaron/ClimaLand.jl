@@ -6,6 +6,9 @@ import ClimaComms
 @safetestset "Aqua tests" begin
     include("aqua.jl")
 end
+@safetestset "Allocation test utilities" begin
+    include("allocation_test_utils_tests.jl")
+end
 
 # Shared ClimaLand utilities tests
 @safetestset "Richards model implicit timestepping tests" begin
