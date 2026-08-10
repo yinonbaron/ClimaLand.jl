@@ -1,0 +1,65 @@
+schema_version = 1
+title = "Selected-cell CORPSE fresh-Fortran trajectory reference"
+
+[build]
+compatibility_patch_md5 = "c4317a597dbac9889e4150b1473cb63c"
+compiler_version = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+executable_sha256 = "c9a976b0071f6a44b747a53624a1d4190af6e2ce6faf3b006638111620593892"
+flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall -std=legacy"
+netcdf_fortran_version = "4.6.3"
+
+[generation]
+command = "julia --project=test generate_selected_corpse_reference.jl <source-root>"
+configuration = "soil_model=3, cycle=1, initialization=0, year=1901, daily_output=1"
+raw_netcdf_checksums_include_creation_time = true
+transformations = ["unpack selected cells to a 37 by 1 Fortran grid", "replace source grid indices with local packed indices", "retain the first 365 forcing days without numerical conversion", "cast packed comparison drivers and authoritative outputs to Float64", "derive annual NPP as sum of 1901 daily cgpp divided by 2, matching the Fortran xcnpp = xcgpp / 2 initialization"]
+
+[input_sha256.selected_fixture]
+casa_c_parameters = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+casa_cn_parameters = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+corpse_parameters = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+forcing = "373b6b6ffedad6d73d27191d10ee9073ed56890d2b4da96b37ffb117a0b15ab3"
+grid = "1881b9df3470e4b27da267685696b1597855daf1a74ddfc54fa54ea9af7d8575"
+mimics_parameters = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+perturbation = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+phenology = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+soil = "fdb9a7806f2a11dcf9d26725052156e9e4a0db10e1f866fa6440554fb12f5e16"
+
+[input_sha256.source_checkout]
+casa_parameters = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+corpse_parameters = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+perturbation = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+phenology = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+[input_sha256.staged_run]
+casa_parameters = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+control = "a972507c85dc37e4954087856cd68af1ec8e0e2920397a2616d47cbe9a6feff7"
+corpse_parameters = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+grid = "fbdbbe1d6c2ffd2b567dc70e9906e01ae3dad9b798f9ef9adcc91239d06899dd"
+meteorology = "40cebdfeed54b1e5cdaebebcbba681ee43eeae5de5cb01229e9e6770dc48d2c6"
+perturbation = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+phenology = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+soil = "fdb9a7806f2a11dcf9d26725052156e9e4a0db10e1f866fa6440554fb12f5e16"
+
+[legacy_mean_audit]
+missing = ["1901-2010 CRU-NCEP meteorology", "exact historical CORPSE CASA restart"]
+role = "informational only; not used as an oracle"
+status = "not reproducible from published inputs"
+
+[reference]
+bytes = 1274371
+cell_ids = [51, 532, 618, 626, 923, 1285, 1394, 1715, 1805, 2182, 2378, 3234, 3442, 3613, 3633, 3898, 3899, 3983, 3997, 4079, 4273, 4397, 4453, 5444, 6325, 7669, 8625, 9667, 9679, 9685, 10433, 10644, 10997, 11162, 11655, 12334, 13397]
+filename = "fresh_fortran_1901.nc"
+records = 365
+sha256 = "d3fc4eb4ba670705b66f4f9aaf0581881ba37c456f035802ef396a4e4a5b3aad"
+
+[source]
+casa_parameters_sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+corpse_parameters_sha256 = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+forcing_sha256 = "373b6b6ffedad6d73d27191d10ee9073ed56890d2b4da96b37ffb117a0b15ab3"
+grid_sha256 = "1881b9df3470e4b27da267685696b1597855daf1a74ddfc54fa54ea9af7d8575"
+repository = "https://github.com/wwieder/biogeochem_testbed.git"
+selected_fixture_sha256 = "0836cad6b8319b3fb024e63ffa32ae9c44413f48d8f21ced10eb283f48b15a1b"
+soil_sha256 = "fdb9a7806f2a11dcf9d26725052156e9e4a0db10e1f866fa6440554fb12f5e16"
+source_code_status = ""

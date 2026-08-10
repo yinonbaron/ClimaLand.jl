@@ -1,0 +1,78 @@
+schema_version = 1
+controls_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+points = 4263
+prespin_loops = 100
+spin_loops = 499
+spin_years = [1901, 1920]
+history_years = [1901, 2014]
+passive_carbon_multiplier = 10
+comparison_atol = 0.0
+comparison_rtol = 0.0
+
+[inputs]
+driver_directory = "INPUT_GSWP3_CLM5dev110_hist"
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+perturbation = "GRID_CN/co2delta_control.txt"
+normal_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+accelerated_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0AD.csv"
+
+[stages.prespin]
+control_candidate = "casa_c_prespin"
+loops = 100
+years = [1901, 1901]
+
+[stages.accelerated_spin]
+control_candidate = "casa_c_adspin"
+loops = 499
+years = [1901, 1920]
+
+[stages.normal_spin]
+control_candidate = "casa_c_spin"
+loops = 499
+years = [1901, 1920]
+
+[stages.historical]
+control_candidate = "casa_c_history"
+loops = 1
+years = [1901, 2014]
+
+[transformation.passive_restoration]
+boundary = "accelerated_spin -> normal_spin"
+field = "casapool%csoil(PASS)"
+multiplier = 10
+
+[postprocessing]
+annual_reduction = "ncra -O each daily year to one annual mean"
+annual_concatenation = "ncrcat -O annual means in 1901-2014 order"
+annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
+daily_windows = [[1901, 1905], [2010, 2014]]
+nco_version_recorded_by_archive = "4.7.5"
+
+[statistical_comparison]
+stock_variables = ["cleaf", "cwood", "cfroot", "clitmetb", "clitstr", "clitcwd", "csoilmic", "csoilslow", "csoilpass"]
+global_sum_rtol = 2.0e-6
+grid_absolute_relative_quantile = 0.99
+grid_absolute_relative_rtol = 1.0e-3
+
+[compiler]
+source_makefile_version = "GNU Fortran 8.1.0"
+source_makefile_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall"
+archive_compiler_status = "not recorded in archive metadata"
+
+[evidence]
+controls = "Committed CASA-CN CLM5/GSWP3 controls, derived to icycle=1 by candidate_reconstruction.toml"
+source = "Archive creation 2022-03-12; latest public source revision before creation is 630389d"
+spin = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt documents the stage order, passive-pool restoration, and convergence checks"
+postprocessing = "Archive history records ncra annual means, ncrcat concatenation, and retained 1901-1905/2010-2014 daily windows"
+compiler = "Pinned source Makefile records GNU Fortran 8.1.0 and the exact flags; archive NetCDF metadata does not record its compiler"
+
+[[case]]
+id = "archive_predecessor"
+source_commit = "630389decceaac88d7ab8e09339daa75f960ba32"
+reason = "Latest public source revision before the CASA-C archive creation timestamp"
+
+[excluded.pinned_current]
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+reason = "Postdates archive creation; its only Fortran changes from archive_predecessor are guarded by icycle > 1 and cannot alter this icycle=1 experiment"

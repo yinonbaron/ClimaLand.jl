@@ -1,0 +1,100 @@
+model = "MIMICS-CN"
+schema_version = 1
+
+[[population]]
+cell_count = 800
+cell_ids_sha256 = "1caf926893e6d324ea30707454810603112604515c16dd665b289e5e9b559f66"
+eligible_cell_count = 790
+grid_sha256 = "e1366efbedc288b6e3f6071234706ca95f8eb03dc5242dd9bd05eb7fe241aca8"
+label = "random_pft_800"
+selection_manifest_sha256 = "c13a62a292ab839f9959af8a7355738b715ddb4dcb8d0771d0a2c37c61ee2e5d"
+
+    [[population.eligibility_gap]]
+    cell_id = 444
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 633
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 830
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 1117
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 1979
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 1980
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 12092
+    evidence_side = "fortran"
+    first_nonfinite_date = "2014-12-31"
+    first_nonfinite_stage = "historical"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 13405
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 13596
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true
+
+    [[population.eligibility_gap]]
+    cell_id = 13789
+    evidence_side = "fortran"
+    first_nonfinite_date = "1920-12-31"
+    first_nonfinite_stage = "spin_continuation"
+    first_nonfinite_variable = "casa_plant.n_fine_root"
+    reason = "fresh Fortran trajectory is nonfinite by the stage boundary; exclude the model-cell pair atomically"
+    reviewed = true

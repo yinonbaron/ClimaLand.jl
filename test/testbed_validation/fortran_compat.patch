@@ -1,0 +1,66 @@
+--- corpse_variable.f90
++++ corpse_variable.f90
+@@ -145,5 +145,0 @@
+-    !Parameters for this test model run, in namelist file
+-    namelist /CORPSE_casa_nml/ initial_C, &
+-                               exudate_npp_frac, &
+-                               rhizosphere_frac, &
+-                               litter_option
+@@ -155,2 +150,9 @@
+     integer:: litter_option
++
++    !Parameters for this test model run, in namelist file
++    namelist /CORPSE_casa_nml/ initial_C, &
++                               exudate_npp_frac, &
++                               rhizosphere_frac, &
++                               litter_option
++
+     real::T           !soil temperature (K)
+--- corpse_inout.f90
++++ corpse_inout.f90
+@@ -262,0 +263,23 @@
++                      ! Restart files omit original-C and Rtot bookkeeping.
++                      ! Rebase both after loading so each stage can audit conservation.
++                      pt(ii)%litterlayer%litterCohorts(RHIZ)%originalLitterC = &
++                          sum(pt(ii)%litterlayer%litterCohorts(RHIZ)%litterC) + &
++                          sum(pt(ii)%litterlayer%litterCohorts(RHIZ)%protectedC) + &
++                          pt(ii)%litterlayer%litterCohorts(RHIZ)%livingMicrobeC
++                      pt(ii)%litterlayer%litterCohorts(BULK)%originalLitterC = &
++                          sum(pt(ii)%litterlayer%litterCohorts(BULK)%litterC) + &
++                          sum(pt(ii)%litterlayer%litterCohorts(BULK)%protectedC) + &
++                          pt(ii)%litterlayer%litterCohorts(BULK)%livingMicrobeC
++                      pt(ii)%soil(lyr)%litterCohorts(RHIZ)%originalLitterC = &
++                          sum(pt(ii)%soil(lyr)%litterCohorts(RHIZ)%litterC) + &
++                          sum(pt(ii)%soil(lyr)%litterCohorts(RHIZ)%protectedC) + &
++                          pt(ii)%soil(lyr)%litterCohorts(RHIZ)%livingMicrobeC
++                      pt(ii)%soil(lyr)%litterCohorts(BULK)%originalLitterC = &
++                          sum(pt(ii)%soil(lyr)%litterCohorts(BULK)%litterC) + &
++                          sum(pt(ii)%soil(lyr)%litterCohorts(BULK)%protectedC) + &
++                          pt(ii)%soil(lyr)%litterCohorts(BULK)%livingMicrobeC
++                      pt(ii)%litterlayer%litterCohorts(RHIZ)%Rtot = 0.0
++                      pt(ii)%litterlayer%litterCohorts(BULK)%Rtot = 0.0
++                      pt(ii)%soil(lyr)%litterCohorts(RHIZ)%Rtot = 0.0
++                      pt(ii)%soil(lyr)%litterCohorts(BULK)%Rtot = 0.0
++
+@@ -757 +780,4 @@
+-    write(106,'(a64)',advance='yes') 'soil_1_DOC(LABILE),soil_1_DOC(RECALCTRNT),soil_1_DOC(RECALCTRNT)'
++    write(106,'(a65)',advance='no') 'soil_1_DOC(LABILE),soil_1_DOC(RECALCTRNT),soil_1_DOC(RECALCTRNT),'
++    write(106,'(a)',advance='yes') &
++        'litlyr_originalC_rhiz,litlyr_originalC_bulk,litlyr_Rtot_rhiz,litlyr_Rtot_bulk,' // &
++        'soil_1_originalC_rhiz,soil_1_originalC_bulk,soil_1_Rtot_rhiz,soil_1_Rtot_bulk'
+@@ -791 +817 @@
+-       write(106,92,advance='yes') &
++       write(106,92,advance='no') &
+@@ -812,0 +839,10 @@
++
++       write(106,93,advance='yes') &
++                               pt(ipt)%litterlayer%litterCohorts(RHIZ)%originalLitterC, &
++                               pt(ipt)%litterlayer%litterCohorts(BULK)%originalLitterC, &
++                               pt(ipt)%litterlayer%litterCohorts(RHIZ)%Rtot, &
++                               pt(ipt)%litterlayer%litterCohorts(BULK)%Rtot, &
++                               pt(ipt)%soil(ilyr)%litterCohorts(RHIZ)%originalLitterC, &
++                               pt(ipt)%soil(ilyr)%litterCohorts(BULK)%originalLitterC, &
++                               pt(ipt)%soil(ilyr)%litterCohorts(RHIZ)%Rtot, &
++                               pt(ipt)%soil(ilyr)%litterCohorts(BULK)%Rtot
+@@ -817,0 +854 @@
++93  format(8(f18.6,','))

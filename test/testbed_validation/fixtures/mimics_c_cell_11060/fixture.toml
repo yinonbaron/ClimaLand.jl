@@ -1,0 +1,34 @@
+license = "CC-BY-4.0"
+schema_version = 1
+
+[cell]
+fixture_lat_index = 1
+fixture_lon_index = 1
+id = 11060
+pft = 7
+reason = "active MIMICS carbon trajectory fixture"
+source_lat_index = 20
+source_lon_index = 116
+
+[fixture.casa_output]
+bytes = 284337
+filename = "casa_1901_1905_cell_11060.nc"
+sha256 = "6049a97caf6286369eb1510acd8e9a121f35023f469b12ae27dfdd0a0b560e96"
+
+[fixture.mimics_output]
+bytes = 213709
+filename = "mimics_1901_1905_cell_11060.nc"
+sha256 = "b70b91daea129c428866a9eb4c841c7a3dd02d525b5c9c7b77cf7118e6f82e5f"
+
+[generation]
+roundtrip_exact = true
+script = "extract_fixture.jl mimics"
+
+[source]
+casa_output_member = "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/casaclm_pool_flux_1901_1905_daily.nc"
+mimics_output_member = "MIMICS_mod5_Conly_KO4/OUTPUT_C/HIST/mimics_pool_flux_1901_1905_daily.nc"
+output_archive = "MIMICS_mod5_Conly_KO4.tar.gz"
+output_archive_md5 = "1be7b02d77da6f85134b85086c918331"
+parameter_file = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+parameter_file_md5 = "f8b2e7f45f3c6eace3fedaa239ae8de8"
+parameter_status = "candidate; original archived control is unpublished"

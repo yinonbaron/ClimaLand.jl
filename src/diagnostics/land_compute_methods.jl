@@ -482,7 +482,7 @@ function compute_10cm_water_mass!(
     soil = get_soil(land_model)
     ∫Hθdz = p.soil.sfc_scratch
     Hθ = p.soil.sub_sfc_scratch
-    z = land_model.soil.domain.fields.z
+    z = soil.domain.fields.z
     depth = FT(-0.1)
     earth_param_set = soil.parameters.earth_param_set
     _ρ_liq = LP.ρ_cloud_liq(earth_param_set)
@@ -494,10 +494,9 @@ function compute_10cm_water_mass!(
     # The layering of the soil model may not coincide with 10 cm exactly, and this could lead
     # to the integral above not exactly representing 10cm.
     # To adjust, divide by the ∫heaviside(z, depth) dz, and then multiply by 10cm
-    H = p.subsfc_scratch
-    @. H = heaviside(z, depth)
-    ∫Hdz = p.sfc_scratch
-    column_integral_definite!(∫Hdz, H)
+    @. Hθ = heaviside(z, depth)
+    ∫Hdz = hasproperty(p, :sfc_scratch) ? p.sfc_scratch : similar(∫Hθdz)
+    column_integral_definite!(∫Hdz, Hθ)
 
     if isnothing(out)
         out = zeros(soil.domain.space.surface) # Allocates

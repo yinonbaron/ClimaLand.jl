@@ -1,0 +1,50 @@
+schema_version = 1
+issue = 29
+points = 4263
+calendar = "365_day"
+dt_seconds = 86400
+
+[inputs]
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+casa_parameters = "GRID_CN/pftlookup_igbp_updated4.csv"
+mimics_parameters = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+forcing_pattern = "met_YEAR_YEAR.nc"
+
+[stages.prespin]
+forcing_years = [1901, 1901]
+repeats = 100
+
+[stages.spin]
+forcing_years = [1901, 1920]
+repeats = 499
+
+[stages.historical]
+forcing_years = [1901, 2014]
+repeats = 1
+
+[comparison.boundary]
+atol = 5.0e-3
+rtol = 1.0e-3
+variables = ["clabile", "cleaf", "cwood", "cfroot", "clitcwd", "cLITm", "cLITs", "cMICr", "cMICk", "cSOMa", "cSOMc", "cSOMp"]
+
+[comparison.fresh_fortran]
+atol = 5.0e-3
+rtol = 1.0e-3
+annual_years = [1901, 2014]
+daily_windows = [[1901, 1905], [2010, 2014]]
+
+[comparison.published_archive]
+atol = 5.0e-3
+rtol = 1.0e-3
+annual_reference = "reference/ann_mimics_pool_flux_1901_2014.nc"
+daily_windows = [[1901, 1905], [2010, 2014]]
+
+[comparison.carbon_budget]
+rtol = 5.0e-12
+
+[provenance]
+fresh_fortran = "stages/"
+published_archive = "reference/"
+rule = "Julia-Fresh-Fortran and Julia-published-archive metrics and tolerances are reported independently."

@@ -1,0 +1,578 @@
+schema_version = 1
+title = "Stratified CLM5/GSWP3 selected-cell workflow fixture"
+
+[audit]
+copied_inputs_exact = true
+fixture_roundtrip_exact = true
+source_selection_exact_before_repacking = true
+static_rows_exact = true
+
+[[cell]]
+clay_fraction = 0.33256
+core = true
+id = 51
+mean_gpp_gC_m2_day = 8.121744113470092
+mean_liquid_moisture_m3_m3 = 0.22007027173639096
+mean_nitrogen_deposition_gN_m2_day = 0.0007346152591421024
+mean_soil_temperature_K = 302.6040329935382
+pft = 17
+porosity = 0.42937
+reasons = ["inactive ice/water boundary"]
+silt_fraction = 0.15542
+[[cell]]
+clay_fraction = 0.46712
+core = false
+id = 532
+mean_gpp_gC_m2_day = 6.178720576080299
+mean_liquid_moisture_m3_m3 = 0.24822350956772582
+mean_nitrogen_deposition_gN_m2_day = 0.00178429371321966
+mean_soil_temperature_K = 300.28594990187634
+pft = 8
+porosity = 0.44499
+reasons = ["high mean GPP"]
+silt_fraction = 0.13716
+[[cell]]
+clay_fraction = 0.42351
+core = false
+id = 618
+mean_gpp_gC_m2_day = 3.3680256129738244
+mean_liquid_moisture_m3_m3 = 0.24768649584101263
+mean_nitrogen_deposition_gN_m2_day = 0.0010159494199079315
+mean_soil_temperature_K = 296.57420168516586
+pft = 9
+porosity = 0.43884
+reasons = ["central porosity"]
+silt_fraction = 0.13697
+[[cell]]
+clay_fraction = 0.42426
+core = true
+id = 626
+mean_gpp_gC_m2_day = 5.933711647190918
+mean_liquid_moisture_m3_m3 = 0.2620987464086956
+mean_nitrogen_deposition_gN_m2_day = 0.001867204223424523
+mean_soil_temperature_K = 298.2159045210177
+pft = 2
+porosity = 0.44155
+reasons = ["high clay fraction"]
+silt_fraction = 0.14808
+[[cell]]
+clay_fraction = 0.14534
+core = true
+id = 923
+mean_gpp_gC_m2_day = 0.001285463018824685
+mean_liquid_moisture_m3_m3 = 0.14316773030632063
+mean_nitrogen_deposition_gN_m2_day = 0.00016489046257655055
+mean_soil_temperature_K = 300.2508973911062
+pft = 16
+porosity = 0.44143
+reasons = ["high silt fraction"]
+silt_fraction = 0.45938
+[[cell]]
+clay_fraction = 0.15709
+core = true
+id = 1285
+mean_gpp_gC_m2_day = 3.280855590852622
+mean_liquid_moisture_m3_m3 = 0.11954579541382386
+mean_nitrogen_deposition_gN_m2_day = 0.0005996927885510223
+mean_soil_temperature_K = 300.22521204656204
+pft = 9
+porosity = 0.40457
+reasons = ["low silt fraction"]
+silt_fraction = 0.1418
+[[cell]]
+clay_fraction = 0.16933
+core = false
+id = 1394
+mean_gpp_gC_m2_day = 1.4216011463579643
+mean_liquid_moisture_m3_m3 = 0.1266748031191343
+mean_nitrogen_deposition_gN_m2_day = 0.0009987493302967203
+mean_soil_temperature_K = 303.4105467039911
+pft = 16
+porosity = 0.4164
+reasons = ["productive representative for PFT 16"]
+silt_fraction = 0.2111
+[[cell]]
+clay_fraction = 0.14206
+core = false
+id = 1715
+mean_gpp_gC_m2_day = 2.0859375721179854
+mean_liquid_moisture_m3_m3 = 0.23869767305654216
+mean_nitrogen_deposition_gN_m2_day = 0.0005477204231602515
+mean_soil_temperature_K = 276.0568587405458
+pft = 1
+porosity = 0.45345
+reasons = ["central mean nitrogen deposition"]
+silt_fraction = 0.44102
+[[cell]]
+clay_fraction = 0.32992
+core = false
+id = 1805
+mean_gpp_gC_m2_day = 2.236619979048867
+mean_liquid_moisture_m3_m3 = 0.24483960669918647
+mean_nitrogen_deposition_gN_m2_day = 0.0018162410660328245
+mean_soil_temperature_K = 280.5688354747662
+pft = 14
+porosity = 0.45167
+reasons = ["high mean nitrogen deposition"]
+silt_fraction = 0.32204
+[[cell]]
+clay_fraction = 0.23114
+core = false
+id = 2182
+mean_gpp_gC_m2_day = 0.09568620398384804
+mean_liquid_moisture_m3_m3 = 0.2031386061469252
+mean_nitrogen_deposition_gN_m2_day = 0.0003177028758504444
+mean_soil_temperature_K = 289.7881306869579
+pft = 16
+porosity = 0.438
+reasons = ["low mean GPP"]
+silt_fraction = 0.34516
+[[cell]]
+clay_fraction = 0.23714
+core = false
+id = 2378
+mean_gpp_gC_m2_day = 0.3033401880971906
+mean_liquid_moisture_m3_m3 = 0.2050107954972944
+mean_nitrogen_deposition_gN_m2_day = 0.0005283220159247305
+mean_soil_temperature_K = 282.3538043245161
+pft = 10
+porosity = 0.43341
+reasons = ["central mean liquid moisture"]
+silt_fraction = 0.28675
+[[cell]]
+clay_fraction = 0.15215
+core = false
+id = 3234
+mean_gpp_gC_m2_day = 0.17817328092780563
+mean_liquid_moisture_m3_m3 = 0.1464410243182839
+mean_nitrogen_deposition_gN_m2_day = 0.0007336833155581221
+mean_soil_temperature_K = 276.4386070118227
+pft = 7
+porosity = 0.41848
+reasons = ["central silt fraction"]
+silt_fraction = 0.27521
+[[cell]]
+clay_fraction = 0.21398
+core = false
+id = 3442
+mean_gpp_gC_m2_day = 1.9448307050473796
+mean_liquid_moisture_m3_m3 = 0.2971337394041617
+mean_nitrogen_deposition_gN_m2_day = 0.00038691510749151606
+mean_soil_temperature_K = 275.514034852964
+pft = 11
+porosity = 0.48908
+reasons = ["productive representative for PFT 11"]
+silt_fraction = 0.6337
+[[cell]]
+clay_fraction = 0.2624
+core = true
+id = 3613
+mean_gpp_gC_m2_day = 6.8147350444211545
+mean_liquid_moisture_m3_m3 = 0.3016040958189293
+mean_nitrogen_deposition_gN_m2_day = 0.0027301191074544924
+mean_soil_temperature_K = 296.0166190645743
+pft = 5
+porosity = 0.43381
+reasons = ["high mean liquid moisture"]
+silt_fraction = 0.24632
+[[cell]]
+clay_fraction = 0.22217
+core = false
+id = 3633
+mean_gpp_gC_m2_day = 2.3366514126192723
+mean_liquid_moisture_m3_m3 = 0.22648900965841923
+mean_nitrogen_deposition_gN_m2_day = 0.0004046657533699385
+mean_soil_temperature_K = 275.59859675675034
+pft = 3
+porosity = 0.47957
+reasons = ["productive representative for PFT 3"]
+silt_fraction = 0.5963
+[[cell]]
+clay_fraction = 0.33862
+core = false
+id = 3898
+mean_gpp_gC_m2_day = 7.014449558366064
+mean_liquid_moisture_m3_m3 = 0.24727312554862327
+mean_nitrogen_deposition_gN_m2_day = 0.0009727175194328945
+mean_soil_temperature_K = 301.68122404917955
+pft = 4
+porosity = 0.4336
+reasons = ["productive representative for PFT 4"]
+silt_fraction = 0.18101
+[[cell]]
+clay_fraction = 0.33862
+core = false
+id = 3899
+mean_gpp_gC_m2_day = 6.991024974492043
+mean_liquid_moisture_m3_m3 = 0.2292018079457411
+mean_nitrogen_deposition_gN_m2_day = 0.0010309483720144879
+mean_soil_temperature_K = 298.2587048203672
+pft = 5
+porosity = 0.43386
+reasons = ["productive representative for PFT 5"]
+silt_fraction = 0.18101
+[[cell]]
+clay_fraction = 0.32732
+core = false
+id = 3983
+mean_gpp_gC_m2_day = 8.577062769664993
+mean_liquid_moisture_m3_m3 = 0.3162988632872043
+mean_nitrogen_deposition_gN_m2_day = 0.0014986001798094723
+mean_soil_temperature_K = 300.1637249391105
+pft = 9
+porosity = 0.4317
+reasons = ["productive representative for PFT 9"]
+silt_fraction = 0.15765
+[[cell]]
+clay_fraction = 0.3545
+core = false
+id = 3997
+mean_gpp_gC_m2_day = 4.025805151302836
+mean_liquid_moisture_m3_m3 = 0.17295031850905168
+mean_nitrogen_deposition_gN_m2_day = 0.001213136351189429
+mean_soil_temperature_K = 293.50216722428047
+pft = 6
+porosity = 0.43234
+reasons = ["productive representative for PFT 6"]
+silt_fraction = 0.15609
+[[cell]]
+clay_fraction = 0.29419
+core = false
+id = 4079
+mean_gpp_gC_m2_day = 8.955665026860466
+mean_liquid_moisture_m3_m3 = 0.40313537103128216
+mean_nitrogen_deposition_gN_m2_day = 0.0060398799383588
+mean_soil_temperature_K = 301.25419492433537
+pft = 12
+porosity = 0.44982
+reasons = ["productive representative for PFT 12"]
+silt_fraction = 0.28389
+[[cell]]
+clay_fraction = 0.27281
+core = true
+id = 4273
+mean_gpp_gC_m2_day = 9.149007750282319
+mean_liquid_moisture_m3_m3 = 0.3894680368528337
+mean_nitrogen_deposition_gN_m2_day = 0.0009854111139838207
+mean_soil_temperature_K = 299.99595694480433
+pft = 2
+porosity = 0.45237
+reasons = ["productive representative for PFT 2", "productive woody vegetation"]
+silt_fraction = 0.36015
+[[cell]]
+clay_fraction = 0.23509
+core = true
+id = 4397
+mean_gpp_gC_m2_day = 1.5886238043483747
+mean_liquid_moisture_m3_m3 = 0.13170031969408014
+mean_nitrogen_deposition_gN_m2_day = 0.0004811014890979175
+mean_soil_temperature_K = 266.5507133741195
+pft = 3
+porosity = 0.45953
+reasons = ["low mean soil temperature"]
+silt_fraction = 0.3808
+[[cell]]
+clay_fraction = 0.20131
+core = true
+id = 4453
+mean_gpp_gC_m2_day = 0.8465331560053152
+mean_liquid_moisture_m3_m3 = 0.1805947479663391
+mean_nitrogen_deposition_gN_m2_day = 0.00022266968868248034
+mean_soil_temperature_K = 301.7518280229765
+pft = 7
+porosity = 0.43915
+reasons = ["high mean soil temperature"]
+silt_fraction = 0.37883
+[[cell]]
+clay_fraction = 0.40084
+core = false
+id = 5444
+mean_gpp_gC_m2_day = 3.5686561975161695
+mean_liquid_moisture_m3_m3 = 0.35926185224942675
+mean_nitrogen_deposition_gN_m2_day = 0.0014944383782628727
+mean_soil_temperature_K = 285.29893264153213
+pft = 4
+porosity = 0.44992
+reasons = ["central mean soil temperature"]
+silt_fraction = 0.20794
+[[cell]]
+clay_fraction = 0.13504
+core = true
+id = 6325
+mean_gpp_gC_m2_day = 0.9927464480166039
+mean_liquid_moisture_m3_m3 = 0.11547860878720155
+mean_nitrogen_deposition_gN_m2_day = 8.170732763302799e-5
+mean_soil_temperature_K = 262.4250700065248
+pft = 7
+porosity = 0.44558
+reasons = ["low mean liquid moisture"]
+silt_fraction = 0.31714
+[[cell]]
+clay_fraction = 0.16696
+core = false
+id = 7669
+mean_gpp_gC_m2_day = 0.8693673001003208
+mean_liquid_moisture_m3_m3 = 0.17005774625428588
+mean_nitrogen_deposition_gN_m2_day = 8.152974812235283e-5
+mean_soil_temperature_K = 265.7685669963543
+pft = 18
+porosity = 0.46916
+reasons = ["productive representative for PFT 18"]
+silt_fraction = 0.52257
+[[cell]]
+clay_fraction = 0.23
+core = false
+id = 8625
+mean_gpp_gC_m2_day = 1.1484051197766105
+mean_liquid_moisture_m3_m3 = 0.13886293308457454
+mean_nitrogen_deposition_gN_m2_day = 0.00015959395425038805
+mean_soil_temperature_K = 271.27236168832434
+pft = 5
+porosity = 0.44106
+reasons = ["central clay fraction"]
+silt_fraction = 0.29322
+[[cell]]
+clay_fraction = 0.17305
+core = false
+id = 9667
+mean_gpp_gC_m2_day = 0.5750535840733969
+mean_liquid_moisture_m3_m3 = 0.2211231005599875
+mean_nitrogen_deposition_gN_m2_day = 0.0009242968057821456
+mean_soil_temperature_K = 288.24785030578596
+pft = 7
+porosity = 0.46402
+reasons = ["high porosity"]
+silt_fraction = 0.60104
+[[cell]]
+clay_fraction = 0.10091
+core = false
+id = 9679
+mean_gpp_gC_m2_day = 1.5466440824859984
+mean_liquid_moisture_m3_m3 = 0.19169564247885465
+mean_nitrogen_deposition_gN_m2_day = 0.00035400585010504805
+mean_soil_temperature_K = 274.5845499018069
+pft = 1
+porosity = 0.43123
+reasons = ["central mean GPP"]
+silt_fraction = 0.29997
+[[cell]]
+clay_fraction = 0.06074
+core = false
+id = 9685
+mean_gpp_gC_m2_day = 0.12301327306104295
+mean_liquid_moisture_m3_m3 = 0.11812440599936452
+mean_nitrogen_deposition_gN_m2_day = 7.174332125016423e-5
+mean_soil_temperature_K = 260.1487479828646
+pft = 18
+porosity = 0.41278
+reasons = ["low porosity"]
+silt_fraction = 0.06148
+[[cell]]
+clay_fraction = 0.22538
+core = false
+id = 10433
+mean_gpp_gC_m2_day = 4.940395998338816
+mean_liquid_moisture_m3_m3 = 0.29644383510448913
+mean_nitrogen_deposition_gN_m2_day = 0.0020619828821764443
+mean_soil_temperature_K = 292.8512542819954
+pft = 1
+porosity = 0.44438
+reasons = ["productive representative for PFT 1"]
+silt_fraction = 0.3737
+[[cell]]
+clay_fraction = 0.1032
+core = true
+id = 10644
+mean_gpp_gC_m2_day = 0.053975565540473155
+mean_liquid_moisture_m3_m3 = 0.11605083280637794
+mean_nitrogen_deposition_gN_m2_day = 7.667390258447675e-5
+mean_soil_temperature_K = 262.0792765262197
+pft = 18
+porosity = 0.4222
+reasons = ["low clay fraction"]
+silt_fraction = 0.21847
+[[cell]]
+clay_fraction = 0.28074
+core = true
+id = 10997
+mean_gpp_gC_m2_day = 9.313543787033504
+mean_liquid_moisture_m3_m3 = 0.31351865291073805
+mean_nitrogen_deposition_gN_m2_day = 0.0008697392586965865
+mean_soil_temperature_K = 303.02818851631383
+pft = 14
+porosity = 0.43977
+reasons = ["productive non-woody vegetation", "productive representative for PFT 14"]
+silt_fraction = 0.28324
+[[cell]]
+clay_fraction = 0.1801
+core = false
+id = 11162
+mean_gpp_gC_m2_day = 0.35564987986708696
+mean_liquid_moisture_m3_m3 = 0.22594619721819892
+mean_nitrogen_deposition_gN_m2_day = 0.000144450529229576
+mean_soil_temperature_K = 284.23729668613964
+pft = 7
+porosity = 0.42715
+reasons = ["low mean nitrogen deposition"]
+silt_fraction = 0.30009
+[[cell]]
+clay_fraction = 0.38315
+core = false
+id = 11655
+mean_gpp_gC_m2_day = 7.3720631390817175
+mean_liquid_moisture_m3_m3 = 0.23041118325152743
+mean_nitrogen_deposition_gN_m2_day = 0.0009010872597348664
+mean_soil_temperature_K = 302.4212904342386
+pft = 10
+porosity = 0.44317
+reasons = ["productive representative for PFT 10"]
+silt_fraction = 0.22299
+[[cell]]
+clay_fraction = 0.41109
+core = false
+id = 12334
+mean_gpp_gC_m2_day = 2.595225142482194
+mean_liquid_moisture_m3_m3 = 0.14282046371181495
+mean_nitrogen_deposition_gN_m2_day = 0.0007465953852883295
+mean_soil_temperature_K = 304.38404490324126
+pft = 7
+porosity = 0.44562
+reasons = ["productive representative for PFT 7"]
+silt_fraction = 0.21028
+[[cell]]
+clay_fraction = 0.43675
+core = false
+id = 13397
+mean_gpp_gC_m2_day = 9.059001025672831
+mean_liquid_moisture_m3_m3 = 0.3481000035053395
+mean_nitrogen_deposition_gN_m2_day = 0.0007914023457519841
+mean_soil_temperature_K = 301.44202997253024
+pft = 8
+porosity = 0.44708
+reasons = ["productive representative for PFT 8"]
+silt_fraction = 0.18164
+
+[fixture.casa_c_parameters]
+bytes = 18947
+filename = "pftlookup_igbp_updated4_exud0.csv"
+license = "MIT"
+sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+
+[fixture.casa_cn_parameters]
+bytes = 17321
+filename = "pftlookup_igbp_updated4.csv"
+license = "MIT"
+sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+
+[fixture.corpse_parameters]
+bytes = 2440
+filename = "corpse_params_12.18d.2017.nml"
+license = "MIT"
+sha256 = "46ef8a4994c142144d31cf7d759a4069070db2b78a5474614d556d66dd33179e"
+
+[fixture.forcing]
+bytes = 83728658
+filename = "forcing_1901_2014.nc"
+license = "CC-BY-4.0"
+sha256 = "373b6b6ffedad6d73d27191d10ee9073ed56890d2b4da96b37ffb117a0b15ab3"
+
+[fixture.grid]
+bytes = 5032
+filename = "grid_selected_cells.csv"
+license = "MIT"
+sha256 = "1881b9df3470e4b27da267685696b1597855daf1a74ddfc54fa54ea9af7d8575"
+
+[fixture.mimics_parameters]
+bytes = 8957
+filename = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+license = "MIT"
+sha256 = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+
+[fixture.perturbation]
+bytes = 79
+filename = "co2delta_control.txt"
+license = "MIT"
+sha256 = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+
+[fixture.phenology]
+bytes = 30424
+filename = "modis_phenology_wtundra.txt"
+license = "MIT"
+sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+[fixture.soil]
+bytes = 2933
+filename = "soil_selected_cells.csv"
+license = "MIT"
+sha256 = "fdb9a7806f2a11dcf9d26725052156e9e4a0db10e1f866fa6440554fb12f5e16"
+
+[license]
+driver_dataset = "CC-BY-4.0"
+testbed_repository_inputs = "MIT"
+
+[selection]
+code = "selected_cell_fixtures.jl"
+code_sha256 = "9327da278b403d64532466b470c7e5556eefca936cd48c59bcfcd2676ebebd7e"
+core_cell_ids = [51, 626, 923, 1285, 3613, 4273, 4397, 4453, 6325, 10644, 10997]
+extended_cell_ids = [51, 532, 618, 626, 923, 1285, 1394, 1715, 1805, 2182, 2378, 3234, 3442, 3613, 3633, 3898, 3899, 3983, 3997, 4079, 4273, 4397, 4453, 5444, 6325, 7669, 8625, 9667, 9679, 9685, 10433, 10644, 10997, 11162, 11655, 12334, 13397]
+method = "non-vegetated PFTs 13, 15, and 17 excluded; deterministic PFT maxima plus nearest 0.1, 0.5, and 0.9 empirical quantiles; ties use the lowest global cell ID"
+statistics_period = "1901-2014"
+
+[source]
+archive_md5_verified = true
+archive_members_match_extracted_sources = true
+archive_members_sha256 = "3b31c0513dece38c5a056bd04ffda4ae2d58a4ffba2568aeb824825065f7e287"
+dataset_doi = "10.5065/jqts-cg20"
+repository = "https://github.com/wwieder/biogeochem_testbed.git"
+repository_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+repository_inputs_match_commit = true
+
+    [source.archive]
+    bytes = 13399060965
+    filename = "INPUT_GSWP3_CLM5dev110_hist.tar.gz"
+    md5 = "7b2a438bf095e1133fdf966327167171"
+    url = "https://zenodo.org/api/records/15504780/files/INPUT_GSWP3_CLM5dev110_hist.tar.gz/content"
+
+[time]
+calendar = "noleap"
+conversion = "yearly 365-day source dimensions concatenated; zero-based day coordinate added"
+days = 41610
+end_year = 2014
+start_year = 1901
+
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["time", "cell"]
+name = "xtairk"
+source_dimensions = ["lon", "lat", "time"]
+units = "K"
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["time", "cell"]
+name = "ndep"
+source_dimensions = ["lon", "lat", "time"]
+units = "gN/m2/day"
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["time", "cell"]
+name = "xcgpp"
+source_dimensions = ["lon", "lat", "time"]
+units = "gC m-2 day-1"
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["nsoilyrs", "time", "cell"]
+name = "xtsoil"
+source_dimensions = ["lon", "lat", "nsoilyrs", "time"]
+units = "K"
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["nsoilyrs", "time", "cell"]
+name = "xmoist"
+source_dimensions = ["lon", "lat", "nsoilyrs", "time"]
+units = "m3/m3"
+[[variable]]
+conversion = "none; values and storage type retained exactly"
+fixture_dimensions = ["nsoilyrs", "time", "cell"]
+name = "xfrznmoist"
+source_dimensions = ["lon", "lat", "nsoilyrs", "time"]
+units = "m3/m3"

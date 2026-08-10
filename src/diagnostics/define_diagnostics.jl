@@ -1258,4 +1258,24 @@ function define_diagnostics!(land_model, possible_diags)
         compute! = (out, Y, p, t) ->
             compute_lake_shf!(out, Y, p, t, land_model),
     )
+
+    define_testbed_diagnostics!(land_model, possible_diags)
+end
+
+function define_diagnostics!(
+    land_model::CASAPlantEnergyHydrologyModel,
+    requested_diags,
+)
+    for component_name in ClimaLand.land_components(land_model)
+        component = getproperty(land_model, component_name)
+        component_diags = get_possible_diagnostics(component)
+        if !(requested_diags isa Val)
+            filter!(
+                diagnostic -> diagnostic in requested_diags,
+                component_diags,
+            )
+        end
+        define_diagnostics!(component, component_diags)
+    end
+    return nothing
 end

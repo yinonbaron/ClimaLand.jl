@@ -1,0 +1,49 @@
+canonical = true
+compatibility_identity = "17bc06b1e8a31b68326d84ab01e0bc3250378598e668cdb92ac91ce9ae2f20ec"
+generation = "representative-linux-v1"
+kind = "reference"
+model = "MIMICS-C"
+outcome = "passed"
+schema_version = 1
+scope = "representative"
+
+[artifact]
+binding = "representative_mimics_c_reference"
+filename = "representative-linux-v1-representative_mimics_c_reference-0ea35ac9cf7fbc833c1d67fce3642b340e9dd805.tar.gz"
+git_tree_sha1 = "0ea35ac9cf7fbc833c1d67fce3642b340e9dd805"
+sha256 = "9e20d077534e85c032d202fe956af8291baf9fe4d2702fd033e7101fdfed8171"
+url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_mimics_c_reference-0ea35ac9cf7fbc833c1d67fce3642b340e9dd805.tar.gz"
+
+[files]
+"reduced_oracle.toml" = "04a301e83d662ea32c80e9dd1a09570318001b8b2b008095f1237a65b014653f"
+
+[payload]
+oracle = "reduced_oracle.toml"
+
+[provenance]
+build_platform = "x86_64-linux-gnu"
+build_receipt_sha256 = "9799090e0377fce4bb409a11033460996e7b68befb8e1947e4034701b5c34941"
+comparison_report_sha256 = "73d68c4e1872e1034cb66b35881266fa9c76ac459f7c5b799f477fb64860c62e"
+comparison_schema = "reduced-comparison-oracle-v1"
+compiler_identity = "GNU Fortran (GCC) 13.2.0"
+generator_revision = "71b6ddc1c4bc21fc16e4d4162381ec6cb4fa46c2fd6eebbe4c8ed9e6109a0c53"
+scope_manifest_sha256 = "293190db2dda44f1babd13715a7e33027349df9e959a40dd60cc9d329671e9f4"
+source_revision = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+toolchain_identity = "climaland-biogeochem-reference-linux-gfortran-v1"
+
+    [provenance.forcing_sha256]
+    "forcing_1901_2014.nc" = "7f78f6ac31e58466b6e85667b64f8a9b85b1b4403a910b982eddfb0d7e0b38d3"
+    "grid_selected_cells.csv" = "7956d4e354f8e834998618cf3d032e9a5231620ed5f5c9e0d14e2d44c6e3831f"
+    "soil_selected_cells.csv" = "8f369cc9f16b0afa90f3827c7c6f012549d15b327d98fa5d779c55999b7277d1"
+
+    [provenance.parameter_sha256]
+    "candidate_reconstruction.toml" = "676600d1deeb94783032b47a12c5b51462765a5d8f2dd426558bbeabfca0f832"
+    "fixtures/selected_cells/mimics_cn_parameters.csv" = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+    "pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv" = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+    "pftlookup_igbp_updated4.csv" = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+    "validation/mimics_c_full_grid_calibration.toml" = "f098e76a042cf4b280d8382030027a928d72e7b8642e74c163eab33793f9316e"
+    "validation/mimics_c_historical_calibration.toml" = "a96b26acf36c64597b2c2ad82869dabf73bd8ee09ff2747f9598c5ad542f4cb5"
+
+    [provenance.shared_parameter_sha256]
+    "co2delta_control.txt" = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+    "modis_phenology_wtundra.txt" = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"

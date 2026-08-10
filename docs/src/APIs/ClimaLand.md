@@ -35,6 +35,9 @@ ClimaLand.LandSoilBiogeochemistry{FT}(
         ClimaLand.Domains.HybridBox,
     };
 ) where {FT}
+ClimaLand.CASAPlantSoilModel
+ClimaLand.CASAPlantEnergyHydrologyModel
+ClimaLand.LitterCouplingParameters
 ClimaLand.SoilSnowModel
 ClimaLand.SoilSnowModel{FT}(
     forcing,

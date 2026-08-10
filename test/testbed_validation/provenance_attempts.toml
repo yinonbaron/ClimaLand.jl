@@ -1,0 +1,419 @@
+schema_version = 1
+updated = "2026-07-29"
+
+[[attempt]]
+id = "artifact_checksums"
+target = "published and local reference artifacts"
+status = "partial_pass"
+evidence = "drivers, CASA-C, MIMICS-C, and three legacy means match manifest byte counts and MD5; CASA-CN and MIMICS-CN are absent locally"
+command = "julia reference_harness.jl verify <data-root> <artifact ids>"
+
+[[attempt]]
+id = "current_source_build"
+target = "testbed source compilation"
+status = "pass"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+evidence = "modern gfortran build links after the declaration-order compatibility patch"
+command = "julia reference_harness.jl build-fortran <source-root> <build-parent>"
+notes = "legacy compiler warnings remain in build.log; a successful build is not an archive integrity pass"
+
+[[attempt]]
+id = "casa_c_archive_metadata"
+target = "CASA carbon-only archive provenance"
+status = "candidate_only"
+archive = "CASACNP_mod5_GSWP3_Conly.tar.gz"
+archive_output = "ann_casaclm_pool_flux_1901_2014.nc"
+created = "2022-03-12T17:01:30"
+parameter_file = "pftlookup_igbp_updated4_exud0.csv"
+recorded_control_directory = "GRID_CN/CASACNP_mod5_GSWP3_Conly"
+candidate_source_commit = "630389decceaac88d7ab8e09339daa75f960ba32"
+evidence = "NetCDF attributes and NCO history; candidate is the latest repository commit before creation"
+blocker = "control directory and spinup restart files were not archived or committed"
+
+[[attempt]]
+id = "mimics_c_archive_metadata"
+target = "MIMICS carbon-only archive provenance"
+status = "candidate_only"
+archive = "MIMICS_mod5_Conly_KO4.tar.gz"
+archive_output = "ann_mimics_pool_flux_1901_2014.nc"
+created = "2021-02-02"
+parameter_file = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+recorded_control_directory = "GRID_CN/MIMICS_mod5_Conly_KO4"
+candidate_source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+evidence = "NetCDF attributes; candidate is the latest repository commit before creation"
+blocker = "control directory and spinup restart files were not archived or committed"
+
+[[attempt]]
+id = "git_object_search_for_missing_controls"
+target = "carbon-only controls and CN restart states"
+status = "not_found"
+evidence = "exact path/filename searches over every local Git object and commit name list returned no matches"
+searched = [
+    "CASACNP_mod5_GSWP3_Conly",
+    "MIMICS_mod5_Conly_KO4",
+    "cnppool_end_spin_1901-1920_x500b.csv",
+    "mimicspool_end_spin_1901-1920_x500b.csv",
+]
+notes = "analysis notebooks mention the carbon-only experiment names but contain no authoritative controls or restarts"
+
+[[attempt]]
+id = "casa_cn_control_audit"
+target = "GRID_CN/CASACNP_mod5_GSWP3_JAMES historical control"
+status = "blocked_missing_inputs"
+control_md5 = "6ffad3aff680ecbe45e2c9558caf4363"
+present = [
+    "grid_info",
+    "casa_parameters",
+    "phenology",
+    "soil_properties",
+    "perturbation",
+]
+missing = ["extracted_1901_meteorology", "casa_spinup_restart"]
+notes = "meteorology is available inside the verified driver archive; the restart is absent from Git history"
+
+[[attempt]]
+id = "mimics_cn_control_audit"
+target = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push historical control"
+status = "blocked_missing_inputs"
+control_md5 = "29e746c0b19aa19373f6215737016897"
+present = [
+    "grid_info",
+    "casa_parameters",
+    "phenology",
+    "soil_properties",
+    "perturbation",
+    "mimics_parameters",
+]
+missing = [
+    "extracted_1901_meteorology",
+    "casa_spinup_restart",
+    "mimics_spinup_restart",
+]
+notes = "meteorology is available inside the verified driver archive; both restarts are absent from Git history"
+
+[[attempt]]
+id = "current_source_casa_c_smoke"
+target = "Fortran runtime with verified GSWP3 input"
+status = "pass_not_parity"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, 4263 cells"
+meteorology_md5 = "d425c87b43e21539c01b589ed90d660b"
+evidence = "created CASA pool/flux restart CSVs and an annual NetCDF file; errors.txt was empty"
+command = "julia reference_harness.jl smoke-fortran <source-root> <met_1901_1901.nc> <run-parent>"
+repeatability = "two independent builds/runs produced byte-identical restart CSVs and exact payloads for 47 of 48 NetCDF variables"
+known_difference = "nLitInptStruc differs because the carbon-only execution path does not assign that nitrogen flux before output"
+notes = "default initial pools make this a compiler/runtime smoke test only; its output is not a parity golden"
+
+[[attempt]]
+id = "current_source_casa_c_cell_51_archive_parity"
+target = "CASA carbon-only archived ice/water boundary, cell 51, 1901"
+status = "pass_exact_boundary_only"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, IGBP 17 ice/water"
+fixture = "fixtures/casa_c_cell_51/fixture.toml"
+command = "julia --project=.buildkite test/testbed_validation/casa_fixture_parity.jl <source-root> test/testbed_validation/fixtures/casa_c_cell_51 <run-parent>"
+evidence = "all 49 NetCDF variables and critical attributes match exactly for all 365 daily records"
+normalization = "the raw run time coordinate receives the archive's documented +1900 year-label offset; no scientific value tolerance is applied"
+legacy_warning = "one expected ReadMetNcFile alignment warning occurs because the sliced 1x1 grid preserves global cell ID 51"
+notes = "all carbon pools and fluxes are zero; this validates the boundary path and workflow but does not establish active-pool parity"
+
+[[attempt]]
+id = "current_source_casa_c_cell_11060_archive_parity"
+target = "CASA carbon-only archived productive trajectory, cell 11060, 1901"
+status = "failed_missing_initial_state"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CASA, carbon-only, initcasa=0, one 1901 loop, IGBP 7"
+fixture = "fixtures/casa_c_cell_11060/fixture.toml"
+command = "julia --project=.buildkite test/testbed_validation/casa_fixture_parity.jl <source-root> test/testbed_validation/fixtures/casa_c_cell_11060 <run-parent>"
+evidence = "28 of 49 variables match exactly, including drivers, fT, fW, thetaLiq, coordinates, masks, and critical metadata; 21 active pools and dependent fluxes differ"
+blocker = "the archive-generating spinup restart was not published or committed; default PFT initial pools are not the archived historical initial state"
+notes = "the productive fixture is valid for environmental-kernel tests and will become the active trajectory gate when the initialization is reconstructed"
+
+[[attempt]]
+id = "corpse_current_source_control_compatibility"
+target = "EXAMPLE_GRID CORPSE historical control with current source"
+status = "control_update_required"
+evidence = "the historical control has 28 values; current source requires line 29 for NetCDF output interval"
+source_change = "ff31ec5 introduced line 29 on 2020-10-12"
+notes = "adding an output interval may restore control parsing but does not establish which historical source generated the legacy mean"
+
+[[attempt]]
+id = "corpse_current_source_one_day_probe"
+target = "ordered CORPSE cohort update in current pinned Fortran source"
+status = "pass_exact_float32"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source_md5 = "8462f575650535d06692d0d8ee6ef17a"
+parameter_md5 = "575cf154cbb1e293117b57a150f565a1"
+configuration = "one soil pool, two fixed cohorts, dt=1/365 year, gfortran default REAL"
+command = "julia reference_harness.jl corpse-one-day <source-root> <run-parent>"
+evidence = "all nine rhizosphere cohort states match Julia exactly; daily CO2 differs by two Float32 ULP because of reduction rounding"
+scope = "equation-order fixture only; this does not reproduce the legacy 2000-2010 mean"
+
+[[attempt]]
+id = "corpse_legacy_mean_forcing_audit"
+target = "corpse_pool_flux_2000-2010_mean.nc"
+status = "blocked_missing_historical_forcing"
+evidence = "NetCDF history identifies 2000-2010 daily ncrcat followed by cdo -yearmean; the committed control requires 4299-cell CLM4.5/CRU-NCEP meteorology"
+missing = ["INPUT_MET_GRID_CRU_NCEP_SOILLIQ/met_1901_1901.nc through met_2010_2010.nc"]
+incompatible_available_input = "published CLM5/GSWP3 archive contains 4263 active cells and cannot be substituted"
+notes = "the 2024 JAMES methods explicitly distinguish the older CLM4.5/CRU-NCEP experiment from the newer CLM5/GSWP3 dataset"
+
+[[attempt]]
+id = "corpse_legacy_mean_restart_audit"
+target = "historical CORPSE 1901 initialization"
+status = "blocked_missing_exact_casa_restart"
+present = ["corpsepool_end_1901_1920_spin_x499b_minFW.csv"]
+missing = ["cnppool_end_1901_1920_spin_x499b_minFW_corpse.csv"]
+candidate_rejected = "cnppool_end_1901_1920_postADspin_x499c.csv belongs to a differently named CASA post-accelerated-spin experiment"
+notes = "renaming the nearby candidate would be an unsupported scientific substitution"
+
+[[attempt]]
+id = "corpse_legacy_mean_historical_source_audit"
+target = "source/configuration around the 2018-03-15 NetCDF creation date"
+status = "no_complete_runnable_configuration"
+evidence = "the last public source commit before file creation is 26b4630 (2017-11-17); the named corpse_params_12.18d.2017.nml was first committed on 2018-04-26 and its restart on 2018-08-24"
+binary = "committed historical executable is Linux x86-64 ELF and cannot run on the current macOS ARM environment"
+notes = "later current-source controls additionally need line 29; none of these source choices restore the missing CRU-NCEP files and exact CASA restart"
+
+[[attempt]]
+id = "corpse_fresh_gswp3_cell_11060_reference"
+target = "authoritative CORPSE fallback reference"
+status = "pass_fresh_fortran"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "CORPSE carbon, initcasa=0, one 1901 year, productive GSWP3 cell 11060, daily output"
+fixture = "fixtures/corpse_c_fresh_cell_11060/fixture.toml"
+command = "julia reference_harness.jl corpse-fortran-fixture <source-root> test/testbed_validation/fixtures/casa_c_cell_11060 <run-parent>"
+evidence = "two independent fresh runs produced exact scientific payloads for all 28 CORPSE and 49 CASA NetCDF variables plus byte-identical cohort restarts; Julia reproduces the trajectory within committed measured tolerances"
+raw_netcdf_note = "file checksums differ only because the global creation-time attribute changes"
+legacy_mean_role = "informational only unless the missing historical inputs are later recovered"
+
+[[attempt]]
+id = "public_exact_filename_search"
+target = "missing control directories and restart files"
+status = "not_found"
+evidence = "exact searches of the public GitHub repository and indexed web results returned no control/restart copies"
+notes = "the published paper documents the 1901-1920 repeated spinup concept but not the missing restart byte content"
+
+[[attempt]]
+id = "casa_boreal_nfix_candidate"
+target = "pftlookup_igbp_updated4_borealNfix.csv"
+status = "pass_evidence_bounded_candidate"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source = "GRID_CN/pftlookup_igbp_updated4.csv"
+source_sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+candidate_sha256 = "d5c034fa3ab75fe55eaf5145ddb125888eb4114ef830df91a59cb6c109dc84f4"
+derivation = "PFT 1 evergreen needleleaf forest nfixrate 0.08 -> 0.21"
+evidence = "the KO4_push README names exactly this change and says the result equals the larch value; PFT 3 is 0.21 in the source table"
+rejected = "changing PFT 3 or every boreal PFT is not supported by the singular 0.08-to-0.21 statement"
+
+[[attempt]]
+id = "mimics_ko6_candidate_matrix"
+target = "pftlookup_LIDET-MIM-REV_CN_desorb2xKO6 parameter family"
+status = "pass_bounded_three_candidate_matrix"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+source = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+source_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+ko6_fi30_sha256 = "7a97606ff0a17ef78b66abc1eeb07f72a593053dbe0ae9668ff946df408cd4c9"
+ko6_fi10_sha256 = "9fc1e9db3e138c16a02c6f4e6e2671848475eb4f5bc5262da20b17888c52b046"
+ko6_fi05_sha256 = "bcd7b733ceb830cbcc4dc9bafca600e2fbc275fa95141cdd7de163a7272961b5"
+common_derivation = "KO(1) 4 -> 6 and KO(2) 4 -> 6"
+bounded_ambiguity = "retain FI(struc)=0.30 at high confidence, use README-supported desorb2 FI(struc)=0.10 at medium confidence, or use the legacy KO6 table's FI(struc)=0.05 at medium confidence"
+rejected = "KO=9 and KO=12 belong to differently named experiment branches"
+parser_compatibility = "the older KO4_push table lacks desorpQ10 and desorpTref; the chosen committed JAMES baseline adds only the pinned reader's required -1 and 25 values"
+
+[[attempt]]
+id = "casa_cn_full_grid_reconstruction"
+target = "CASA-CN CLM5/GSWP3 1901-2014 archive"
+status = "evidence_backed_matrix_exhausted"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+compiler = "GNU Fortran 16.1.0"
+configuration = "100-year prespin; 499 repeated 1901-1920 accelerated cycles; passive C and N x10; 499 normal cycles; 1901-2014 history"
+best_mismatch_count = 132978805
+comparison = "exact annual 1901-2014 plus daily 1901-1905 and 2010-2014; no tolerance"
+verified = "4,263-point restart hashes at all boundaries; passive C+N restoration; unaffected columns; zero exudation; normal-spin carbon convergence"
+failed = "all scientific comparison groups retain exact value mismatches; accelerated-spin carbon misses the global-change and fraction-below-1-g-m-2 convergence thresholds"
+blocker = "archive compiler is unrecorded; source-named GNU Fortran 8.1.0 is unavailable on the current macOS ARM host"
+report_sha256 = "3139f93b7e43cd244f04f467dff774bf4c406260b37946a39d245dc847e73408"
+
+[[attempt]]
+id = "carbon_only_control_candidates"
+target = "CASA-C and MIMICS-C CLM5/GSWP3 control families"
+status = "pass_auditable_derivation"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "four CASA stages and four MIMICS stages derived from checked-in CN controls"
+switches = "isomModel explicitly asserted for each family; icycle 2 -> 1; output roots OUTPUT_CN -> OUTPUT_C"
+evidence = "published NetCDF parameter attributes select CASA exud0 and MIMICS base CASA/KO4 tables"
+audit = "candidate_reconstruction.toml pins source/derived SHA-256 hashes and emits exact line-level diffs without modifying upstream files; blank legacy prespin line 29 is explicitly completed with the pinned reader's required NetCDF interval"
+
+[[attempt]]
+id = "carbon_nitrogen_prespin_control_candidates"
+target = "CASA-CN and bounded MIMICS-CN CLM5/GSWP3 prespin controls"
+status = "pass_auditable_derivation"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+configuration = "one CASA-CN boreal-N-fix control and three MIMICS-CN KO6/FI controls derived from the committed prespin family"
+switches = "isomModel is explicit for CASA or MIMICS; icycle=2 is explicitly preserved"
+casa_cn_sha256 = "f327eda2dfd68d3acd9e166600b65c9eb94f36b27e27572d8a87c00078e93db6"
+mimics_cn_fi30_sha256 = "bb796d5d86b96c7d915c0c3376d9e5be3e69f7b8d7addfc49e9a71767f6bedde"
+mimics_cn_fi10_sha256 = "818e4042a08060bb6fc49e602b59ac963587a5981fc9013cf53d8188f2838d19"
+mimics_cn_fi05_sha256 = "88ff85b2259c55c7368d5cda73ec94845a2e11c45a334ee6e1ca3e76fda05031"
+audit = "each derived control points to explicitly named .candidate parameter files, records exact source/derived hashes and mutations, and leaves the upstream controls untouched"
+
+[[attempt]]
+id = "candidate_reduced_prespin_validation"
+target = "all reconstructed parameters and carbon-only/carbon-nitrogen controls"
+status = "pass_deterministic_reduced_prespin"
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+fixture = "fixtures/casa_c_cell_11060/fixture.toml"
+configuration = "sixteen cases, one per candidate, one productive cell, one 1901 loop, each executed twice"
+cases = [
+    "CASA-CN boreal N-fix",
+    "MIMICS-CN KO6/FI30",
+    "MIMICS-CN KO6/FI10",
+    "MIMICS-CN KO6/FI05",
+    "four derived CN prespin controls wired to the candidate parameter files",
+    "four independently reduced CASA-C controls",
+    "four independently reduced MIMICS-C controls",
+]
+evidence = "all candidates parse and complete with the pinned executable; control reduction changes only runtime extent, required input paths, and output paths while preserving model/cycle and other candidate configuration; every staged upstream scientific and fixture input has a pinned SHA-256 hash; every CASA and MIMICS restart CSV is byte-identical between independent repeats"
+command = "julia --project=.buildkite candidate_reconstruction.jl validate <source-root> <fixture-dir> <candidate-output> <run-root>"
+scope = "reader compatibility and deterministic reduced prespin only; archive-generating full-grid parity remains downstream"
+
+[[attempt]]
+id = "casa_c_archive_reconstruction"
+target = "CASA-C CLM5/GSWP3 1901-2014 archive"
+status = "evidence_backed_matrix_exhausted"
+source_commit = "630389decceaac88d7ab8e09339daa75f960ba32"
+configuration = "4,263 points; carbon-only; 100-year prespin; 9,980-year accelerated spin; exact passive-carbon x10 restoration; 9,980-year normal spin; 1901-2014 daily history"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+archive_compiler = "not recorded in archive metadata; source Makefile records GNU Fortran 8.1.0"
+archive_md5 = "6a6dc040f338772bc38116a29d865788"
+archive_reference_md5 = "annual=f6455b69c3047401523747fb6a400c51; 1901-1905 daily=171aee4abb83bf31d0b397d071fd327e; 2010-2014 daily=ad4b76d1ac0906f2945ca89505249b97"
+comparison = "zero absolute and relative tolerance; annual 1901-2014 plus daily 1901-1905 and 2010-2014; coordinates, masks, variable sets, types, units, finite values, and missing values"
+statistical_reproduction_status = "passed"
+global_stock_rtol = 2.0e-6
+global_stock_maximum_absolute_relative_error = 1.0551509538714562e-6
+grid_stock_quantile = 0.99
+grid_stock_absolute_relative_rtol = 1.0e-3
+grid_stock_absolute_relative_error = 5.836138648491375e-4
+grid_stock_defined_cell_years = 338466
+grid_stock_zero_reference_cell_years = 147516
+grid_stock_zero_reference_candidate_nonzero_cell_years = 114
+best_mismatch_count = 29418387
+annual_failed_variables = 24
+first_daily_window_failed_variables_per_year = 21
+last_daily_window_failed_variables_per_year = 24
+metadata_mismatches = 0
+passive_restoration_mismatches = 0
+accelerated_spin_global_delta_pg = 0.0012659708430263325
+normal_spin_global_delta_pg = 0.0008417332215262648
+convergence_status = "both spins pass dSOC <0.01 Pg C, >98% below 1 g C m-2, and >98% below 0.1% at equivalent 20-year-cycle endpoints"
+matrix_sha256 = "6a92e65fa3a7d17c6b0e924fb16d386aeb277c0d6fed8845e02ac574a8f93718"
+reconstruction_report_sha256 = "cf0d6f454886f61e82a6dc02a3ad075027150112dd2d19a07a0cb07b6e28b805"
+search_report_sha256 = "584c394d397cacc953d787e996e851a94a8fd35f932c3d3ae046fc5c39d1a28c"
+blocker = "the exact archive compiler/toolchain is unpublished; the only later pinned source revision postdates archive creation and changes only icycle > 1 branches, so it is excluded from the carbon-only matrix"
+
+[[attempt]]
+id = "mimics_c_archive_reconstruction"
+target = "MIMICS-C CLM5/GSWP3 1901-2014 archive"
+status = "evidence_backed_matrix_exhausted"
+source_commit = "9988b1b70266f8aafd9877c55e656e52fc77798d"
+configuration = "4,263 points; carbon-only; 100-year prespin; one 9,980-year spin; 1901-2014 daily history initialized from the first spin endpoint; pre-Q10 KO4_micCN_FI30 table"
+parameter_sha256 = "251435a0d914f72e8b498b2661f0067663418ccfcc3389f21cce7ceaff4d9dbf"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+archive_compiler = "not recorded in archive metadata; source Makefile records GNU Fortran 8.1.0"
+source_makefile_compiler_candidate = "GNU Fortran 8.1.0 blocked because it is unavailable on the current macOS ARM host"
+archive_md5 = "1be7b02d77da6f85134b85086c918331"
+archive_reference_md5 = "annual CASA=74f21a3912cbf4373c06198049fa0769; annual MIMICS=d3bd53bc949e86966fe04b18c3cf2f7d; CASA 1901-1905 daily=357c2a798d786937b46ad52e8c9f3da0; CASA 2010-2014 daily=9888b5acfb6966c8f00bf4925074f6a4; MIMICS 1901-1905 daily=fd349b97609ef4d5b35dbc6143dbd1f8; MIMICS 2010-2014 daily=d829e8fccb2ee6b72e327bc0540d5c2c"
+comparison = "zero absolute and relative tolerance; CASA and MIMICS annual 1901-2014 plus daily 1901-1905 and 2010-2014; coordinates, masks, variable sets, types, critical attributes, finite values, missing values, and sign changes"
+annual_reduction_validation = "the in-process Float64 annual reduction exactly reproduces all archived NCO 4.7.5 annual values for both retained five-year daily windows and both models"
+best_mismatch_count = 8824262
+scientific_value_mismatch_count = 8824261
+annual_casa_failed_variables = 0
+annual_casa_failed_values = 0
+annual_mimics_failed_variables = 9
+annual_mimics_failed_values = 267381
+daily_casa_failed_values = 0
+daily_mimics_failed_values = 8556880
+metadata_mismatches = 0
+first_spin_global_delta_pg = 0.01052900855277753
+first_spin_fraction_below_1_g_m2 = 0.9725545390570021
+first_spin_fraction_below_0_1_percent = 0.9819376026272578
+convergence_status = "the retained spin fails dSOC <0.01 Pg C and >98% below 1 g C m-2, and passes >98% below 0.1%"
+history_initialization_evidence = "the archive was created on 2021-02-02, before the public x500b continuation control was committed on 2021-08-27; starting 1901 from x500 instead of x500b reduces day-one cLITs stock error from +2.782936 Pg C to -0.007861 Pg C with exact litter inputs"
+residual_csomc_evidence = "starting 1901 from x500 reduces day-one cSOMc stock error from +1.824668 Pg C to -0.555844 Pg C; 3,957 of 4,263 cells match exactly and PFT 16 accounts for -0.54417 Pg C of the residual"
+excluded_continuation_control = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+excluded_continuation_control_commit = "117f087382b21261f51c67bd5de2a12c7ebd43a5"
+excluded_continuation_completed_points = 4263
+excluded_continuation_global_delta_pg = 0.013343572261862042
+excluded_continuation_fraction_below_1_g_m2 = 0.9758386113065916
+excluded_continuation_fraction_below_0_1_percent = 0.9908515130190007
+excluded_continuation_day_one_clits_error_pg = 2.782936
+excluded_continuation_day_one_csomc_error_pg = 1.824668
+excluded_continuation_matrix_sha256 = "0f7e6ede66d5a6f4ce308b9ffa5fd876b1e416f50afe7841bda0ccd9d83ea10e"
+excluded_continuation_reconstruction_report_sha256 = "093f99cdc05629554f2582c6e0274f3871707d56006138c38ee071775da68012"
+excluded_continuation_search_report_sha256 = "e9d7a658f406bb6beccc86df7bcb05012f3dd76da6f4a70c29fee91cf144fc7d"
+excluded_continuation_boundary_hashes = "the rejected four-stage reconstruction report records the CASA and MIMICS restart SHA-256 values at the x500b boundary"
+continuation_duration_search = "at 1,410 extra years, cLITs error is +0.001211 Pg C but cSOMc error is -0.557054 Pg C; at 3,630 extra years, cSOMc error is +0.001798 Pg C but cLITs error is +0.722808 Pg C; no tested endpoint matches both pools"
+matrix_sha256 = "418bf4dba099c226774f9e63f59733f3ed22c6b4c0f4aef85425908eb0112fb8"
+reconstruction_report_sha256 = "0e34c90df103e08bcb49a5720647dcf560f66f6fb415f9af8b3484c5ace03ed1"
+search_report_sha256 = "b10428ed8ecdc9edc3bb80f667908a5f24c8127459e0bbf3062b57b628fd2a0f"
+blocker = "the archive compiler/toolchain is unpublished and the source-Makefile GNU Fortran 8.1.0 candidate is unavailable locally; the post-archive x500b continuation, post-archive Q10 source, and carbon-nitrogen KO6 histories are not evidence-backed substitutes"
+
+[[attempt]]
+id = "mimics_cn_archive_reconstruction_preflight"
+target = "MIMICS-CN CLM5/GSWP3 1901-2014 archive"
+status = "blocked_full_grid_runtime"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+configuration = "4,263 points; carbon-nitrogen; 100-year prespin; two 499-cycle 1901-1920 KO4/FI30 spins; 1901-2014 history"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+archive_compiler = "not recorded in archive metadata; source Makefile records unavailable GNU Fortran 8.1.0"
+matrix_sha256 = "7530609070f8c890f236e1342ef94cd0e6415e70814e15b0120f1f5b57a7cf02"
+prespin_elapsed_seconds = 517.047700917
+prespin_casa_restart_sha256 = "656a341ce5ff16f3119458ce55226e457e36e744b3a82a88cbfff354e2325a55"
+prespin_mimics_restart_sha256 = "7f56eb039bd81d1cb0d5553b94ec9ef1eafada20d89046f4f450c49ed489ef22"
+serial_twenty_year_elapsed_seconds = 137.695
+projected_two_spin_hours = 38.2
+rejected_optimization = "-O3 was not faster; compiler automatic loop parallelization was slower; explicit eight-thread grid parallelism changed carbon-balance and respiration diagnostics despite an exact prognostic MIMICS restart"
+comparison = "runner pins zero absolute and relative tolerance for both CASA and MIMICS annual 1901-2014 histories and daily 1901-1905/2010-2014 windows"
+blocker = "the bounded production matrix has not completed because its two source-exact serial spins project to approximately 38 hours on the current host; no archive match or exhausted-matrix result is claimed"
+
+[[attempt]]
+id = "mimics_cn_bundled_ko4_fi30_global_run"
+issue = 43
+target = "complete 4,263-point legacy Fortran MIMICS-CN workflow"
+status = "complete_global_run"
+climaland_runner_commit = "4dfbf81a5f123d356b07cad247649d17853768d6"
+runner_sha256 = "c4098429ec8d68fb1e3086ee804164e2f31c121e28ed8d0fcf33f6437a5c2154"
+compatibility_patch_sha256 = "acf6d0e14aac9886ffe4b0dff5adc7b9e775287003c8a738af4c4aa26f08c10f"
+source_commit = "82c57f8aa1179865d9752b617493ef06f45c3266"
+configuration = "100 repeats of 1901 prespin; two 499-cycle 1901-1920 spins; 1901-2014 history; bundled KO4/FI30 MIMICS parameters in every stage"
+command = "julia --startup-file=no --project=.buildkite test/testbed_validation/mimics_cn_reconstruction.jl run-case ../biogeochem_testbed .. ../mimics_cn_reconstruction_issue25 bundled_ko4_fi30"
+output_root = "../mimics_cn_reconstruction_issue25/bundled_ko4_fi30"
+parameter_file = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+parameter_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+compiler = "GNU Fortran (Homebrew GCC 16.1.0) 16.1.0"
+netcdf_fortran = "4.6.3"
+compiler_flags = "-O1 -C -fbacktrace -fbounds-check -fdefault-real-8 -fdefault-double-8 -fcheck=all -Wall -std=legacy"
+prespin_elapsed_seconds = 528.848526625
+spin_elapsed_seconds = 53312.524270375
+spin_continuation_elapsed_seconds = 54595.662617458
+historical_elapsed_seconds = 2258.598439875
+matrix_sha256 = "a05f93962e3cfe299ba446243d8367e73dd8b38f83400920c30d00b8b2c0c97a"
+workflow_sha256 = "748bd07a429e9dad0c20ca8deabb49976e5fcb0fb38926341fc40eb97d9f8d87"
+control_diff_report_sha256 = "3f0e23f0cdee6dbf1d2c23cb3ffebbb04f19a22a667e73599d90c3a58fa81985"
+build_metadata_sha256 = "d965045449bd54caea7b4fa4d4d075e3a57a0b20df382067093a34b4037343e7"
+workflow_metadata_sha256 = "1e056d2f218dd63346b02c5272e25ec00ae3a7dba875cafe86657e7fcbdf29eb"
+reconstruction_report_sha256 = "c23cee6a4e97ff35254f53f1fc48606ec68893b861b6ab44b1e537eebd79c42f"
+prespin_stage_metadata_sha256 = "01aa914eb674959f0c77d99704bc970fdb6545b5365abc8b6a2ed10dbfe81204"
+spin_stage_metadata_sha256 = "3d6f09c85084960a62fec9ece5c82ad86355bd564ec789c3cd45f2c5de9aa94d"
+spin_continuation_stage_metadata_sha256 = "c2486626c9f464ec269a1bdeb181629f29d9a7f4e8a2c08b44108d4f20982e57"
+historical_stage_metadata_sha256 = "f6c13e9ec92d16b55b368caaa5d5334697967587331f28da4263e220ab40c60a"
+prespin_casa_restart_sha256 = "bb66be3da72cc366c1b5c15efcd62e4b1258f56aef2cf06db1d8f2d7543797b5"
+prespin_mimics_restart_sha256 = "331a3090f68db2f32af613ba12bf921e41b9b574d6dd530719b61c1504b70e6d"
+spin_casa_restart_sha256 = "d9c4bc465da6e322287085b88c0d1119c8541c05ee806bdcdf0dbe0fa5ccf6a6"
+spin_mimics_restart_sha256 = "5e68829295be1546f5afcdddb65c3df71ab0fde19940a0e6e0ed9f44aad737bf"
+spin_continuation_casa_restart_sha256 = "f1e868ec2194c42e0fac2453d74e9d51df0e39da0b8f25cd9607d4fbf08107b5"
+spin_continuation_mimics_restart_sha256 = "d43518cc5656c0574ae7478c5c729586b8d79ef50646d3a278a4fa798f8fd1e1"
+historical_casa_restart_sha256 = "5b9f0c043fd86d846939f7330c0637000bd96ee792ac0fc888c00781eeb431c0"
+historical_mimics_restart_sha256 = "b507fa0ad8bc9b4ea009c7de618f5293abe6afb3533ffe87945a5a9e4202d659"
+scientific_result = "the run completed; the archive comparison is a mismatch and non-finite states appear after the continuation spin, but archive agreement is not the issue 43 acceptance criterion"

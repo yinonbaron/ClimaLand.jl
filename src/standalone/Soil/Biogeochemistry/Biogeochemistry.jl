@@ -43,11 +43,26 @@ export SoilCO2ModelParameters,
     MicrobeProduction,
     SoilCO2FluxBC,
     SoilO2FluxBC,
+    AbstractNutrientMode,
+    CarbonOnly,
+    CarbonNitrogen,
     AtmosCO2StateBC,
     AtmosO2StateBC,
     SoilCO2StateBC,
     AbstractSoilDriver,
-    SoilDrivers
+    SoilDrivers,
+    CASA,
+    MIMICS,
+    CORPSE
+
+"Compile-time nutrient configuration for standalone biogeochemistry models."
+abstract type AbstractNutrientMode end
+
+"Carbon-only state and process configuration."
+struct CarbonOnly <: AbstractNutrientMode end
+
+"Coupled carbon-nitrogen state and process configuration."
+struct CarbonNitrogen <: AbstractNutrientMode end
 
 """
     SoilCO2ModelParameters{FT <: AbstractFloat, PSE}
@@ -1193,6 +1208,9 @@ function ClimaLand.make_compute_jacobian(model::SoilCO2Model{FT}) where {FT}
     return compute_jacobian!
 end
 
+include("./casa.jl")
+include("./mimics.jl")
+include("./corpse.jl")
 include("./co2_parameterizations.jl")
 
 end # module

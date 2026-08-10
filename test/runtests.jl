@@ -6,6 +6,9 @@ import ClimaComms
 @safetestset "Aqua tests" begin
     include("aqua.jl")
 end
+@safetestset "Allocation test utilities" begin
+    include("allocation_test_utils_tests.jl")
+end
 
 # Shared ClimaLand utilities tests
 @safetestset "Richards model implicit timestepping tests" begin
@@ -19,6 +22,9 @@ end
 end
 @safetestset "General utilities tests" begin
     include("shared_utilities/utilities.jl")
+end
+@safetestset "Checkpoint grid compatibility" begin
+    include("shared_utilities/checkpoints.jl")
 end
 @safetestset "Variable types tests" begin
     include("shared_utilities/variable_types.jl")
@@ -67,6 +73,25 @@ end
 @safetestset "Soil Biogeochemistry module tests" begin
     include("standalone/Soil/Biogeochemistry/biogeochemistry_module.jl")
 end
+@safetestset "CASA biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/casa.jl")
+end
+@safetestset "MIMICS biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/mimics.jl")
+end
+@safetestset "CORPSE biogeochemistry kernels" begin
+    include("standalone/Soil/Biogeochemistry/corpse.jl")
+end
+# The reference harness executes POSIX tools and Linux-built Fortran oracles.
+# Its pinned provenance and test environment target Julia 1.12 or newer.
+if !Sys.iswindows() && VERSION >= v"1.12"
+    @safetestset "Biogeochemical testbed reference harness" begin
+        include("testbed_validation/runtests.jl")
+    end
+end
+@safetestset "CASA plant-soil litter coupling" begin
+    include("integrated/casa_biogeochemistry.jl")
+end
 @safetestset "Soil CO2 parameterization tests" begin
     include("standalone/Soil/Biogeochemistry/co2_parameterizations.jl")
 end
@@ -108,6 +133,10 @@ end
 end
 
 # Standalone Vegetation model tests
+@safetestset "CASA plant module tests" begin
+    include("standalone/Vegetation/casa.jl")
+end
+
 @safetestset "Canopy module tests" begin
     include("standalone/Vegetation/canopy_model.jl")
 end
@@ -172,4 +201,8 @@ end
 
 @safetestset "ILAMB setup" begin
     include("../experiments/ilamb/tests/test_ilamb_setup.jl")
+end
+
+@safetestset "Testbed candidate reconstruction" begin
+    include("testbed_validation/candidate_runtests.jl")
 end

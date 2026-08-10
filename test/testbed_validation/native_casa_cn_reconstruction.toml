@@ -1,0 +1,40 @@
+schema_version = 1
+issue = 30
+points = 4263
+calendar = "365_day"
+dt_seconds = 86400
+mineral_nitrogen_owner = "casa_soil.n_mineral"
+passive_carbon_multiplier = 10
+passive_nitrogen_multiplier = 10
+root_exudation = 0
+cwd_nitrogen = true
+
+[stages.prespin]
+forcing_years = [1901, 1901]
+repeats = 100
+parameters = "pftlookup_igbp_updated4_borealNfix.candidate.csv"
+
+[stages.accelerated_spin]
+forcing_years = [1901, 1920]
+repeats = 499
+parameters = "pftlookup_igbp_updated4_exud0AD.csv"
+
+[stages.normal_spin]
+forcing_years = [1901, 1920]
+repeats = 499
+parameters = "pftlookup_igbp_updated4_exud0.csv"
+
+[stages.historical]
+forcing_years = [1901, 2014]
+repeats = 1
+
+[comparison]
+daily_windows = [[1901, 1905], [2010, 2014]]
+annual_reference = "ann_casaclm_pool_flux_1901_2014.nc"
+fresh_fortran_namespace = "historical_comparison.fresh_fortran"
+published_archive_namespace = "historical_comparison.published_archive"
+
+[output]
+eltype = "Float32"
+deflatelevel = 1
+checkpoint_format = "native ClimaLand HDF5"

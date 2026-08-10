@@ -11,6 +11,7 @@ apis = [
     ],
     "Canopy" => [
         "Canopy Models" => "APIs/canopy/Canopy.md",
+        "CASA Plant Carbon" => "APIs/canopy/CASA.md",
         "Plant Hydraulics" => "APIs/canopy/PlantHydraulics.md",
         "Leaf, stem, root dynamics" => "APIs/canopy/Biomass.md",
         "Optimal LAI" => "APIs/canopy/LAI.md",

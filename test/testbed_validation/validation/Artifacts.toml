@@ -1,0 +1,41 @@
+[representative_casa_c_reference]
+git-tree-sha1 = "701afc982e84c82c51c020b5f177cc4dee5e5a03"
+
+    [[representative_casa_c_reference.download]]
+    sha256 = "4241bd003a3b4fb50d7a3eade9723d655b122f3ac58905fae5fe4f27f83aaf27"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_casa_c_reference-701afc982e84c82c51c020b5f177cc4dee5e5a03.tar.gz"
+
+[representative_casa_cn_reference]
+git-tree-sha1 = "a3a4bfca744162bd550cf27c1f9a581d735f1c4c"
+
+    [[representative_casa_cn_reference.download]]
+    sha256 = "e1a8e58f39ef7a51bc38f0fc2a017ca1531c508648da486416079e2fc3b2ee7e"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_casa_cn_reference-a3a4bfca744162bd550cf27c1f9a581d735f1c4c.tar.gz"
+
+[representative_corpse_reference]
+git-tree-sha1 = "1426e867e98d06206142ee2b9643ca6f80c27fd6"
+
+    [[representative_corpse_reference.download]]
+    sha256 = "afee167571ee50643f5f584cc5864e2a2d46435e754d3cf9cae417116da40b87"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_corpse_reference-1426e867e98d06206142ee2b9643ca6f80c27fd6.tar.gz"
+
+[representative_forcing]
+git-tree-sha1 = "40bfe53967c9fa3bd25d82d862f7e0e6d5196df3"
+
+    [[representative_forcing.download]]
+    sha256 = "b28ef777cf49d3b64c2bbf0ce5f4edeee98e142c6c5edc9ba697d77ab9782550"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_forcing-40bfe53967c9fa3bd25d82d862f7e0e6d5196df3.tar.gz"
+
+[representative_mimics_c_reference]
+git-tree-sha1 = "0ea35ac9cf7fbc833c1d67fce3642b340e9dd805"
+
+    [[representative_mimics_c_reference.download]]
+    sha256 = "9e20d077534e85c032d202fe956af8291baf9fe4d2702fd033e7101fdfed8171"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_mimics_c_reference-0ea35ac9cf7fbc833c1d67fce3642b340e9dd805.tar.gz"
+
+[representative_mimics_cn_reference]
+git-tree-sha1 = "d4c30559c61fcbb6a6ee23249f25c40bc722534c"
+
+    [[representative_mimics_cn_reference.download]]
+    sha256 = "b5fb1e74fdea98607bd530eb615850991f85380fc99e2df53c45defebddf6beb"
+    url = "https://github.com/yinonbaron/ClimaLand.jl/releases/download/representative-linux-v1/representative-linux-v1-representative_mimics_cn_reference-d4c30559c61fcbb6a6ee23249f25c40bc722534c.tar.gz"

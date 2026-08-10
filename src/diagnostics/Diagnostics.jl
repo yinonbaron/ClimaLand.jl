@@ -15,7 +15,12 @@ import ..LandModel
 import ..SoilSnowModel
 import ..Soil: EnergyHydrology, Runoff
 import ..Soil.Biogeochemistry: SoilCO2Model
+import ..Soil.Biogeochemistry.CASA: CASASoilModel
+import ..Soil.Biogeochemistry.MIMICS: MIMICSSoilModel
+import ..Soil.Biogeochemistry.CORPSE: CORPSESoilModel
 import ..Snow: SnowModel
+import ..Vegetation.CASA: CASAPlantModel
+import ..CASAPlantSoilModel, ..CASAPlantEnergyHydrologyModel
 import ..Canopy:
     CanopyModel,
     medlyn_conductance,

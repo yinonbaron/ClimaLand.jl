@@ -2,6 +2,97 @@ ClimaLand.jl Release Notes
 ========================
 main
 ----
+- ![][badge-✨feature] Add an explicit fresh-reference mode for all five
+  Representative biogeochemistry comparisons. The Validation Runner now uses
+  one verified shared Fortran build, isolated parallel model workers, strict
+  comparison contracts, and retained failure evidence without modifying pinned
+  references. Issue [#54](https://github.com/yinonbaron/ClimaLand.jl/issues/54).
+- ![][badge-✨feature] Added a public Validation Runner that defaults to the
+  80-cell Representative comparison for all five biogeochemistry models, with
+  immutable reference-publication tooling and a required scientific-validation
+  CI workflow. Issues [#55](https://github.com/yinonbaron/ClimaLand.jl/issues/55),
+  [#56](https://github.com/yinonbaron/ClimaLand.jl/issues/56), and
+  [#57](https://github.com/yinonbaron/ClimaLand.jl/issues/57).
+- ![][badge-✨feature] Add immutable Core and Smoke Scope Manifests and a
+  Git-versioned CASA-C Comparison Policy to the Validation Runner, with strict
+  nesting, reviewed Eligibility Gaps, fail-closed nonfinite handling, and
+  temporary warnings for the `ordinary` and `extended` aliases. Issue
+  [#47](https://github.com/yinonbaron/ClimaLand.jl/issues/47).
+- ![][badge-✨feature] Add the deterministic 80-cell Representative Scope,
+  source-pinned reduced forcing and CASA-C oracle artifacts, and complete
+  pinned CASA-C execution through the Validation Runner, using mixed
+  absolute-relative tolerances calibrated across all 4,263 cells at every
+  fresh-Fortran boundary. The verified public run covers 80/80 cells and
+  passes every scientific and checkpoint check. Issue
+  [#48](https://github.com/yinonbaron/ClimaLand.jl/issues/48).
+- ![][badge-✨feature] Add the Validation Runner's first complete tracer:
+  a pinned 11-cell Core CASA-C comparison with fail-closed input verification,
+  compact reports, and trustworthy command exit status. Issue
+  [#46](https://github.com/yinonbaron/ClimaLand.jl/issues/46).
+- ![][badge-✨feature] Add a source-pinned, resumable 4,263-cell legacy
+  Fortran CORPSE-C workflow derived from the committed testbed controls, with
+  reduced-oracle validation, exact restart handoffs, bounded historical-output
+  retention, convergence and conservation diagnostics, and selected-cell
+  regression checks. Issue
+  [#44](https://github.com/yinonbaron/ClimaLand.jl/issues/44).
+- ![][badge-✨feature] Add the native four-stage, 4,263-cell MIMICS-CN
+  reconstruction using issue 43's hash-pinned KO4/FI30 parameters, with native
+  C/N checkpoints, working-DIN and process diagnostics, stage budgets, and
+  separate fresh-Fortran and archive comparisons. Issue
+  [#31](https://github.com/yinonbaron/ClimaLand.jl/issues/31).
+- ![][badge-🐛bugfix] Match legacy CASA plant-N uptake offsets, allocation
+  arithmetic, ratio units, stage-restart serialization, and single-precision
+  meteorological input handoff to the Fortran selected-cell trajectory. Preserve
+  MIMICS-CN's fixed wood lignin:N value from the initial plant C:N table rather
+  than deriving it from the separately rounded minimum N:C table. Preserve
+  Fortran's gram/day CASA and MIMICS-CN arithmetic order in `LegacyDaily`,
+  including LAI evaluation, before converting the result to native SI
+  tendencies. Document the remaining long-spin sensitivity caused by applying
+  those tendencies to kilogram-valued ClimaTimeSteppers state at a
+  discontinuous minimum-LAI gate. Issue
+  [#31](https://github.com/yinonbaron/ClimaLand.jl/issues/31).
+- ![][badge-🔥behavioralΔ] Added prescribed CORPSE exudation to integrated
+  CASA--CORPSE carbon routing and a complete selected-cell `LegacyDaily`
+  prespin-to-history regression. Issue
+  [#37](https://github.com/yinonbaron/ClimaLand.jl/issues/37).
+- ![][badge-✨feature] Added the source-pinned selected-cell CORPSE reference
+  covering CASA/CORPSE prespin, two 9,980-year spin stages with cohort restart
+  handoff, and the 1901--2014 GSWP3 transient. Package tests consume the
+  extracted CASA/cohort boundary artifact and its per-cell convergence,
+  conservation, control, input, output, and log hashes without compiling
+  Fortran. Issue [#36](https://github.com/yinonbaron/ClimaLand.jl/issues/36).
+- ![][badge-✨feature] Add the source-pinned, resumable 4,263-cell MIMICS-CN
+  prespin, two-stage long-spin, and 1901--2014 archive reconstruction workflow,
+  with paired CASA/MIMICS restart hashes, C/N convergence records, and exact
+  annual and retained-daily comparison groups.
+- ![][badge-🐛bugfix] Correct CASA-CN plant mineral-N supply limiting and
+  selected-workflow P:N and structural-litter C:N parameters, and regenerate
+  the 37-cell CASA references with the corrected Julia--Fortran tolerances.
+- ![][badge-✨feature] Add the native 4,263-cell MIMICS-C prespin, long-spin,
+  and historical reconstruction with native checkpoints, process diagnostics,
+  stage carbon budgets, and separate fresh-Fortran and archive comparisons.
+- ![][badge-🐛bugfix] Preserve complete checkpoint state by field name and add
+  singleton vertical-domain fallbacks for `ColumnGrid` and rectilinear
+  latitude-longitude grids that ClimaCore cannot reconstruct.
+- ![][badge-✨feature] Add standalone carbon-only `CASAPlantModel`,
+  `CASASoilModel`, `MIMICSSoilModel`, and `CORPSESoilModel` implementations
+  with a selectable `CASAPlantSoilModel` and a soil-biogeochemical-testbed
+  validation workflow. All four models and their litter coupling accept native
+  surface parameter fields for heterogeneous PFT and soil properties. Add the
+  compile-time `CarbonNitrogen` CASA and MIMICS configurations, mineral-N
+  cycling, native diagnostics/restarts, and checksum-pinned CASA/MIMICS CN
+  validation fixtures and archive-grid transition reports. Add native
+  root-weighted `EnergyHydrology` temperature and moisture coupling for CASA,
+  MIMICS, and CORPSE, including heterogeneous rooting depth and integrated
+  component diagnostics. Add an opt-in CORPSE `ContinuousRate` formulation
+  that evaluates all fixed-cohort processes as one timestep-independent,
+  simultaneous ODE while retaining `LegacyDaily` as the exact Fortran-parity
+  default. Add the corresponding opt-in CASA plant `ContinuousRate`
+  formulation for simultaneous carbon-nitrogen SI-rate dynamics while
+  retaining its ordered `LegacyDaily` map as the default. Add an opt-in MIMICS
+  carbon-only `ContinuousRate` formulation that evaluates decomposition,
+  turnover, protection, desorption, oxidation, litter input, and CWD transfer
+  simultaneously while preserving `LegacyDaily` as the Fortran-parity default.
 - ![][badge-🔥behavioralΔ] Remove SAI from energy fluxes, tendency PR [#1782](https://github.com/CliMA/ClimaLand.jl/pull/1782)
 - ![][badge-🔥behavioralΔ] Set the `optimal_lai_z`/`optimal_lai_sigma`/`optimal_lai_alpha`
   defaults to values calibrated against MODIS LAI (Yuan et al. 2017): 21.4 / 0.939 / 0.0701.

@@ -1,0 +1,12 @@
+schema_version = 1
+name = "core"
+cell_ids = [51, 626, 923, 1285, 3613, 4273, 4397, 4453, 6325, 10644, 10997]
+eligibility_gaps = []
+
+[selection]
+method = "preserved issue-33 Core regression anchors"
+source_manifest_sha256 = "0836cad6b8319b3fb024e63ffa32ae9c44413f48d8f21ced10eb283f48b15a1b"
+
+[[partition]]
+name = "all"
+cell_ids = [51, 626, 923, 1285, 3613, 4273, 4397, 4453, 6325, 10644, 10997]

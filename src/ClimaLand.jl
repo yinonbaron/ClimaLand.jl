@@ -424,6 +424,8 @@ import .Snow: snow_boundary_fluxes!, maximum_snow_cover_fraction!
 include("standalone/InlandWater/InlandWater.jl")
 using .InlandWater
 import .InlandWater: lake_boundary_fluxes!
+include("standalone/Vegetation/Vegetation.jl")
+using .Vegetation
 include("standalone/Vegetation/Canopy.jl")
 using .Canopy
 import .Canopy:
@@ -436,6 +438,7 @@ import .Canopy:
     root_water_flux_per_ground_area!
 ### Concrete types of AbstractLandModels
 ### and associated methods
+include("integrated/casa_biogeochemistry.jl")
 include("integrated/soil_energy_hydrology_biogeochemistry.jl")
 include("integrated/pond_soil_model.jl")
 include("integrated/soil_canopy_model.jl")

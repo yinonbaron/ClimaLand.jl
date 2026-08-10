@@ -20,9 +20,13 @@ For more information about abstract types, please see the [Julia manual](https:/
 | `AbstractSoilModel`                | `RichardsModel`           |
 |                                    | `EnergyHydrology`         |
 | N/A                                | `CanopyModel`             |
+| N/A                                | `CASAPlantModel`          |
 | `AbstractSnowModel`                | `SnowModel`               |
 | `AbstractInlandWaterModel`         | `SlabLakeModel`           |
 | `AbstractSoilBiogeochemistryModel` | `SoilCO2Model`            |
+|                                    | `CASASoilModel`           |
+|                                    | `MIMICSSoilModel`         |
+|                                    | `CORPSESoilModel`         |
 | `AbstractBucketModel`              | `BucketModel`             |
 | `AbstractSurfaceWaterModel`        | `PondModel`               |
 
@@ -40,6 +44,15 @@ For more information about abstract types, please see the [Julia manual](https:/
 |                            | `SnowModel`                 |
 | `LandSoilBiogeochemistry`  | `EnergyHydrologyModel`      |
 |                            | `SoilCO2Model`              |
+| `CASAPlantSoilModel`       | `CASAPlantModel`            |
+|                            | one of `CASASoilModel`,     |
+|                            | `MIMICSSoilModel`, or       |
+|                            | `CORPSESoilModel`           |
+| `CASAPlantEnergyHydrologyModel` | `EnergyHydrology`      |
+|                            | `CASAPlantModel`            |
+|                            | one of `CASASoilModel`,     |
+|                            | `MIMICSSoilModel`, or       |
+|                            | `CORPSESoilModel`           |
 | `LandHydrology`            | `RichardsModel`             |
 |                            | `PondModel`                 |
 

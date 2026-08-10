@@ -1,0 +1,750 @@
+schema_version = 1
+source_commit = "27ae1a0b673411642cd780ecad66d1c8f84e6a58"
+
+[[validation_input]]
+path = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+sha256 = "f27d11c1f936167c61d3c84241845937f6d29644b0b7861d7bd9a412d511cb13"
+
+[[validation_input]]
+path = "GRID_CN/pftlookup_igbp_updated4_exud0AD.csv"
+sha256 = "9dac2d263b43eb5a2df71ed7dbef398bc58ae55421829af8db97018fa93509e2"
+
+[[validation_input]]
+path = "GRID_CN/pftlookup_igbp_updated4.csv"
+sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+
+[[validation_input]]
+path = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+
+[[validation_input]]
+path = "GRID_CN/modis_phenology_wtundra.txt"
+sha256 = "6963fd1d47368577c1d32b55ccb762c9ed7e6d96a03ed6cd5af85cbfd119af7f"
+
+[[validation_input]]
+path = "GRID_CN/co2delta_control.txt"
+sha256 = "3496a014c08ace404629676804ebf962ddee87f8216131ffb070f75b4d0944a1"
+
+[[candidate]]
+id = "casa_boreal_nfix"
+kind = "casa_parameter"
+source = "GRID_CN/pftlookup_igbp_updated4.csv"
+destination = "parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+confidence = "high"
+validation_soil_model = 1
+validation_cycle = 2
+expected_source_sha256 = "a3f2732c0ab6be472b4f7af1f9ec0c16389c2018c0a36d8378e7e6894302ed4f"
+expected_derived_sha256 = "d5c034fa3ab75fe55eaf5145ddb125888eb4114ef830df91a59cb6c109dc84f4"
+evidence = [
+    "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt: MIMICS_mod3_borealNfix_GSWP3 increased boreal nfix from 0.08 to 0.21, same as larches",
+    "GRID_CN/pftlookup_igbp_updated4.csv: the nfixrate section assigns 0.08 to PFT 1 and 0.21 to PFT 3",
+    "GRID_CN/*_JAMES prespin controls name pftlookup_igbp_updated4_borealNfix.csv",
+]
+rejected_alternative = [
+    "Changing PFT 3 was rejected because it already has the stated larch value 0.21",
+    "Changing every boreal PFT was rejected because the README describes one 0.08 value becoming the larch value",
+]
+
+[[candidate.mutation]]
+type = "casa_pft_field"
+section = "N/Cleafmi"
+pft = 1
+field = "nfixrate"
+before = "0.08"
+after = "0.21"
+
+[[candidate]]
+id = "mimics_ko6_fi30"
+kind = "mimics_parameter"
+source = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+destination = "parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI30.candidate.csv"
+confidence = "high"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+expected_source_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+expected_derived_sha256 = "7a97606ff0a17ef78b66abc1eeb07f72a593053dbe0ae9668ff946df408cd4c9"
+evidence = [
+    "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt: MIMICS_mod4_dens1.0_KO6_GSWP3 points to a REV_CN_desorb2xKO6 parameter file",
+    "EXAMPLE_GRID/pftlookup_LIDET-MIM-REV_lowerKM_v11.28.2017.csv: both KO parameters are 6",
+    "The parser-complete checked-in JAMES KO4_micCN_FI30 table differs from the same-directory older table only by the two desorption fields required by the pinned reader",
+]
+rejected_alternative = [
+    "KO=9 belongs to MIMICS_desorb2_GSWP3 and KO=12 belongs to MIMICS_mod3_GSWP3, not the named KO6 branch",
+    "The KO4_push table was rejected as a generation baseline because it lacks desorpQ10 and desorpTref and fails the pinned reader after parsing all earlier fields",
+    "FI(struc)=0.10 and 0.05 are retained as separate bounded candidates rather than silently folded into the FI30 reconstruction",
+]
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(1)"
+before = "4"
+after = "6"
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(2)"
+before = "4"
+after = "6"
+
+[[candidate]]
+id = "mimics_ko6_fi10"
+kind = "mimics_parameter"
+source = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+destination = "parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI10.candidate.csv"
+confidence = "medium"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+expected_source_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+expected_derived_sha256 = "9fc1e9db3e138c16a02c6f4e6e2671848475eb4f5bc5262da20b17888c52b046"
+evidence = [
+    "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/README.txt: the KO6 branch is similar to MIMICS_desorb2_GSWP3",
+    "The same README records FI_chem=0.10 for MIMICS_desorb2_GSWP3",
+    "The target filename omits the checked-in table's FI30 suffix, so FI(struc)=0.10 remains a bounded alternative",
+]
+rejected_alternative = [
+    "Changing FI(metb), fPHYS, or desorption was rejected because those desorb2 settings already match the nearest checked-in CN table",
+    "The KO4_push table was rejected as a generation baseline because it lacks the two desorption fields required by the pinned reader",
+    "FI(struc)=0.05 is retained as a separate candidate because it is directly evidenced by a legacy KO6 table",
+]
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(1)"
+before = "4"
+after = "6"
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(2)"
+before = "4"
+after = "6"
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "FI(struc)"
+before = "0.30"
+after = "0.10"
+
+[[candidate]]
+id = "mimics_ko6_fi05"
+kind = "mimics_parameter"
+source = "GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+destination = "parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI05.candidate.csv"
+confidence = "medium"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+expected_source_sha256 = "52d12f43e484caec0580198f72fc85f814ccc9c2e9799165859076640c84bb3b"
+expected_derived_sha256 = "bcd7b733ceb830cbcc4dc9bafca600e2fbc275fa95141cdd7de163a7272961b5"
+evidence = [
+    "EXAMPLE_GRID/pftlookup_LIDET-MIM-REV_lowerKM_v11.28.2017.csv directly combines KO(1)=6, KO(2)=6, and FI(struc)=0.05",
+    "The parser-complete JAMES KO4_micCN_FI30 table preserves the CN and desorption fields required by the pinned reader",
+    "The missing target filename omits an FI suffix, so the directly evidenced legacy FI05 combination remains a bounded alternative rather than an asserted original",
+]
+rejected_alternative = [
+    "The legacy EXAMPLE_GRID table was rejected as the direct source because it predates the target CN table and lacks the complete current parameter contract",
+    "Changing fields other than KO(1), KO(2), and FI(struc) was rejected because the legacy evidence does not isolate any additional target change",
+]
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(1)"
+before = "4"
+after = "6"
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "KO(2)"
+before = "4"
+after = "6"
+
+[[candidate.mutation]]
+type = "named_parameter"
+name = "FI(struc)"
+before = "0.30"
+after = "0.05"
+
+[[candidate]]
+id = "casa_cn_prespin"
+kind = "control"
+source = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/casa_cn/prespin_boreal_nfix.candidate.lst"
+confidence = "high"
+validation_soil_model = 1
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "f327eda2dfd68d3acd9e166600b65c9eb94f36b27e27572d8a87c00078e93db6"
+evidence = [
+    "The committed CASA-CN prespin control supplies the CLM5/GSWP3 CN family and names the missing boreal-N-fix table",
+    "The Fortran control contract defines isomModel=1 as CASA and icycle=2 as carbon-nitrogen",
+    "The generated parameter path names the high-confidence boreal-N-fix candidate explicitly rather than presenting it as the missing original",
+]
+rejected_alternative = [
+    "Leaving isomModel=2 was rejected because it selects MIMICS rather than the named CASA-CN family",
+    "Retaining the missing original parameter filename was rejected because it would require an inferred file to masquerade as an upstream artifact",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../../parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "mimics_cn_prespin_fi30"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/mimics_cn/prespin_ko6_fi30.candidate.lst"
+confidence = "high"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+validation_mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI30.candidate.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "bb796d5d86b96c7d915c0c3376d9e5be3e69f7b8d7addfc49e9a71767f6bedde"
+evidence = [
+    "The committed MIMICS-CN prespin control supplies the CLM5/GSWP3 CN family and names the missing KO6 table",
+    "The Fortran control contract defines isomModel=2 as MIMICS and icycle=2 as carbon-nitrogen",
+    "The generated control points explicitly to the high-confidence boreal-N-fix and KO6/FI30 candidates",
+]
+rejected_alternative = [
+    "Using a missing original filename was rejected because it would hide the inferred status of the reconstructed parameter table",
+    "FI(struc)=0.10 and 0.05 remain separate bounded controls rather than being silently collapsed into this FI30 candidate",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../../parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 18
+field = "mimics_parameters"
+before = "./pftlookup_LIDET-MIM-REV_CN_desorb2xKO6.csv"
+after = "../../parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI30.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "mimics_cn_prespin_fi10"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/mimics_cn/prespin_ko6_fi10.candidate.lst"
+confidence = "medium"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+validation_mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI10.candidate.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "818e4042a08060bb6fc49e602b59ac963587a5981fc9013cf53d8188f2838d19"
+evidence = [
+    "The committed MIMICS-CN prespin control supplies the CLM5/GSWP3 CN family and names the missing KO6 table",
+    "The generated control preserves isomModel=2 and icycle=2 while selecting the bounded KO6/FI10 candidate",
+]
+rejected_alternative = [
+    "Using a missing original filename was rejected because it would hide the inferred status of the reconstructed parameter table",
+    "FI(struc)=0.30 and 0.05 remain separate bounded controls",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../../parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 18
+field = "mimics_parameters"
+before = "./pftlookup_LIDET-MIM-REV_CN_desorb2xKO6.csv"
+after = "../../parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI10.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "mimics_cn_prespin_fi05"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/mimics_cn/prespin_ko6_fi05.candidate.lst"
+confidence = "medium"
+validation_soil_model = 2
+validation_cycle = 2
+validation_casa_parameter = "candidate:parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+validation_mimics_parameter = "candidate:parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI05.candidate.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "88ff85b2259c55c7368d5cda73ec94845a2e11c45a334ee6e1ca3e76fda05031"
+evidence = [
+    "The committed MIMICS-CN prespin control supplies the CLM5/GSWP3 CN family and names the missing KO6 table",
+    "The generated control preserves isomModel=2 and icycle=2 while selecting the bounded KO6/FI05 candidate",
+]
+rejected_alternative = [
+    "Using a missing original filename was rejected because it would hide the inferred status of the reconstructed parameter table",
+    "FI(struc)=0.30 and 0.10 remain separate bounded controls",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../../parameters/pftlookup_igbp_updated4_borealNfix.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 18
+field = "mimics_parameters"
+before = "./pftlookup_LIDET-MIM-REV_CN_desorb2xKO6.csv"
+after = "../../parameters/pftlookup_LIDET-MIM-REV_CN_desorb2xKO6_micCN_FI05.candidate.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "casa_c_prespin"
+kind = "control"
+source = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/casa_c/prespin.lst"
+confidence = "medium"
+validation_soil_model = 1
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "63e943bb2f8a601939732ed77095a1764e70ac09f387723233e444c4f7bc4a47"
+evidence = [
+    "The committed CASA-CN control supplies the documented CLM5/GSWP3 prespin structure",
+    "The Fortran control contract defines isomModel=1 as CASA and icycle=1 as carbon only",
+    "The published CASA-C NetCDF metadata names pftlookup_igbp_updated4_exud0.csv",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../pftlookup_igbp_updated4_exud0.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/PRESPIN/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/PRESPIN/casaclm_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "casa_c_adspin"
+kind = "control"
+source = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_spin_1901-1920_x500_STEP_2of4.lst"
+destination = "controls/casa_c/adspin.lst"
+confidence = "medium"
+validation_soil_model = 1
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0AD.csv"
+expected_source_sha256 = "bc0617cc8808a80f2b0c3aa6f92e66937e23f920a40e83b0d30a100834eaa4f0"
+expected_derived_sha256 = "51dd2420f2ea41cb99b1151017e28fed35751f44469683db118e4c6a5a79b8e3"
+evidence = [
+    "The committed CASA-CN accelerated-spin control supplies stage count, initialization, restarts, and accelerated CASA parameters",
+    "The Fortran control contract defines isomModel=1 as CASA and icycle=1 as carbon only",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "1"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/SPIN/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN/casaclm_pool_flux_yyyy.nc"
+
+[[candidate]]
+id = "casa_c_spin"
+kind = "control"
+source = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+destination = "controls/casa_c/spin.lst"
+confidence = "medium"
+validation_soil_model = 1
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+expected_source_sha256 = "5f7f1d971c139a8867b371f380baf9ed1fb7bb72de13ad977436847ffeef86bd"
+expected_derived_sha256 = "e411d62c9165d5d9774631136d9347c0926801e444e4afe18007da6230344d41"
+evidence = [
+    "The committed CASA-CN normal-spin control supplies stage count, initialization, and restart boundary",
+    "The Fortran control contract defines isomModel=1 as CASA and icycle=1 as carbon only",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "1"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/SPIN2/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN2/casaclm_pool_flux_yyyy.nc"
+
+[[candidate]]
+id = "casa_c_history"
+kind = "control"
+source = "GRID_CN/CASACNP_mod5_GSWP3_JAMES/fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+destination = "controls/casa_c/history.lst"
+confidence = "high"
+validation_soil_model = 1
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+expected_source_sha256 = "958bf1fc0410030099345867b584bd38e98c8d14bd453779c60c29f6f9075397"
+expected_derived_sha256 = "8c7c3916c74fecd25f21d8ca55593ac5f94118ec65ce8fa3eb1701728a63f4c5"
+evidence = [
+    "The committed CASA-CN historical control supplies the CLM5/GSWP3 1901-2014 transient structure",
+    "The published CASA-C NetCDF metadata names pftlookup_igbp_updated4_exud0.csv and the carbon-only archive output family",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "1"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/HIST/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/HIST/casaclm_pool_flux_yyyy.nc"
+
+[[candidate]]
+id = "mimics_c_prespin"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_prespin_1901_x100_STEP_1of4.lst"
+destination = "controls/mimics_c/prespin.lst"
+confidence = "medium"
+validation_soil_model = 2
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv"
+validation_mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+expected_source_sha256 = "d406a8db68ba236e637ef98e3d17af4aac488acc9c0a6f4e315eabed4b368f3d"
+expected_derived_sha256 = "1ae3aac2a8cbf42c7c16554b5c00365268ecc9cc491d591dd3758fe76277c3ec"
+evidence = [
+    "The committed MIMICS-CN control supplies the documented CLM5/GSWP3 prespin structure",
+    "The Fortran control contract defines isomModel=2 as MIMICS and icycle=1 as carbon only",
+    "Published MIMICS-C metadata names pftlookup_igbp_updated4.csv and the checked-in KO4_micCN_FI30 table",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 10
+field = "casa_parameters"
+before = "../pftlookup_igbp_updated4_borealNfix.csv"
+after = "../pftlookup_igbp_updated4.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/PRESPIN/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/PRESPIN/casaclm_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 18
+field = "mimics_parameters"
+before = "./pftlookup_LIDET-MIM-REV_CN_desorb2xKO6.csv"
+after = "./pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 21
+field = "mimics_netcdf"
+before = "./OUTPUT_CN/PRESPIN/mimics_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/PRESPIN/mimics_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 29
+field = "netcdf_interval"
+before = ""
+after = "1"
+
+[[candidate]]
+id = "mimics_c_spin"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_spin_1901-1920_x500_STEP_2of4.lst"
+destination = "controls/mimics_c/spin.lst"
+confidence = "high"
+validation_soil_model = 2
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv"
+validation_mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+expected_source_sha256 = "92f9bfdb83a81f75e86c3cf0a10d59f4396cb5afdebd50395564a5a334cebe17"
+expected_derived_sha256 = "24fe06da5f00e929547bdf3c0836a8f5edf951397164976496c726dad1a4c1e1"
+evidence = [
+    "The committed KO4 MIMICS-CN spin control supplies stage counts, initialization, restart boundaries, and the checked-in KO4 parameter table",
+    "The Fortran control contract defines isomModel=2 as MIMICS and icycle=1 as carbon only",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/SPIN/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN/casaclm_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 21
+field = "mimics_netcdf"
+before = "./OUTPUT_CN/SPIN/mimics_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN/mimics_pool_flux_yyyy.nc"
+
+[[candidate]]
+id = "mimics_c_spin_continuation"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_spin_1901-1920_x500_STEP_2bof4.lst"
+destination = "controls/mimics_c/spin_continuation.lst"
+confidence = "high"
+validation_soil_model = 2
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv"
+validation_mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+expected_source_sha256 = "68435397b8468c3169b4362f87e867d4908efe965f9b0aa711a1f86b95b4feab"
+expected_derived_sha256 = "1661c9bfa5e34ba0cbeb58f722b42c183c85a6cb01d49a8329e7a716f0383f6b"
+evidence = [
+    "The committed KO4 MIMICS-CN continuation control supplies the second long-spin stage and its restart boundary",
+    "The Fortran control contract defines isomModel=2 as MIMICS and icycle=1 as carbon only",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/SPIN2/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN2/casaclm_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 21
+field = "mimics_netcdf"
+before = "./OUTPUT_CN/SPIN2/mimics_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/SPIN2/mimics_pool_flux_yyyy.nc"
+
+[[candidate]]
+id = "mimics_c_history"
+kind = "control"
+source = "GRID_CN/MIMICS_mod5_GSWP3_KO4_push/fcasacnp_clm_HIST_1901_2014_STEP_3of4.lst"
+destination = "controls/mimics_c/history.lst"
+confidence = "high"
+validation_soil_model = 2
+validation_cycle = 1
+validation_casa_parameter = "source:GRID_CN/pftlookup_igbp_updated4.csv"
+validation_mimics_parameter = "source:GRID_CN/MIMICS_mod5_GSWP3_JAMES/pftlookup_LIDET-MIM-REV_CN_desorb2xKO4_micCN_FI30.csv"
+expected_source_sha256 = "4183db09cf37ae2f281b62f552623d571415c5c865bda73593520de026d7ef27"
+expected_derived_sha256 = "122e39e6fdb9f7838a7cfb28671e79a4cc735f2e7188c827593e08b0f7385a85"
+evidence = [
+    "The committed KO4 MIMICS-CN historical control supplies the CLM5/GSWP3 1901-2014 transient structure",
+    "Published MIMICS-C metadata names pftlookup_igbp_updated4.csv and the checked-in KO4_micCN_FI30 table",
+]
+
+[[candidate.mutation]]
+type = "control_line"
+line = 7
+field = "soil_model"
+before = "2"
+after = "2"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 8
+field = "cycle"
+before = "2"
+after = "1"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 17
+field = "casa_netcdf"
+before = "./OUTPUT_CN/HIST/casaclm_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/HIST/casaclm_pool_flux_yyyy.nc"
+
+[[candidate.mutation]]
+type = "control_line"
+line = 21
+field = "mimics_netcdf"
+before = "./OUTPUT_CN/HIST/mimics_pool_flux_yyyy.nc"
+after = "./OUTPUT_C/HIST/mimics_pool_flux_yyyy.nc"

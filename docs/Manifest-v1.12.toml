@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.5"
+julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "af6618b1e06973323ca48b7af6885160a0933e92"
+project_hash = "778755396a5dc13bf344f39e316296749c5382f8"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "d9aaef7c63466eee4de23b4d9dad03629df54bea"
@@ -546,11 +546,6 @@ version = "0.10.3"
     CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
     OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
     PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-
-[[deps.NullBroadcasts]]
-git-tree-sha1 = "343c7bb67d0a29ea5d7d2b3e945afe81e2862337"
-uuid = "0d71be07-595a-4f89-9529-4065a4ab43a6"
-version = "0.1.0"
 
 [[deps.ClimaUtilities]]
 deps = ["Artifacts", "ClimaComms", "Dates"]
@@ -2730,6 +2725,11 @@ version = "2.30.3"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+
+[[deps.NullBroadcasts]]
+git-tree-sha1 = "343c7bb67d0a29ea5d7d2b3e945afe81e2862337"
+uuid = "0d71be07-595a-4f89-9529-4065a4ab43a6"
+version = "0.1.0"
 
 [[deps.Nullables]]
 git-tree-sha1 = "8f87854cc8f3685a60689d8edecaa29d2251979b"

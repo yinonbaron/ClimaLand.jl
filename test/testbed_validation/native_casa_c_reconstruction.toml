@@ -1,0 +1,46 @@
+schema_version = 1
+issue = 28
+points = 4263
+calendar = "365_day"
+dt_seconds = 86400
+passive_carbon_multiplier = 10
+
+[inputs]
+grid = "GRID_CN/gridinfo_igbpz_CLM5_GSWP3.csv"
+soil = "GRID_CN/gridinfo_soil_CLM5_GSWP3.csv"
+phenology = "GRID_CN/modis_phenology_wtundra.txt"
+normal_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0.csv"
+accelerated_parameters = "GRID_CN/pftlookup_igbp_updated4_exud0AD.csv"
+forcing_pattern = "met_YEAR_YEAR.nc"
+
+[stages.prespin]
+forcing_years = [1901, 1901]
+repeats = 100
+
+[stages.accelerated_spin]
+forcing_years = [1901, 1920]
+repeats = 499
+
+[stages.normal_spin]
+forcing_years = [1901, 1920]
+repeats = 499
+
+[stages.historical]
+forcing_years = [1901, 2014]
+repeats = 1
+
+[comparison]
+boundary_atol = 5.0e-3
+boundary_rtol = 1.0e-3
+historical_atol = 5.0e-3
+historical_rtol = 1.0e-3
+budget_rtol = 5.0e-12
+daily_windows = [[1901, 1905], [2010, 2014]]
+annual_reference = "reference/ann_casaclm_pool_flux_1901_2014.nc"
+stock_variables = ["cleaf", "cwood", "cfroot", "clitmetb", "clitstr", "clitcwd", "csoilmic", "csoilslow", "csoilpass"]
+flux_variables = ["cgpp", "cnpp", "cresp", "cLitInptMet", "cLitInptStruc", "cpassInpt"]
+
+[provenance]
+fresh_fortran = "stages/"
+published_archive = "reference/"
+rule = "Fresh-Fortran numerical differences and published-archive provenance differences are reported in separate tables."
