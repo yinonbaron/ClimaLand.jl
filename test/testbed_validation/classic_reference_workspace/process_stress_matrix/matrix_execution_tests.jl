@@ -69,17 +69,21 @@ end
                 records,
                 Dict(
                     "site" => site,
-                    "archive_path" => abspath(archive),
+                    "archive_id" => basename(archive),
                     "archive_sha256" => bytes2hex(open(SHA.sha256, archive)),
-                    "receipt_path" => abspath(receipt),
+                    "receipt_id" => basename(receipt),
                     "receipt_sha256" => bytes2hex(open(SHA.sha256, receipt)),
                 ),
             )
         end
-        document = Dict("schema_version" => 1, "site" => records)
+        document = Dict(
+            "schema_version" => 2,
+            "path_root" => "CLASSIC_STAGE_B_ARCHIVE_ROOT",
+            "site" => records,
+        )
         path =
             write_toml_fixture(joinpath(directory, "archives.toml"), document)
-        loaded = load_archive_manifest(path, sites)
+        loaded = load_archive_manifest(path, sites; archive_root = directory)
         @test loaded.sites == sites
         @test Set(keys(loaded.archives)) == Set(sites)
         @test loaded.sha256 == bytes2hex(open(SHA.sha256, path))
@@ -87,18 +91,66 @@ end
         forged = deepcopy(document)
         first(forged["site"])["archive_sha256"] = repeat("f", 64)
         write_toml_fixture(path, forged)
-        @test_throws ArgumentError load_archive_manifest(path, sites)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
 
         missing = deepcopy(document)
         pop!(missing["site"])
         write_toml_fixture(path, missing)
-        @test_throws ArgumentError load_archive_manifest(path, sites)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
 
         extra = deepcopy(document)
         push!(extra["site"], deepcopy(first(extra["site"])))
         extra["site"][end]["site"] = "DE-Hai"
         write_toml_fixture(path, extra)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
+
+        write_toml_fixture(path, document)
         @test_throws ArgumentError load_archive_manifest(path, sites)
+        escaped = deepcopy(document)
+        first(escaped["site"])["archive_id"] = "../GF-Guy.tar"
+        write_toml_fixture(path, escaped)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
+
+        absolute = deepcopy(document)
+        first(absolute["site"])["archive_id"] =
+            joinpath(directory, "GF-Guy.tar")
+        write_toml_fixture(path, absolute)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
+
+        outside = mktempdir()
+        outside_archive = joinpath(outside, "outside.tar")
+        write(outside_archive, "outside")
+        symlink(outside_archive, joinpath(directory, "link.tar"))
+        linked = deepcopy(document)
+        first(linked["site"])["archive_id"] = "link.tar"
+        first(linked["site"])["archive_sha256"] =
+            bytes2hex(open(SHA.sha256, outside_archive))
+        write_toml_fixture(path, linked)
+        @test_throws ArgumentError load_archive_manifest(
+            path,
+            sites;
+            archive_root = directory,
+        )
     end
 end
 

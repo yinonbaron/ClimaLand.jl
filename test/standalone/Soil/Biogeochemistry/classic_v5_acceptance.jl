@@ -131,8 +131,6 @@ function run_v5_acceptance()
         )
         tolerance = (; atol = 0.0, rtol = 0.0)
         @test snapshot.receipt["status"] == "complete"
-        @test CLASSIC.REAL_TRANSITION_EVIDENCE_STATUS == :accepted_issue_101_v5
-        @test CLASSIC.real_transition_is_accepted()
         pre = CLASSIC.CLASSICState(
             read_field(snapshot, "pre.litrmass"),
             read_field(snapshot, "pre.soilcmas"),

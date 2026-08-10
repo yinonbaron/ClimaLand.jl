@@ -3,10 +3,9 @@
 The matrix runner consumes only packed external issue #103 archives. It never
 copies raw forcing or binary trajectory payloads into Git.
 
-A common-root directory remains supported. Independent canonical roots are
-loaded from a manifest with one absolute archive path, outer-receipt path, and
-verified SHA-256 pair per selected site. The checked real manifest is
-intentionally absent pending direct user approval. A common-root layout is:
+A common-root directory remains supported. Independent canonical archives are loaded from the checked portable manifest.
+It stores root-relative archive and receipt identifiers plus verified SHA-256
+pairs; `CLASSIC_STAGE_B_ARCHIVE_ROOT` supplies the external root. A common-root layout is:
 
 ```text
 $CLASSIC_REFERENCE_ROOT/replaceable/runs/issue-103-all-sites-stage-b-v5/archives/
@@ -33,10 +32,12 @@ Run from the repository root after all four real archives are present:
 
 ```bash
 JULIA_DEPOT_PATH=/tmp/classic-matrix-depot \
+  CLASSIC_STAGE_B_ARCHIVE_ROOT=/path/to/campaign-v8/archives \
+  CLASSIC_TOLERANCE_EVIDENCE_ROOT=/path/to/classic-reference/runs \
   julia \
   --project=.buildkite --startup-file=no \
   test/testbed_validation/classic_reference_workspace/process_stress_matrix/run_real_matrix.jl \
-  CANONICAL_ARCHIVE_MANIFEST_OR_COMMON_ROOT \
+  canonical_archives.toml \
   $CLASSIC_REFERENCE_ROOT/replaceable/runs/issue-106-process-matrix/receipt.toml
 ```
 
@@ -54,7 +55,6 @@ receipt hashes of both measurements are retained. A later site exceeding one
 of these ceilings is localized and leaves acceptance blocked rather than
 silently broadening the tolerance.
 
-All four selected canonical archives replayed locally green. The remaining
-blocker is direct user approval to record the independent-root manifest and
-change the checked scientific acceptance status. `selection_matrix.toml`
-therefore remains `status = "blocked"` and does not claim seasonal parity.
+All four selected canonical archives replay green. The checked manifest and
+selection record direct user approval, and the durable external receipt binds
+all state, flux, budget, drift, tolerance, schema, and archive hashes.

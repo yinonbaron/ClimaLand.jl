@@ -31,12 +31,16 @@ end
           bytes2hex(open(SHA.sha256, metrics_path))
     @test matrix["inventory"]["input_receipts_sha256"] ==
           bytes2hex(open(SHA.sha256, receipts_path))
-    @test matrix["acceptance"]["status"] == "blocked"
-    @test matrix["acceptance"]["seasonal_parity_claimed"] == false
-    @test matrix["acceptance"]["blocked_reason"] ==
-          "pending direct user approval to record the independent-root archive manifest and promote scientific acceptance status"
-    @test !haskey(matrix["acceptance"], "missing_evidence")
-    @test !haskey(matrix["acceptance"], "blocked_by_issue")
+    @test matrix["acceptance"]["status"] == "ready_for_acceptance"
+    @test matrix["acceptance"]["seasonal_parity_claimed"] === true
+    @test matrix["acceptance"]["approval_status"] ==
+          "direct_user_approval_recorded"
+    manifest_path = joinpath(@__DIR__, "canonical_archives.toml")
+    @test matrix["acceptance"]["canonical_archive_manifest"] ==
+          "canonical_archives.toml"
+    @test matrix["acceptance"]["canonical_archive_manifest_sha256"] ==
+          bytes2hex(open(SHA.sha256, manifest_path))
+    @test !haskey(matrix["acceptance"], "blocked_reason")
 
     selections = matrix["selection"]
     @test Set(s["class"] for s in selections) == Set((

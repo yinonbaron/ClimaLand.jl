@@ -128,7 +128,6 @@ ClimaLand.Soil.Biogeochemistry.CLASSIC.N_PFTS
 ClimaLand.Soil.Biogeochemistry.CLASSIC.N_CATEGORIES
 ClimaLand.Soil.Biogeochemistry.CLASSIC.N_SOIL_LAYERS
 ClimaLand.Soil.Biogeochemistry.CLASSIC.N_PARAMETER_PFTS
-ClimaLand.Soil.Biogeochemistry.CLASSIC.REAL_TRANSITION_EVIDENCE_STATUS
 ```
 
 ## CLASSIC Functions
@@ -138,7 +137,6 @@ ClimaLand.Soil.Biogeochemistry.CLASSIC.classic_domain
 ClimaLand.Soil.Biogeochemistry.CLASSIC.forcing_at
 ClimaLand.Soil.Biogeochemistry.CLASSIC.advance!
 ClimaLand.Soil.Biogeochemistry.CLASSIC.advance_stage_b
-ClimaLand.Soil.Biogeochemistry.CLASSIC.real_transition_is_accepted
 ClimaLand.Soil.Biogeochemistry.CLASSIC.state_from_prognostic
 ClimaLand.Soil.Biogeochemistry.CLASSIC.set_prognostic_state!
 ```

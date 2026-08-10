@@ -1,0 +1,30 @@
+schema_version = 2
+path_root = "CLASSIC_STAGE_B_ARCHIVE_ROOT"
+
+[[site]]
+site = "GF-Guy"
+archive_id = "GF-Guy.tar"
+archive_sha256 = "d742ebe91797885259f0bec40900c6b0eaafa07114c6431d1985b30568f16951"
+receipt_id = "GF-Guy.receipt.toml"
+receipt_sha256 = "3041c1f74e5f33ef69a340fa49c7f5776923b4fd2ac8bd5eb309f1bfcc858b81"
+
+[[site]]
+site = "SD-Dem"
+archive_id = "SD-Dem.tar"
+archive_sha256 = "1c1f934e3853fffedd451a56db34976012a5ed3426050b55fe847b21a3325b02"
+receipt_id = "SD-Dem.receipt.toml"
+receipt_sha256 = "8682fb608eb098960789e59181ca2bc90ad90e3c810015f85bbcf987f0ce6d52"
+
+[[site]]
+site = "US-MMS"
+archive_id = "US-MMS.tar"
+archive_sha256 = "89d9ba9783c0ee7e5e08863198a430c53f9da6e100bf63605d273b4bedf9c6f9"
+receipt_id = "US-MMS.receipt.toml"
+receipt_sha256 = "7129da1c06531e9a62df423c28736a47b795f48c7b47e4fb674c6d0a7ea4fe9c"
+
+[[site]]
+site = "CA-Cbo"
+archive_id = "CA-Cbo.tar"
+archive_sha256 = "4bd9efa158bbd7f7954b7287830a4f01f90f9aafd106122030fc2a477cc83e2d"
+receipt_id = "CA-Cbo.receipt.toml"
+receipt_sha256 = "4c745b3d85a2890d0c5b7fc4386a8bb226829a441177f40f7be680e9fdbe446d"

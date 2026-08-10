@@ -1,10 +1,13 @@
 schema_version = 1
 
 [acceptance]
-blocked_reason = "pending direct user approval to record the independent-root archive manifest and promote scientific acceptance status"
+approval_status = "direct_user_approval_recorded"
+approval_reference = "2026-08-10 Stage B publication instruction"
+canonical_archive_manifest = "canonical_archives.toml"
+canonical_archive_manifest_sha256 = "c4021bdc8eb1bc12697997bdbf4678cea965654f60fbda8a659b95ff23054e4a"
 required_oracle_contract = "stage_b_v5"
-seasonal_parity_claimed = false
-status = "blocked"
+seasonal_parity_claimed = true
+status = "ready_for_acceptance"
 
 [criteria.cold_freeze_thaw]
 freeze_thaw_transition_count_min = 10

@@ -69,7 +69,11 @@ function draft_report_fixture(root, inventory)
                 activity = draft_activity(),
                 achieved_errors = inactive ? nothing : errors,
                 evaluation = inactive ? nothing :
-                             (; failure_localization = Any[]),
+                             (;
+                    failure_localization = Any[],
+                    effective_budget_tolerances = copy(tolerances.budget),
+                    effective_drift_tolerances = copy(tolerances.drift),
+                ),
                 applicability = inactive ?
                                 Dict("stage_b_status" => "inactive") : nothing,
             ),
@@ -117,6 +121,10 @@ end
         @test report["tolerances"]["flux"] == fixture.tolerances.flux
         @test report["tolerances"]["budget"] == fixture.tolerances.budget
         @test report["tolerances"]["drift"] == fixture.tolerances.drift
+        @test report["site"][3]["effective_budget_tolerances"] ==
+              fixture.tolerances.budget
+        @test report["site"][3]["effective_drift_tolerances"] ==
+              fixture.tolerances.drift
         @test haskey(report["site"][3], "failure_localization")
         @test report["site"][1]["replay_claimed"] === false
         @test report["site"][1]["deferred_issue"] == 108
@@ -125,6 +133,69 @@ end
     end
 end
 
+
+
+@testset "all-site acceptance promotion revalidates the draft" begin
+    inventory = load_campaign_inventory(POLICY_INVENTORY, SITE_METRICS)
+    mktempdir() do root
+        fixture = draft_report_fixture(root, inventory)
+        repository_root = normpath(joinpath(@__DIR__, "../../../.."))
+        draft_path = joinpath(root, "draft.toml")
+        draft = write_all_site_draft_report(
+            draft_path,
+            fixture.campaign,
+            fixture.archives,
+            inventory,
+            fixture.tolerances;
+            repository_root,
+        )
+        acceptance_path = joinpath(root, "acceptance.toml")
+        result = write_all_site_acceptance_report(
+            acceptance_path,
+            draft_path;
+            repository_root,
+            approval_reference = "2026-08-10 Stage B publication instruction",
+            approved_draft_sha256 = draft.sha256,
+        )
+        report = TOML.parsefile(acceptance_path)
+        @test result.sha256 == sha256_file(acceptance_path)
+        @test report["report_kind"] == "all_site_stage_b_acceptance"
+        @test report["status"] == "complete"
+        @test report["approval_status"] == "direct_user_approval_recorded"
+        @test report["scientific_status"] == "accepted"
+        @test report["seasonal_parity_claimed"] === true
+        @test report["checksum_status"] == "promoted"
+        @test report["source_draft_sha256"] == draft.sha256
+        @test report["approved_draft_sha256"] == draft.sha256
+        @test report["active_site_count"] == 57
+        @test report["inactive_site_count"] == 2
+        @test length(report["site"]) == 59
+        @test all(
+            isempty(site["failure_localization"]) for site in report["site"]
+        )
+
+        @test_throws ArgumentError write_all_site_acceptance_report(
+            joinpath(root, "no-approval.toml"),
+            draft_path;
+            repository_root,
+            approval_reference = "",
+            approved_draft_sha256 = draft.sha256,
+        )
+        tampered = TOML.parsefile(draft_path)
+        tampered["site"][3]["max_state_errors"]["state.one"] = 2.0
+        forged_path = joinpath(root, "forged.toml")
+        open(forged_path, "w") do io
+            TOML.print(io, tampered; sorted = true)
+        end
+        @test_throws ArgumentError write_all_site_acceptance_report(
+            joinpath(root, "forged-acceptance.toml"),
+            forged_path;
+            repository_root,
+            approval_reference = "approved",
+            approved_draft_sha256 = draft.sha256,
+        )
+    end
+end
 @testset "all-site draft report fails closed on forged inputs" begin
     inventory = load_campaign_inventory(POLICY_INVENTORY, SITE_METRICS)
     mktempdir() do root
@@ -186,6 +257,8 @@ end
 @testset "all-site draft report runner parses" begin
     runner = joinpath(@__DIR__, "run_all_site_report.jl")
     @test Meta.parseall(read(runner, String)) isa Expr
+    promotion_runner = joinpath(@__DIR__, "promote_all_site_report.jl")
+    @test Meta.parseall(read(promotion_runner, String)) isa Expr
 end
 
 @testset "external output path rejects final symlinks" begin

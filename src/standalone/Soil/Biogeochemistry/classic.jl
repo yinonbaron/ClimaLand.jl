@@ -20,15 +20,17 @@ export CLASSICAudit,
     N_PARAMETER_PFTS,
     N_PFTS,
     N_SOIL_LAYERS,
-    REAL_TRANSITION_EVIDENCE_STATUS,
     StageBTransfer,
     advance_stage_b,
     advance!,
     classic_domain,
     forcing_at,
-    real_transition_is_accepted,
     set_prognostic_state!,
     state_from_prognostic
+
+# -----------------------------------------------------------------------------
+# Public constants and data model
+# -----------------------------------------------------------------------------
 
 """
     N_PFTS
@@ -57,13 +59,6 @@ const N_SOIL_LAYERS = 20
 Number of entries in each source-native PFT parameter vector.
 """
 const N_PARAMETER_PFTS = 15
-
-"""
-    REAL_TRANSITION_EVIDENCE_STATUS
-
-Return the acceptance label for the SHA-bound real-transition evidence.
-"""
-const REAL_TRANSITION_EVIDENCE_STATUS = :accepted_issue_101_v5
 
 function _check_pool_shape(field, label)
     expected = (1, N_CATEGORIES, N_SOIL_LAYERS)
@@ -430,6 +425,10 @@ function _empty_audit(::Type{FT}) where {FT <: AbstractFloat}
     )
 end
 
+# -----------------------------------------------------------------------------
+# Reusable transition storage
+# -----------------------------------------------------------------------------
+
 function _classic_cache(::Type{FT}) where {FT <: AbstractFloat}
     phases = CLASSICPhases(_empty_state(FT), _empty_state(FT), _empty_state(FT))
     transition = CLASSICTransition(_empty_state(FT), _empty_audit(FT), phases)
@@ -451,6 +450,10 @@ function _classic_cache(::Type{FT}) where {FT <: AbstractFloat}
     return CLASSICCache(_empty_state(FT), transition, mixing)
 end
 
+
+# -----------------------------------------------------------------------------
+# Forcing providers
+# -----------------------------------------------------------------------------
 
 """
     ConstantForcingProvider{F}
@@ -569,6 +572,10 @@ function forcing_at(provider::PrescribedDailyForcingProvider, time)
     return provider.forcings[index]
 end
 
+# -----------------------------------------------------------------------------
+# ClimaLand model integration
+# -----------------------------------------------------------------------------
+
 """
     classic_domain(parameters; device = ClimaComms.device())
 
@@ -587,8 +594,72 @@ A `ClimaLand.Domains.Column` whose precision matches `parameters`.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
-domain = classic_domain(parameters)
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+inputs = demo_inputs()
+domain = classic_domain(inputs.parameters)
+length(parent(domain.fields.z)) == N_SOIL_LAYERS
 ```
+
+See also [`CLASSICParameters`](@ref) and [`CLASSICSoilModel`](@ref).
+
 """
 function classic_domain(
     parameters::CLASSICParameters{FT};
@@ -650,9 +721,71 @@ parameter, domain, driver, and cache types.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
-provider = ConstantForcingProvider(forcing)
-model = CLASSICSoilModel(parameters; drivers = provider)
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+inputs = demo_inputs()
+provider = ConstantForcingProvider(inputs.forcing)
+model = CLASSICSoilModel(inputs.parameters; drivers = provider)
+model.callback_period == 86400.0
 ```
+
 
 See also [`advance!`](@ref) and [`classic_domain`](@ref).
 """
@@ -702,23 +835,6 @@ Land.auxiliary_types(::CLASSICSoilModel) = ()
 Land.auxiliary_domain_names(::CLASSICSoilModel) = ()
 
 """
-    real_transition_is_accepted()
-
-Return whether the SHA-bound real v5 transition evidence is accepted.
-
-# Returns
-`true` only for the accepted issue-101-v5 evidence label.
-
-# Examples
-```julia
-using ClimaLand.Soil.Biogeochemistry.CLASSIC
-real_transition_is_accepted()
-```
-"""
-real_transition_is_accepted() =
-    REAL_TRANSITION_EVIDENCE_STATUS === :accepted_issue_101_v5
-
-"""
     state_from_prognostic(Y)
 
 Copy bottom-to-top ClimaCore prognostic fields into source-order CLASSIC state.
@@ -732,9 +848,78 @@ A newly allocated `CLASSICState` in top-to-bottom source order [kg C m⁻²].
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+import ClimaLand
+inputs = demo_inputs()
+model = CLASSICSoilModel(
+    inputs.parameters;
+    drivers = ConstantForcingProvider(inputs.forcing),
+)
 Y, _, _ = ClimaLand.initialize(model)
 state = state_from_prognostic(Y)
+size(state.litrmass) == (1, N_CATEGORIES, N_SOIL_LAYERS)
 ```
+
+See also [`set_prognostic_state!`](@ref) and [`CLASSICSoilModel`](@ref).
+
 """
 function state_from_prognostic(Y)
     component = getproperty(Y, :classic_soil)
@@ -772,8 +957,78 @@ Write source-order CLASSIC state into bottom-to-top ClimaCore fields.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
-set_prognostic_state!(Y, state)
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+import ClimaLand
+inputs = demo_inputs()
+model = CLASSICSoilModel(
+    inputs.parameters;
+    drivers = ConstantForcingProvider(inputs.forcing),
+)
+Y, _, _ = ClimaLand.initialize(model)
+set_prognostic_state!(Y, inputs.state)
+state_from_prognostic(Y).litrmass == inputs.state.litrmass
 ```
+
+See also [`state_from_prognostic`](@ref).
+
 """
 function set_prognostic_state!(Y, state::CLASSICState)
     component = getproperty(Y, :classic_soil)
@@ -787,6 +1042,10 @@ function set_prognostic_state!(Y, state::CLASSICState)
     end
     return nothing
 end
+
+# -----------------------------------------------------------------------------
+# Contract validation
+# -----------------------------------------------------------------------------
 
 function _check_layer_matrix(value, label)
     size(value) == (1, N_SOIL_LAYERS) || throw(
@@ -905,6 +1164,10 @@ function _moisture_scalars(parameters, forcing, layer)
     end
     return clamp(litter, FT(0.2), one(FT)), clamp(soil, FT(0.2), one(FT))
 end
+
+# -----------------------------------------------------------------------------
+# Respiration and pool recurrence
+# -----------------------------------------------------------------------------
 
 """
     _respiration!(ltresveg, scresveg, state, parameters, forcing)
@@ -1131,6 +1394,10 @@ function _tridiag_cached!(a, b, c, r, u, work, n)
     return nothing
 end
 
+# -----------------------------------------------------------------------------
+# Vertical mixing and turbation
+# -----------------------------------------------------------------------------
+
 """
     _solve_mixing!(values, coefficients, depth, parameters, mixing, n)
 
@@ -1324,6 +1591,10 @@ function _turbate!(state, parameters, forcing)
     return _turbate!(state, parameters, forcing, _classic_cache(FT).mixing)
 end
 
+# -----------------------------------------------------------------------------
+# Public transition and callback seams
+# -----------------------------------------------------------------------------
+
 """
     advance_stage_b!(cache, state, parameters, forcing)
 
@@ -1348,9 +1619,76 @@ call using the same cache.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+inputs = demo_inputs()
 cache = CLASSIC._classic_cache(Float64)
-transition = CLASSIC.advance_stage_b!(cache, state, parameters, forcing)
+transition = CLASSIC.advance_stage_b!(
+    cache,
+    inputs.state,
+    inputs.parameters,
+    inputs.forcing,
+)
+transition.state.litrmass == inputs.state.litrmass
 ```
+
 
 See also [`advance_stage_b`](@ref) and [`advance!`](@ref).
 """
@@ -1418,8 +1756,76 @@ A newly allocated `CLASSICTransition` containing state, phases, and audits.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
-transition = advance_stage_b(state, parameters, forcing)
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+inputs = demo_inputs()
+transition = advance_stage_b(
+    inputs.state,
+    inputs.parameters,
+    inputs.forcing,
+)
+transition.state.litrmass == inputs.state.litrmass
 ```
+
+See also [`advance!`](@ref) and [`CLASSICTransition`](@ref).
+
 """
 function advance_stage_b(
     state::CLASSICState{FT},
@@ -1448,9 +1854,78 @@ must be retained.
 # Examples
 ```julia
 using ClimaLand.Soil.Biogeochemistry.CLASSIC
+
+function demo_inputs(::Type{FT} = Float64) where {FT}
+    layer_shape = (1, N_SOIL_LAYERS)
+    pool_shape = (1, N_CATEGORIES, N_SOIL_LAYERS)
+    depths = collect(range(FT(0.1); step = FT(0.1), length = N_SOIL_LAYERS))
+    parameters = CLASSICParameters(;
+        thpor = fill(FT(0.5), layer_shape),
+        psisat = fill(FT(4), layer_shape),
+        bi = ones(FT, layer_shape),
+        isand = zeros(Int32, layer_shape),
+        zbotw = reshape(copy(depths), layer_shape),
+        zbot = depths,
+        delzw = fill(FT(0.1), layer_shape),
+        sort = Int32[1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14],
+        bsratelt = ones(FT, N_PARAMETER_PFTS),
+        bsratesc = ones(FT, N_PARAMETER_PFTS),
+        humicfac = fill(FT(0.5), N_PARAMETER_PFTS),
+        bsratelt_g = one(FT),
+        bsratesc_g = one(FT),
+        humicfac_bg = FT(0.5),
+        tanhq10 = FT[2.16, 0.67, 0.075, 28.1],
+        deltat = one(FT),
+        tfrez = FT(273.16),
+        zero = FT(1e-20),
+        tcrit = -one(FT),
+        frozered = FT(0.1),
+        r_depthredu = FT(8.3),
+        cryodiffus = zero(FT),
+        biodiffus = zero(FT),
+        kterm = FT(3),
+        spinfast = Int32(1),
+        turbation_on = false,
+    )
+    transfer = StageBTransfer(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    forcing = CLASSICForcing(;
+        tbar = fill(FT(288.16), layer_shape),
+        thliq = fill(FT(0.25), layer_shape),
+        thice = zeros(FT, layer_shape),
+        fcancmx = zeros(FT, 1, N_PFTS),
+        fg = ones(FT, 1),
+        rmrveg = zeros(FT, 1, N_PFTS),
+        rmr = zeros(FT, 1),
+        max_annual_active_layer = fill(FT(2), 1),
+        competition = transfer,
+        land_use = transfer,
+        harvest = transfer,
+        turnover = transfer,
+        mortality = transfer,
+        disturbance = transfer,
+    )
+    state = CLASSICState(
+        zeros(FT, pool_shape),
+        zeros(FT, pool_shape),
+    )
+    return (; state, parameters, forcing)
+end
+import ClimaLand
+inputs = demo_inputs()
+model = CLASSICSoilModel(
+    inputs.parameters;
+    drivers = ConstantForcingProvider(inputs.forcing),
+)
 Y, _, _ = ClimaLand.initialize(model)
 transition = advance!(model, Y, model.callback_period)
+state_from_prognostic(Y).litrmass == transition.state.litrmass
 ```
+
+See also [`CLASSICSoilModel`](@ref) and [`state_from_prognostic`](@ref).
+
 """
 function advance!(model::CLASSICSoilModel, Y, time)
     forcing = forcing_at(model.drivers, time)

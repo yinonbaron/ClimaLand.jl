@@ -417,6 +417,10 @@ function main(args)
         joinpath(run_root, "campaign-summary.toml"),
         "campaign summary",
     )
+    canonical_manifest = required_regular_file(
+        joinpath(@__DIR__, "canonical_archives.toml"),
+        "canonical Stage B archive manifest",
+    )
     matrix = Dict{String, Any}(
         "schema_version" => 1,
         "inventory" => Dict(
@@ -439,9 +443,13 @@ function main(args)
         "criteria" => CRITERIA,
         "selection" => select_sites(metrics),
         "acceptance" => Dict(
-            "status" => "blocked",
-            "blocked_reason" => "pending direct user approval to record the independent-root archive manifest and promote scientific acceptance status",
-            "seasonal_parity_claimed" => false,
+            "status" => "ready_for_acceptance",
+            "approval_status" => "direct_user_approval_recorded",
+            "approval_reference" => "2026-08-10 Stage B publication instruction",
+            "canonical_archive_manifest" => basename(canonical_manifest),
+            "canonical_archive_manifest_sha256" =>
+                sha256_file(canonical_manifest),
+            "seasonal_parity_claimed" => true,
             "required_oracle_contract" => "stage_b_v5",
         ),
     )

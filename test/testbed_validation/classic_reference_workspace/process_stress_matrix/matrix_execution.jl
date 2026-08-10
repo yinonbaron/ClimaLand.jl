@@ -10,7 +10,8 @@ using Main.ClassicToleranceContract:
 using Main.ClassicTrajectoryBundle: load_bundle_schema, verify_replay_acceptance
 using Main.ClassicCallbackAdapter: classic_callback_transition
 
-export discover_matrix_archives,
+export archive_root_from_env,
+    discover_matrix_archives,
     evaluate_replay_report,
     load_archive_manifest,
     load_tolerance_contract,
@@ -23,12 +24,14 @@ export discover_matrix_archives,
 const SHA256_PATTERN = r"^[0-9a-f]{64}$"
 const REQUIRED_REFERENCE_KIND = "fresh_local_fortran"
 const REQUIRED_ORACLE_CONTRACT = "stage_b_v5"
+const ARCHIVE_PATH_ROOT = "CLASSIC_STAGE_B_ARCHIVE_ROOT"
 
 valid_sha256(value) =
     value isa AbstractString && occursin(SHA256_PATTERN, value)
-sha256_file(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256_file(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function required_regular_file(path, label)
     isfile(path) || throw(ArgumentError("missing $label: $path"))
@@ -78,17 +81,66 @@ function discover_matrix_archives(root, sites)
 end
 
 """
-    load_archive_manifest(path, sites)
+    archive_root_from_env([environment])
 
-Load the exact ordered four-site canonical archive inventory. Every archive
-and external receipt must be an absolute, non-symlink regular file whose
-SHA-256 matches the checked manifest.
+Return the explicit external root containing the canonical Stage B archives.
 """
-function load_archive_manifest(path, sites)
+function archive_root_from_env(environment = ENV)
+    root = get(environment, ARCHIVE_PATH_ROOT, nothing)
+    isnothing(root) && throw(
+        ArgumentError("set $ARCHIVE_PATH_ROOT to the canonical archive root"),
+    )
+    return required_archive_root(root)
+end
+
+function required_archive_root(root)
+    root isa AbstractString && isabspath(root) ||
+        throw(ArgumentError("canonical archive root must be absolute"))
+    isdir(root) || throw(ArgumentError("canonical archive root is unavailable"))
+    islink(root) &&
+        throw(ArgumentError("canonical archive root must not be a symlink"))
+    return realpath(root)
+end
+
+function canonical_archive_identifier(identifier, label)
+    identifier isa AbstractString && !isempty(identifier) ||
+        throw(ArgumentError("$label identifier must be a nonempty string"))
+    isabspath(identifier) &&
+        throw(ArgumentError("$label identifier must be root relative"))
+    normalized = normpath(identifier)
+    normalized == identifier ||
+        throw(ArgumentError("$label identifier must be normalized"))
+    first(splitpath(normalized)) == ".." &&
+        throw(ArgumentError("$label identifier escapes the archive root"))
+    return normalized
+end
+
+function resolve_archive_identifier(root, identifier, label)
+    relative = canonical_archive_identifier(identifier, label)
+    candidate = required_regular_file(joinpath(root, relative), label)
+    resolved = realpath(candidate)
+    first(splitpath(normpath(relpath(resolved, root)))) == ".." &&
+        throw(ArgumentError("$label resolves outside the archive root"))
+    return resolved
+end
+
+"""
+    load_archive_manifest(path, sites; archive_root)
+
+Load the exact ordered four-site canonical archive inventory. Every checked
+identifier is root-relative and resolves beneath an explicit, non-symlink
+external archive root. Archive and receipt hashes must match the manifest.
+"""
+function load_archive_manifest(path, sites; archive_root = nothing)
+    isnothing(archive_root) &&
+        throw(ArgumentError("canonical archive root is required"))
+    root = required_archive_root(archive_root)
     path = required_regular_file(path, "canonical archive manifest")
     document = TOML.parsefile(path)
-    get(document, "schema_version", nothing) == 1 ||
+    get(document, "schema_version", nothing) == 2 ||
         throw(ArgumentError("unsupported canonical archive manifest"))
+    get(document, "path_root", nothing) == ARCHIVE_PATH_ROOT ||
+        throw(ArgumentError("canonical archive manifest root label differs"))
     records = get(document, "site", Any[])
     names = [get(record, "site", "") for record in records]
     names == sites ||
@@ -98,14 +150,16 @@ function load_archive_manifest(path, sites)
     archives = Dict{String, NamedTuple}()
     for record in records
         site = record["site"]
-        archive_path = get(record, "archive_path", "")
-        receipt_path = get(record, "receipt_path", "")
-        isabspath(archive_path) && isabspath(receipt_path) ||
-            throw(ArgumentError("$site canonical paths must be absolute"))
-        archive_path =
-            required_regular_file(archive_path, "$site canonical archive")
-        receipt_path =
-            required_regular_file(receipt_path, "$site canonical receipt")
+        archive_path = resolve_archive_identifier(
+            root,
+            get(record, "archive_id", ""),
+            "$site canonical archive",
+        )
+        receipt_path = resolve_archive_identifier(
+            root,
+            get(record, "receipt_id", ""),
+            "$site canonical receipt",
+        )
         archive_sha = get(record, "archive_sha256", "")
         receipt_sha = get(record, "receipt_sha256", "")
         valid_sha256(archive_sha) && sha256_file(archive_path) == archive_sha ||
@@ -168,7 +222,7 @@ function validate_site_archive_receipt(
     receipt["archive_bytes"] == filesize(archive_path) ||
         throw(ArgumentError("archive receipt byte count differs"))
     valid_sha256(receipt["archive_sha256"]) &&
-    receipt["archive_sha256"] == sha256_file(archive_path) ||
+        receipt["archive_sha256"] == sha256_file(archive_path) ||
         throw(ArgumentError("archive SHA-256 differs"))
     receipt["trajectory_schema_sha256"] == expected_schema_sha256 ||
         throw(ArgumentError("trajectory schema SHA-256 differs"))
@@ -436,6 +490,7 @@ function run_real_matrix(
     archive_source,
     output_receipt;
     evidence_root,
+    archive_root = nothing,
     matrix_path = joinpath(@__DIR__, "selection_matrix.toml"),
     schema_path = joinpath(@__DIR__, "..", "trajectory_bundle", "schema.toml"),
     tolerance_path = joinpath(@__DIR__, "tolerances.toml"),
@@ -443,7 +498,7 @@ function run_real_matrix(
     matrix = TOML.parsefile(matrix_path)
     sites = selected_matrix_sites(matrix)
     source = if isfile(archive_source)
-        load_archive_manifest(archive_source, sites)
+        load_archive_manifest(archive_source, sites; archive_root)
     else
         (; archives = discover_matrix_archives(archive_source, sites), sha256 = "")
     end

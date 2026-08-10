@@ -16,9 +16,10 @@ const EVIDENCE_ROOT_ENV = "CLASSIC_TOLERANCE_EVIDENCE_ROOT"
 
 valid_sha256(value) =
     value isa AbstractString && occursin(SHA256_PATTERN, value)
-sha256_file(path) = open(path) do io
-    bytes2hex(SHA.sha256(io))
-end
+sha256_file(path) =
+    open(path) do io
+        bytes2hex(SHA.sha256(io))
+    end
 
 function required_regular_file(path, label)
     isfile(path) || throw(ArgumentError("missing $label: $path"))
@@ -156,8 +157,8 @@ function validate_measurement_receipt(
         throw(ArgumentError("measurement maximum flux error differs"))
     carbon_closure = get(receipt, "max_carbon_closure", nothing)
     carbon_closure isa Real &&
-    isfinite(carbon_closure) &&
-    carbon_closure >= 0 ||
+        isfinite(carbon_closure) &&
+        carbon_closure >= 0 ||
         throw(ArgumentError("measurement carbon closure is invalid"))
     accumulated_drift = get(receipt, "accumulated_drift", nothing)
     accumulated_drift isa Real && isfinite(accumulated_drift) ||
@@ -279,8 +280,8 @@ function load_tolerance_contract(path, schema; evidence_root = nothing)
         observed isa Real && isfinite(observed) && observed >= 0 ||
             throw(ArgumentError("$name observed error is invalid"))
         safety_factor isa Real &&
-        isfinite(safety_factor) &&
-        safety_factor > 1 ||
+            isfinite(safety_factor) &&
+            safety_factor > 1 ||
             throw(ArgumentError("$name safety factor is invalid"))
         expected_family =
             name in expected_state ? "state" :
@@ -383,8 +384,8 @@ function evaluate_replay_report(report, tolerances, schema)
     budget_failure_index = findfirst(
         step ->
             !step.roundoff_ok ||
-            abs(step.roundoff_residual) >
-            max(budget_floor, step.roundoff_bound),
+                abs(step.roundoff_residual) >
+                max(budget_floor, step.roundoff_bound),
         report.steps,
     )
     budget_ok = report.closure_ok && isnothing(budget_failure_index)
@@ -458,6 +459,13 @@ function evaluate_replay_report(report, tolerances, schema)
     lifecycle_ok =
         report.initialization_count == 1 &&
         report.recurrent_state_replacements == 0
+    effective_budget_tolerances = Dict(
+        "carbon_closure" => maximum(
+            step -> max(budget_floor, step.roundoff_bound),
+            report.steps,
+        ),
+    )
+    effective_drift_tolerances = Dict("accumulated_drift" => drift_threshold)
     return (;
         ok = lifecycle_ok && state_ok && flux_ok && budget_ok && drift_ok,
         state_ok,
@@ -469,6 +477,8 @@ function evaluate_replay_report(report, tolerances, schema)
         max_flux_errors = report.max_flux_errors,
         max_budget_errors = budget_errors,
         max_drift_errors = drift_errors,
+        effective_budget_tolerances,
+        effective_drift_tolerances,
         failure_localization = localization,
     )
 end

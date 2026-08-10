@@ -1,10 +1,10 @@
 # CLASSIC Stage B process-stress matrix
 
 This directory selects four process-stressing sites from all 59 released
-CLASSIC v2 site configurations. All four selected canonical archives have
-replayed locally within the checked per-field tolerances. Checked scientific acceptance is not yet claimed because
-the real independent-root archive manifest and acceptance-status change require
-direct user approval.
+CLASSIC v2 site configurations. All four selected canonical archives replay within the checked per-field
+tolerances. The portable `canonical_archives.toml` records their root-relative
+identifiers and hashes, and the checked matrix records the direct user approval
+for scientific acceptance.
 
 ## Reproduce the selection
 
@@ -79,10 +79,10 @@ prepared initialization. `selection_matrix.toml` binds those two files, the
 immutable released source/input/container archives, and the completed #98
 campaign summary.
 
-## Remaining acceptance blocker
+## Scientific acceptance
 
-The four canonical seasonal archives replay locally green with hash-bound,
-field-specific state, flux, daily-budget, and accumulated-drift limits. The
-checked matrix remains blocked until the user explicitly approves recording the
-independent-root archive manifest and changing the scientific acceptance status.
-`matrix_acceptance_ready` therefore remains false.
+The four canonical seasonal archives replay green with hash-bound, field-specific
+state, flux, daily-budget, and accumulated-drift limits. The direct user
+approval is recorded in `selection_matrix.toml`; its status is
+`ready_for_acceptance` and `matrix_acceptance_ready` validates the durable
+external receipt before returning true.

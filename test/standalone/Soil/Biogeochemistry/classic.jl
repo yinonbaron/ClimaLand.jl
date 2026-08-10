@@ -261,9 +261,9 @@ end
     @test allocated_advance(model, Y, 3 * model.callback_period) == 0
 end
 
-@testset "real transition evidence status" begin
-    @test CLASSIC.REAL_TRANSITION_EVIDENCE_STATUS == :accepted_issue_101_v5
-    @test CLASSIC.real_transition_is_accepted()
+@testset "runtime acceptance evidence is external" begin
+    @test !isdefined(CLASSIC, :REAL_TRANSITION_EVIDENCE_STATUS)
+    @test !isdefined(CLASSIC, :real_transition_is_accepted)
 end
 
 

@@ -10,7 +10,7 @@ include(joinpath(TRAJECTORY_DIRECTORY, "classic_callback_adapter.jl"))
 include("matrix_execution.jl")
 
 using .ClassicToleranceContract: evidence_root_from_env
-using .ClassicMatrixExecution: run_real_matrix
+using .ClassicMatrixExecution: archive_root_from_env, run_real_matrix
 
 function main(args)
     length(args) == 2 || error(
@@ -21,6 +21,8 @@ function main(args)
         archive_source,
         output_receipt;
         evidence_root = evidence_root_from_env(),
+        archive_root = isfile(archive_source) ? archive_root_from_env() :
+                       nothing,
     )
     receipt["status"] == "complete" || exit(1)
 end

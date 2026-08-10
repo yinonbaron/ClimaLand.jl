@@ -5,7 +5,10 @@ import TOML
 using ..ClassicAllSiteParity:
     external_output_path, sha256_file, validate_archive_set
 
-export build_all_site_draft_report, write_all_site_draft_report
+export build_all_site_acceptance_report,
+    build_all_site_draft_report,
+    write_all_site_acceptance_report,
+    write_all_site_draft_report
 
 const SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
@@ -103,7 +106,7 @@ function checked_site_record(report, package, tolerances)
         throw(ArgumentError("site archive receipt hash differs"))
     stage_b_status = get(external, "stage_b_status", nothing)
     stage_b_status == report.stage_b_status &&
-    stage_b_status in ("active", "inactive") ||
+        stage_b_status in ("active", "inactive") ||
         throw(ArgumentError("site Stage-B applicability differs"))
     report.evidence_complete === true ||
         throw(ArgumentError("site evidence is incomplete"))
@@ -151,6 +154,10 @@ function checked_site_record(report, package, tolerances)
             tolerances.drift,
             "drift maxima",
         )
+        record["effective_budget_tolerances"] =
+            Dict(report.evaluation.effective_budget_tolerances)
+        record["effective_drift_tolerances"] =
+            Dict(report.evaluation.effective_drift_tolerances)
         record["failure_localization"] =
             collect(report.evaluation.failure_localization)
         record["replay_claimed"] = true
@@ -165,6 +172,8 @@ function checked_site_record(report, package, tolerances)
         record["max_flux_errors"] = Dict{String, Float64}()
         record["max_budget_errors"] = Dict{String, Float64}()
         record["max_drift_errors"] = Dict{String, Float64}()
+        record["effective_budget_tolerances"] = Dict{String, Float64}()
+        record["effective_drift_tolerances"] = Dict{String, Float64}()
         record["failure_localization"] = Any[]
         record["replay_claimed"] = false
         record["deferred_issue"] = 108
@@ -231,6 +240,200 @@ function build_all_site_draft_report(
     )
 end
 
+
+
+function checked_promoted_error_map(errors, tolerances, label)
+    checked = exact_error_inventory(errors, tolerances, label)
+    all(checked[name] <= tolerances[name] for name in keys(tolerances)) ||
+        throw(ArgumentError("$label exceeds the accepted tolerance"))
+    return checked
+end
+
+function validate_draft_site(site, tolerances)
+    required = (
+        "site",
+        "stage_b_status",
+        "evidence_complete",
+        "stage_b_parity_observed",
+        "archive_path",
+        "archive_sha256",
+        "archive_receipt_path",
+        "archive_receipt_sha256",
+        "evidence_sha256",
+        "max_state_errors",
+        "max_flux_errors",
+        "max_budget_errors",
+        "max_drift_errors",
+        "effective_budget_tolerances",
+        "effective_drift_tolerances",
+        "failure_localization",
+        "replay_claimed",
+    )
+    all(haskey(site, key) for key in required) ||
+        throw(ArgumentError("draft site record is incomplete"))
+    site["evidence_complete"] === true ||
+        throw(ArgumentError("draft site evidence is incomplete"))
+    archive = site["archive_path"]
+    receipt = site["archive_receipt_path"]
+    isabspath(archive) && isfile(archive) && !islink(archive) ||
+        throw(ArgumentError("draft archive is unavailable"))
+    isabspath(receipt) && isfile(receipt) && !islink(receipt) ||
+        throw(ArgumentError("draft archive receipt is unavailable"))
+    valid_sha256(site["archive_sha256"]) &&
+        sha256_file(archive) == site["archive_sha256"] ||
+        throw(ArgumentError("draft archive hash differs"))
+    valid_sha256(site["archive_receipt_sha256"]) &&
+        sha256_file(receipt) == site["archive_receipt_sha256"] ||
+        throw(ArgumentError("draft archive receipt hash differs"))
+    evidence = site["evidence_sha256"]
+    evidence isa AbstractDict &&
+        !isempty(evidence) &&
+        all(valid_sha256, values(evidence)) ||
+        throw(ArgumentError("draft site evidence hashes are incomplete"))
+    isempty(site["failure_localization"]) ||
+        throw(ArgumentError("draft site contains a failed comparison"))
+
+    status = site["stage_b_status"]
+    if status == "active"
+        site["stage_b_parity_observed"] === true &&
+            site["replay_claimed"] === true ||
+            throw(ArgumentError("active draft site lacks parity"))
+        checked_promoted_error_map(
+            site["max_state_errors"],
+            tolerances["state"],
+            "state maxima",
+        )
+        checked_promoted_error_map(
+            site["max_flux_errors"],
+            tolerances["flux"],
+            "flux maxima",
+        )
+        checked_promoted_error_map(
+            site["max_budget_errors"],
+            site["effective_budget_tolerances"],
+            "budget maxima",
+        )
+        checked_promoted_error_map(
+            site["max_drift_errors"],
+            site["effective_drift_tolerances"],
+            "drift maxima",
+        )
+    elseif status == "inactive"
+        site["stage_b_parity_observed"] === false &&
+            site["replay_claimed"] === false &&
+            get(site, "deferred_issue", nothing) == 108 ||
+            throw(ArgumentError("inactive draft site claims Stage B parity"))
+        all(
+            isempty(site[key]) for key in (
+                "max_state_errors",
+                "max_flux_errors",
+                "max_budget_errors",
+                "max_drift_errors",
+                "effective_budget_tolerances",
+                "effective_drift_tolerances",
+            )
+        ) || throw(ArgumentError("inactive draft site contains parity maxima"))
+    else
+        throw(ArgumentError("draft Stage B applicability is invalid"))
+    end
+    return status
+end
+
+function build_all_site_acceptance_report(
+    draft_path;
+    approval_reference,
+    approved_draft_sha256,
+)
+    approval_reference isa AbstractString &&
+        !isempty(strip(approval_reference)) ||
+        throw(ArgumentError("direct user approval reference is required"))
+    valid_sha256(approved_draft_sha256) &&
+        sha256_file(draft_path) == approved_draft_sha256 ||
+        throw(ArgumentError("approved all-site draft SHA-256 differs"))
+    isfile(draft_path) && !islink(draft_path) ||
+        throw(ArgumentError("all-site draft report is unavailable"))
+    draft = TOML.parsefile(draft_path)
+    get(draft, "schema_version", nothing) == 1 &&
+        get(draft, "report_kind", nothing) == "all_site_stage_b_draft" &&
+        get(draft, "status", nothing) == "draft_complete" &&
+        get(draft, "approval_status", nothing) ==
+        "pending_direct_user_approval" &&
+        get(draft, "scientific_status", nothing) == "not_promoted" &&
+        get(draft, "seasonal_parity_claimed", nothing) === false &&
+        get(draft, "checksum_status", nothing) == "draft_only_not_promoted" ||
+        throw(ArgumentError("all-site draft status is invalid"))
+    get(draft, "site_count", nothing) == 59 &&
+        get(draft, "evidence_complete", nothing) === true &&
+        get(draft, "active_stage_b_parity_observed", nothing) === true ||
+        throw(ArgumentError("all-site draft evidence is incomplete"))
+    all(
+        valid_sha256(get(draft, key, nothing)) for key in (
+            "policy_inventory_sha256",
+            "site_metrics_sha256",
+            "archive_inventory_sha256",
+            "tolerance_contract_sha256",
+        )
+    ) || throw(ArgumentError("all-site draft provenance is incomplete"))
+    tolerances = get(draft, "tolerances", nothing)
+    tolerances isa AbstractDict ||
+        throw(ArgumentError("all-site draft lacks tolerances"))
+    Set(keys(tolerances)) == Set(("state", "flux", "budget", "drift")) ||
+        throw(ArgumentError("all-site draft tolerance inventory differs"))
+    sites = get(draft, "site", Any[])
+    length(sites) == 59 ||
+        throw(ArgumentError("all-site draft requires 59 site records"))
+    names = getindex.(sites, "site")
+    length(unique(names)) == 59 ||
+        throw(ArgumentError("all-site draft site inventory has duplicates"))
+    statuses = [validate_draft_site(site, tolerances) for site in sites]
+    count(==("active"), statuses) ==
+    get(draft, "active_site_count", nothing) ==
+    57 || throw(ArgumentError("all-site active count differs"))
+    count(==("inactive"), statuses) ==
+    get(draft, "inactive_site_count", nothing) ==
+    2 || throw(ArgumentError("all-site inactive count differs"))
+    archive_inventory_sha256(sites) == draft["archive_inventory_sha256"] ||
+        throw(ArgumentError("all-site archive inventory hash differs"))
+    measurements = get(draft, "tolerance_measurement_receipt", Any[])
+    !isempty(measurements) && all(
+        measurement ->
+            haskey(measurement, "evidence_id") &&
+                valid_sha256(get(measurement, "sha256", nothing)),
+        measurements,
+    ) || throw(ArgumentError("all-site tolerance evidence is incomplete"))
+
+    acceptance = deepcopy(draft)
+    acceptance["report_kind"] = "all_site_stage_b_acceptance"
+    acceptance["status"] = "complete"
+    acceptance["approval_status"] = "direct_user_approval_recorded"
+    acceptance["approval_reference"] = String(approval_reference)
+    acceptance["scientific_status"] = "accepted"
+    acceptance["seasonal_parity_claimed"] = true
+    acceptance["checksum_status"] = "promoted"
+    acceptance["source_draft_sha256"] = sha256_file(draft_path)
+    acceptance["approved_draft_sha256"] = String(approved_draft_sha256)
+    return acceptance
+end
+
+function write_all_site_acceptance_report(
+    path,
+    draft_path;
+    repository_root,
+    approval_reference,
+    approved_draft_sha256,
+)
+    path = external_output_path(path, repository_root)
+    ispath(path) && throw(ArgumentError("acceptance report already exists"))
+    report = build_all_site_acceptance_report(
+        draft_path;
+        approval_reference,
+        approved_draft_sha256,
+    )
+    open(path, "w") do io
+        TOML.print(io, report; sorted = true)
+    end
+    return (; report, path, sha256 = sha256_file(path))
+end
 function write_all_site_draft_report(
     path,
     campaign,
