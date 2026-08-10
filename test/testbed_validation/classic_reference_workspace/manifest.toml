@@ -1,0 +1,100 @@
+schema_version = 1
+
+[workspace]
+canonical_allocation_env = "WORK"
+directory_name = "classic-v2-reference"
+minimum_free_bytes = 8000000000
+immutable_directories = [
+    "immutable/archives",
+]
+replaceable_directories = [
+    "replaceable/builds",
+    "replaceable/cache",
+    "replaceable/extracted",
+    "replaceable/fixture-staging",
+    "replaceable/runs",
+    "replaceable/staging",
+]
+
+[prerequisites]
+platform = "linux"
+commands = ["apptainer", "tar", "md5sum"]
+
+[source_pin]
+repository = "https://gitlab.com/cccma/classic.git"
+tag = "CLASSICv2.0"
+commit = "7dd82c9a48a7c8beb6455a229888c90ba20d8eff"
+archive_top_level = "classic-CLASSICv2.0"
+
+[setup]
+commands = [
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl check test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl init test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl fetch test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+    "julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl verify test/testbed_validation/classic_reference_workspace/manifest.toml $WORK/classic-v2-reference",
+]
+
+[[resource]]
+id = "source"
+record_id = 18188101
+doi = "10.5281/zenodo.18188101"
+record_url = "https://zenodo.org/records/18188101"
+version = "2.0"
+publication_date = "2026-01-07"
+record_license = "CC-BY-4.0"
+embedded_license = "Open Government Licence - Canada version 2.0"
+
+  [[resource.file]]
+  filename = "classic-CLASSICv2.0.tar.gz"
+  relative_path = "immutable/archives/zenodo-18188101/classic-CLASSICv2.0.tar.gz"
+  bytes = 13563844
+  md5 = "7f3082ebc524d21d29c578f4fdf2ca28"
+  url = "https://zenodo.org/api/records/18188101/files/classic-CLASSICv2.0.tar.gz/content"
+
+[[resource]]
+id = "container"
+record_id = 18201505
+doi = "10.5281/zenodo.18201505"
+record_url = "https://zenodo.org/records/18201505"
+version = "2.0"
+publication_date = "2026-01-07"
+record_license = "CC-BY-4.0"
+embedded_license = "Open Government Licence - Canada version 2.0"
+
+  [[resource.file]]
+  filename = "CLASSIC_container.tar.gz"
+  relative_path = "immutable/archives/zenodo-18201505/CLASSIC_container.tar.gz"
+  bytes = 1716454680
+  md5 = "5510acc8ba800aa3ff716683ab8304b7"
+  url = "https://zenodo.org/api/records/18201505/files/CLASSIC_container.tar.gz/content"
+
+[[resource]]
+id = "benchmark_collection"
+record_id = 18202323
+doi = "10.5281/zenodo.18202323"
+record_url = "https://zenodo.org/records/18202323"
+version = "2.0"
+publication_date = "2026-01-07"
+record_license = "CC-BY-4.0"
+embedded_license = "Site inputs retain source-specific terms; audit before redistribution"
+
+  [[resource.file]]
+  filename = "Benchmark_CLASSIC_output.tar.gz"
+  relative_path = "immutable/archives/zenodo-18202323/Benchmark_CLASSIC_output.tar.gz"
+  bytes = 484045022
+  md5 = "fb0d8c57e7b926644bf0b9fcdf079a2c"
+  url = "https://zenodo.org/api/records/18202323/files/Benchmark_CLASSIC_output.tar.gz/content"
+
+  [[resource.file]]
+  filename = "Benchmark_CLASSIC_plots.tar"
+  relative_path = "immutable/archives/zenodo-18202323/Benchmark_CLASSIC_plots.tar"
+  bytes = 988429312
+  md5 = "bd9c5f9a78456ea35c132e17ea18a7c0"
+  url = "https://zenodo.org/api/records/18202323/files/Benchmark_CLASSIC_plots.tar/content"
+
+  [[resource.file]]
+  filename = "FLUXNET.tar.gz"
+  relative_path = "immutable/archives/zenodo-18202323/FLUXNET.tar.gz"
+  bytes = 473185623
+  md5 = "25a26e1cc4664b93a29fc726c4182e5c"
+  url = "https://zenodo.org/api/records/18202323/files/FLUXNET.tar.gz/content"

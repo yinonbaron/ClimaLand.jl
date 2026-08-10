@@ -1,0 +1,131 @@
+schema_version = 1
+scope = "CLASSIC Stage B mineral-soil carbon trajectory"
+storage_order = "fortran_column_major"
+endianness = "little"
+
+[[field]]
+name = "static.thpor"
+section = "static_data"
+role = "static_data"
+units = "m3 m-3"
+dtype = "float64"
+dimensions = ["tile", "soil_layer"]
+sampling = "constant"
+application_phase = "heterotrophic_respiration"
+
+[[field]]
+name = "initial.litrmass"
+section = "initial_state"
+role = "owned_state"
+units = "kg C m-2"
+dtype = "float64"
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+sampling = "beginning"
+application_phase = "transition_start"
+
+[[field]]
+name = "driver.tbar"
+section = "drivers"
+role = "external_forcing"
+units = "K"
+dtype = "float64"
+dimensions = ["tile", "soil_layer"]
+sampling = "interval_mean"
+application_phase = "heterotrophic_respiration"
+
+[[field]]
+name = "reference.post_litrmass"
+section = "reference_state"
+role = "reference_state"
+units = "kg C m-2"
+dtype = "float64"
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+sampling = "end"
+application_phase = "after_turbation"
+
+[[field]]
+name = "audit.ltresveg"
+section = "audit_diagnostics"
+role = "audit_diagnostic"
+units = "umol CO2 m-2 s-1"
+dtype = "float64"
+dimensions = ["tile", "pft_and_bare", "soil_layer"]
+sampling = "instantaneous"
+application_phase = "after_heterotrophic_respiration"
+
+[dimensions]
+tile = 1
+pft = 12
+pft_and_bare = 13
+soil_layer = 20
+parameter_pft = 15
+q10_parameter = 4
+
+[dimension_labels]
+tile = "il1:il2"
+pft = "1:icc"
+pft_and_bare = "1:iccp1"
+soil_layer = "1:ignd"
+parameter_pft = "1:kk"
+q10_parameter = "1:4"
+
+[time]
+calendar = "proleptic_gregorian"
+time_standard = "UTC"
+timestamp_format = "ISO-8601"
+step_days = 1.0
+
+[groups]
+field = [
+  { names = ["static.psisat"], section = "static_data", role = "static_data", units = "m", dtype = "float64", dimensions = ["tile", "soil_layer"], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["static.zbotw", "static.delzw"], section = "static_data", role = "static_data", units = "m", dtype = "float64", dimensions = ["tile", "soil_layer"], sampling = "constant", application_phase = "heterotrophic_respiration_and_turbation" },
+  { names = ["static.zbot"], section = "static_data", role = "static_data", units = "m", dtype = "float64", dimensions = ["soil_layer"], sampling = "constant", application_phase = "turbation_geometry" },
+  { names = ["static.bi"], section = "static_data", role = "static_data", units = "1", dtype = "float64", dimensions = ["tile", "soil_layer"], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["static.isand"], section = "static_data", role = "static_data", units = "1", dtype = "int32", dimensions = ["tile", "soil_layer"], sampling = "constant", application_phase = "heterotrophic_respiration_and_turbation" },
+  { names = ["static.sort"], section = "static_data", role = "static_data", units = "1", dtype = "int32", dimensions = ["pft"], sampling = "constant", application_phase = "parameter_lookup" },
+  { names = ["static.mineral_mask"], section = "static_data", role = "static_data", units = "1", dtype = "int32", dimensions = ["tile"], sampling = "constant", application_phase = "all_stage_b_calls" },
+  { names = ["parameter.deltat_days"], section = "static_data", role = "parameter", units = "d", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "pool_update_and_turbation" },
+  { names = ["parameter.tfrez"], section = "static_data", role = "parameter", units = "K", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.zero", "parameter.frozered", "parameter.humicfac_bg", "parameter.kterm"], section = "static_data", role = "parameter", units = "1", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "stage_b_kernel" },
+  { names = ["parameter.tanhq10"], section = "static_data", role = "parameter", units = "1", dtype = "float64", dimensions = ["q10_parameter"], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.bsratelt", "parameter.bsratesc"], section = "static_data", role = "parameter", units = "kg C kgC-1 yr-1", dtype = "float64", dimensions = ["parameter_pft"], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.bsratelt_g", "parameter.bsratesc_g"], section = "static_data", role = "parameter", units = "kg C kgC-1 yr-1", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.r_depthredu"], section = "static_data", role = "parameter", units = "m", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.tcrit"], section = "static_data", role = "parameter", units = "degC", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "heterotrophic_respiration" },
+  { names = ["parameter.humicfac"], section = "static_data", role = "parameter", units = "1", dtype = "float64", dimensions = ["parameter_pft"], sampling = "constant", application_phase = "pool_update" },
+  { names = ["parameter.cryodiffus", "parameter.biodiffus"], section = "static_data", role = "parameter", units = "m2 d-1", dtype = "float64", dimensions = [], sampling = "constant", application_phase = "turbation" },
+  { names = ["parameter.spinfast"], section = "static_data", role = "parameter", units = "1", dtype = "int32", dimensions = [], sampling = "constant", application_phase = "pool_update_and_turbation" },
+  { names = ["parameter.turbation_on"], section = "static_data", role = "parameter", units = "1", dtype = "int32", dimensions = [], sampling = "constant", application_phase = "heterotrophic_respiration_and_turbation" },
+  { names = ["initial.soilcmas"], section = "initial_state", role = "owned_state", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "beginning", application_phase = "transition_start" },
+  { names = ["driver.pre_resp_competition_delta_litter", "driver.pre_resp_competition_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "competition" },
+  { names = ["driver.pre_resp_land_use_delta_litter", "driver.pre_resp_land_use_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "land_use" },
+  { names = ["driver.pre_resp_harvest_delta_litter", "driver.pre_resp_harvest_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "timber_harvest" },
+  { names = ["driver.thliq", "driver.thice"], section = "drivers", role = "external_forcing", units = "m3 m-3", dtype = "float64", dimensions = ["tile", "soil_layer"], sampling = "interval_mean", application_phase = "heterotrophic_respiration" },
+  { names = ["driver.fcancmx"], section = "drivers", role = "external_forcing", units = "1", dtype = "float64", dimensions = ["tile", "pft"], sampling = "instantaneous", application_phase = "before_heterotrophic_respiration" },
+  { names = ["driver.fg"], section = "drivers", role = "external_forcing", units = "1", dtype = "float64", dimensions = ["tile"], sampling = "instantaneous", application_phase = "before_heterotrophic_respiration" },
+  { names = ["driver.rmrveg"], section = "drivers", role = "external_forcing", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile", "pft"], sampling = "interval_mean", application_phase = "pool_update_soilresp_audit" },
+  { names = ["driver.rmr"], section = "drivers", role = "external_forcing", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile"], sampling = "interval_mean", application_phase = "pool_update_unused_v2_argument" },
+  { names = ["driver.max_annual_active_layer"], section = "drivers", role = "external_forcing", units = "m", dtype = "float64", dimensions = ["tile"], sampling = "instantaneous", application_phase = "before_turbation" },
+  { names = ["driver.post_resp_turnover_delta_litter", "driver.post_resp_turnover_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "turnover_and_reproduction" },
+  { names = ["driver.post_resp_mortality_delta_litter", "driver.post_resp_mortality_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "mortality" },
+  { names = ["driver.post_resp_disturbance_delta_litter", "driver.post_resp_disturbance_delta_soil"], section = "drivers", role = "external_forcing", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "interval_sum", application_phase = "disturbance_and_fire" },
+  { names = ["reference.after_pool_update_litrmass", "reference.after_pool_update_soilcmas"], section = "reference_state", role = "reference_state", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["reference.before_turbation_litrmass", "reference.before_turbation_soilcmas"], section = "reference_state", role = "reference_state", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "before_turbation" },
+  { names = ["reference.post_soilcmas"], section = "reference_state", role = "reference_state", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "end", application_phase = "after_turbation" },
+  { names = ["audit.scresveg"], section = "audit_diagnostics", role = "audit_diagnostic", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "after_heterotrophic_respiration" },
+  { names = ["audit.humtrsvg"], section = "audit_diagnostics", role = "audit_diagnostic", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["audit.litter_clamp_correction", "audit.soil_clamp_correction"], section = "audit_diagnostics", role = "audit_diagnostic", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["audit.turbation_delta_litter", "audit.turbation_delta_soil"], section = "audit_diagnostics", role = "audit_diagnostic", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile", "pft_and_bare", "soil_layer"], sampling = "instantaneous", application_phase = "after_turbation" },
+  { names = ["audit.hetrsveg"], section = "audit_diagnostics", role = "audit_diagnostic", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile", "pft_and_bare"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["audit.litres", "audit.socres", "audit.hetrores", "audit.humiftrs"], section = "audit_diagnostics", role = "audit_diagnostic", units = "umol CO2 m-2 s-1", dtype = "float64", dimensions = ["tile"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["audit.soilresp"], section = "audit_diagnostics", role = "audit_diagnostic", units = "kg C m-2 step-1", dtype = "float64", dimensions = ["tile"], sampling = "instantaneous", application_phase = "after_pool_update" },
+  { names = ["audit.turbation_litter_column_residual", "audit.turbation_soil_column_residual"], section = "audit_diagnostics", role = "audit_diagnostic", units = "kg C m-2", dtype = "float64", dimensions = ["tile", "pft_and_bare"], sampling = "instantaneous", application_phase = "after_turbation" },
+]
+
+[authority]
+source_record = "Zenodo 18188101"
+source_archive_sha256 = "8b7a9b7bc50c4b63bdb4aad9e5037406b919100616684a2c1c8c738b6ebe7ef8"
+source_commit = "7dd82c9a48a7c8beb6455a229888c90ba20d8eff"
+executable_sha256 = "20bd7e0b19815f9971a7c9b6afd90d7ddf30223b20be5154e80382298e292b19"
+parameter_namelist_sha256 = "9f3ff5bdbf8e10e5825f4a07e57028cdd376690f7c7bcf765734ea1ab47e16ce"
+job_options_sha256 = "f775e4085d7393a9f6b2ad04e99cdeae0999a51f07e9cb4a4575cf381aa96a06"

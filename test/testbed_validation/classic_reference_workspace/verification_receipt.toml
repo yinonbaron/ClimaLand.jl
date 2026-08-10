@@ -1,0 +1,45 @@
+schema_version = 1
+verified_at = "2026-08-07"
+workspace = "/work/yinonmb/classic-v2-reference"
+canonical_workspace = "/gpfs01/work/yinonmb/classic-v2-reference"
+command = "/work/yinonmb/software/Julia/julia-1.11.2/bin/julia --startup-file=no test/testbed_validation/classic_reference_workspace/classic_workspace.jl verify test/testbed_validation/classic_reference_workspace/manifest.toml /work/yinonmb/classic-v2-reference"
+result = "verified"
+available_bytes = 2671370580262912
+apptainer_version = "apptainer version 1.5.0-1.el9"
+tar_version = "tar (GNU tar) 1.34"
+md5sum_version = "md5sum (GNU coreutils) 8.32"
+
+[[file]]
+resource = "source"
+filename = "classic-CLASSICv2.0.tar.gz"
+bytes = 13563844
+md5 = "7f3082ebc524d21d29c578f4fdf2ca28"
+status = "verified"
+
+[[file]]
+resource = "container"
+filename = "CLASSIC_container.tar.gz"
+bytes = 1716454680
+md5 = "5510acc8ba800aa3ff716683ab8304b7"
+status = "verified"
+
+[[file]]
+resource = "benchmark_collection"
+filename = "Benchmark_CLASSIC_output.tar.gz"
+bytes = 484045022
+md5 = "fb0d8c57e7b926644bf0b9fcdf079a2c"
+status = "verified"
+
+[[file]]
+resource = "benchmark_collection"
+filename = "Benchmark_CLASSIC_plots.tar"
+bytes = 988429312
+md5 = "bd9c5f9a78456ea35c132e17ea18a7c0"
+status = "verified"
+
+[[file]]
+resource = "benchmark_collection"
+filename = "FLUXNET.tar.gz"
+bytes = 473185623
+md5 = "25a26e1cc4664b93a29fc726c4182e5c"
+status = "verified"

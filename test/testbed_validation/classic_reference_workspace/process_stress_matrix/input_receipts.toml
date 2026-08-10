@@ -1,0 +1,890 @@
+path_root = "CLASSIC_REFERENCE_ROOT"
+raw_data_embedded = false
+schema_version = 2
+site_count = 59
+
+[[site]]
+raw_data_embedded = false
+site = "AU-Tum"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/AU-Tum/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/AU-Tum/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/AU-Tum/AU-Tum_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/AU-Tum/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "c3d7822cf95783be2c9f7183e90c0d0c11d3ac7688fd857f58f27dbb6bed17db"
+    precipitation_forcing = "d7b97b90a0efd909b07d6c792efd18f4527c40c4a4e94721d556829b68eb09c9"
+    prepared_initialization = "b683d75788899486648f8d1bf1e726ae51bdf6af5be1ed326a58417340b5d4ff"
+    site_metadata = "5d92cceb0ead3c923ee25fa6302d6cd08f117ab447c0728090830634f75665e2"
+[[site]]
+raw_data_embedded = false
+site = "BR-Sa1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/BR-Sa1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/BR-Sa1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/BR-Sa1/BR-Sa1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/BR-Sa1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "228dfbffcd5f01e10df5ae68c98ce4ea92f565fa057b6e591eacac2122e4c0ea"
+    precipitation_forcing = "0432a1e3fa0ea61b511b20bcb56be8b620a999d0f43b7985f81c3d621dc55761"
+    prepared_initialization = "9c85ad52331c9a4da1ce889ef69e2f38bd62526e55147374946a3e8cf6511c15"
+    site_metadata = "109c62f714f93359ef05c74eaac2f8d6d261c106199be5ebe33459775be303c3"
+[[site]]
+raw_data_embedded = false
+site = "CA-Ca1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Ca1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Ca1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Ca1/CA-Ca1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Ca1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "a92b2abb3d6788922108c7fd43929e717a49f799f966943a9e8eb3a0e510a9f0"
+    precipitation_forcing = "9e986ca963e24a9ea7fc89825d172bad36236277fbea981235188888502df000"
+    prepared_initialization = "a6e66bf25d98d076ad0f0c771a67178fc1f832e289a29ca016d497f5bb52ad78"
+    site_metadata = "7eb26ec8b6fc1a4f8062f72888c2d838dbaadd14e865641f1e4d4d8ef83df5c6"
+[[site]]
+raw_data_embedded = false
+site = "CA-Cbo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Cbo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Cbo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Cbo/CA-Cbo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Cbo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "ca091bef5609905371635eef39a610070e20c12346b188344ffb77853a3078f5"
+    precipitation_forcing = "39d83ff5ec757e8a87c8e8349dfc06658dbb5a27030e4e1a913eec143ef1e9d5"
+    prepared_initialization = "b12e3b72ffd6d08ffb3a2ac3f632dcf89e889c0c4323009c6d1a7a5b805c6bb9"
+    site_metadata = "a6ef171c50c2e15d20dbd882002d89ee1522ff2ae0a2ca844b194b0de55266e5"
+[[site]]
+raw_data_embedded = false
+site = "CA-DL1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-DL1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-DL1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-DL1/CA-DL1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-DL1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "62b4cdf1697f8f717169b1a53ffc4861dfee414c1c6123043be55832e8b6ca0f"
+    precipitation_forcing = "b9b219c16753228df24f684a58dcb441e4e9576d393514e70ef0c2d85d04788f"
+    prepared_initialization = "c914fc028addaa27f5718d944d417fcb94dd5e6793634af528a8d6815af98faf"
+    site_metadata = "7ed0cbd21a985c943c1a6cc53c5e44755bc2646420da4aed3e562190931070b4"
+[[site]]
+raw_data_embedded = false
+site = "CA-Gro"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Gro/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Gro/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Gro/CA-Gro_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Gro/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "e664db87a95fb8fca5086c3d768fa4b0728f423dcdc4a6022b1282416b9ab86f"
+    precipitation_forcing = "5b2f249d10f277f51106f0964213ce8251f219876bb211d368a62f0ac1c30343"
+    prepared_initialization = "2584aad8f90f723f011b68db066b8b09b46e3e4901a69e0f114d3267f4cd50cd"
+    site_metadata = "fcd63c7dc2b32f69eb971f2c19c7865f57f4879b0fd2325d3de1f4290eaee538"
+[[site]]
+raw_data_embedded = false
+site = "CA-HPC"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-HPC/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-HPC/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-HPC/CA-HPC_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-HPC/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "6447ef143480e57d1f4b9cb3f696e93a06b95617a67bcec000412f26fb3f2b7b"
+    precipitation_forcing = "c548beca2ed270ec93f49081370068d1281cccb8e694c6b4dff17a74d03cb561"
+    prepared_initialization = "3b0f492151b8cc334b7798aeacff0da833d54cb02f9ea6cfea1ccd139fe5b495"
+    site_metadata = "b105f7cd6ab1bb8390393e069e71c237c62cb3fa792b9661f3d5570f7c2be0a6"
+[[site]]
+raw_data_embedded = false
+site = "CA-Man"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Man/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Man/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Man/CA-Man_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Man/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "c5ed12bab8bb5d9ce5813ff4a7f03e563ef62601d71090bf77a2d7e4648e802d"
+    precipitation_forcing = "d461e9c5e09684659b0f692e663ea4bfee47900887dbf1f7e5727080095073ee"
+    prepared_initialization = "ea3187930758ec8bc0ce020c32c5a4c26e12f3bfa5143dfd238e1e4b0c450426"
+    site_metadata = "8dfee16cb82bc4c376d30ef14d96e65c06fabd7cf2a07b48a160b2f081adbeda"
+[[site]]
+raw_data_embedded = false
+site = "CA-Mer"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Mer/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Mer/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Mer/CA-Mer_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Mer/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0a66d068816e9a41b34786889c3dc0fb27e10875735e82f01fc047e65584b56c"
+    precipitation_forcing = "c8886599f2c05e248997601754a85dd597e4512fbf889f87f690578201e14412"
+    prepared_initialization = "499bbcf3abf4e279d77b9775170a128f627323d645131fc33f4bb8a8a6a4a92d"
+    site_metadata = "54c5982f2bc0c64a02f1f3d41914b2fb4eb9fcc4ee0e1e2c2cc6ba0ca5505be0"
+[[site]]
+raw_data_embedded = false
+site = "CA-Oas"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Oas/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Oas/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Oas/CA-Oas_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Oas/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "e60b3a3f7f807dfc37447b185db83bb8f03b74ac19e81b54e5d28921e8df6f9a"
+    precipitation_forcing = "7061b5495e6117337a0c92c44daf2398405c115d05c5424340eeeaff33bd26a1"
+    prepared_initialization = "8fe407ae62b98b95008982085dd4ba35fb65a5ccb3f72b281e559abb4c4b42d7"
+    site_metadata = "95c56f3b90a31ff65742c77594b19c743862ee6694bfaeee4c6aeec4ad7e6129"
+[[site]]
+raw_data_embedded = false
+site = "CA-Obs"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Obs/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Obs/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Obs/CA-Obs_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Obs/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "2aa0739be57f55bdb9df4de642a3faf555516e2b06dd6e984f658017eacee704"
+    precipitation_forcing = "c2f07280cd1cca23cf81080c1ae24d7d2159fc94716e8a90658333fae0de4c6a"
+    prepared_initialization = "11d48d8959849339192435bc5b0ab409c80d14b5cd38935622fa24c56eaa5a3d"
+    site_metadata = "db893c79d3299bc0882853e62d5f917cfbc03beb476b50034ce88aa1d9ebd4d1"
+[[site]]
+raw_data_embedded = false
+site = "CA-Qfo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Qfo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-Qfo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-Qfo/CA-Qfo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-Qfo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0ac992bed778f4f40a4a4ba82ab1b90ec6bbfce28d46555f665e808e9e5ab04e"
+    precipitation_forcing = "675039830e1cc0c36ca5a13199dc97046d28ef38ed32e39afcb2e15ef1ac7400"
+    prepared_initialization = "22e52650cca54920dde62dc6786066ddf6e62a26804be725e7ad77d82c6c5ed1"
+    site_metadata = "64ab4582cf2df7b66848fc9370f5748f8ef65450a57a70ecb7b312ce6e31cbc0"
+[[site]]
+raw_data_embedded = false
+site = "CA-SMC"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-SMC/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-SMC/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-SMC/CA-SMC_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-SMC/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "dcfb9fb09dc788931513f22c3a6e13f3692937919852a271071bb29f935ff605"
+    precipitation_forcing = "e298126997211ae5d978af0e95f14e8bc22d2af09055b7afacf24c68cf27572d"
+    prepared_initialization = "6c642fb108a4efce3cdce4594f966548aaee92ff68d16b80405b2a5f79a1ad59"
+    site_metadata = "8b76fd16faeef07f76133c5ca913e51e61a5d7036973847db8177c358d11b6e1"
+[[site]]
+raw_data_embedded = false
+site = "CA-TP4"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TP4/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TP4/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-TP4/CA-TP4_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-TP4/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "099084d40edc4f75621c14e7ed7f24363feb6109948aa193f1a48218a990ab9c"
+    precipitation_forcing = "d898ff273d9a72ff4fe081061eecdf725c12ef3cb301b0c66d9d22595a39a692"
+    prepared_initialization = "fae218346cd220a98b19de34d25d7171a7b49c6efef46806c35188aa875e37a9"
+    site_metadata = "ef27d0facca6d0a612b0564a4edde4928a194e8e2b823dd4713e9a1d373aa7ea"
+[[site]]
+raw_data_embedded = false
+site = "CA-TPD"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TPD/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TPD/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-TPD/CA-TPD_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-TPD/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "c69c168f3bad0e1f7c9d235d45929289cc5532537b57061568d32c37a5227c5b"
+    precipitation_forcing = "c9e59fd40efcd546b3d064d330f8d6f4d9f43f92a310a385f11976ff34fccf37"
+    prepared_initialization = "11c7ac6ce1d826179c7a0c720f401abd1ff603f43e8a90db67fe9a34a81c3f2c"
+    site_metadata = "d6bde711ebf7028cdd0a7f9b5b1c5034c6955303643ca3cfe4c6859e2dbeaae7"
+[[site]]
+raw_data_embedded = false
+site = "CA-TVC"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TVC/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-TVC/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-TVC/CA-TVC_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-TVC/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "d55d8b80d208b22f8b2b600908141d45a757ce097ccf7fb7171b34a3b951fdd5"
+    precipitation_forcing = "0bee2f4cdf683acc2fc5609ae64426f35f1088824f54e882397a137e8d86334e"
+    prepared_initialization = "1342b6efef53c26caf3ecf871082f34ef6d76425e9386fa337ae704bf909a048"
+    site_metadata = "8c2b690c080f5c170a9fc6da86a21a8067d424cc86b698f67dc1d9457b05a7b0"
+[[site]]
+raw_data_embedded = false
+site = "CA-WP1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-WP1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CA-WP1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CA-WP1/CA-WP1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CA-WP1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "d81258c7a569c63317d226c2ce9df326ef983cda95f3905685b82798adaf8e09"
+    precipitation_forcing = "fa2ea3f179f5da97ce4d910a96ad813e47d1ba31b67d2b8ecda2abef186f0566"
+    prepared_initialization = "27a3a53b3e6a20a2f49e8467d455f2d9f492b88bfd38cecf2ebbc52172bb4d27"
+    site_metadata = "54c4d68fe6026392b34b9da726390d798789d803ae5ab57da743dd4ba56a0445"
+[[site]]
+raw_data_embedded = false
+site = "CG-Tch"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CG-Tch/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CG-Tch/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CG-Tch/CG-Tch_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CG-Tch/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "323a4d15067f0334cbf4e570e5d8a967e31d08beda294d0b7d0e94523e8f71d0"
+    precipitation_forcing = "1f257cf0ff9d6c8cc30653de3de153a743f5c0c9325dfd10f33c34498c07c930"
+    prepared_initialization = "84dd65ed2b6c97803dc5a22404dca7c97fefb3fc5d7341ef5e7ad1d7751152ad"
+    site_metadata = "a30ab2b78e219ef8f3ac4bfb453564f3c8b373cd79a7b0b0fb078a7b0845abfb"
+[[site]]
+raw_data_embedded = false
+site = "CN-Dan"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CN-Dan/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CN-Dan/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CN-Dan/CN-Dan_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CN-Dan/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "3ac58e14c9729ce1c6e4f8015631ec386e498e57b927f5079fcbbe6c57fdc690"
+    precipitation_forcing = "3972a01c21170fd48c8513d6ea45018081b5b1570a2c33af16926e22729a96d5"
+    prepared_initialization = "cda6ab408dbf50a02fb1085dfe083f78cb8e76d4c321975971dfeaaef409f99d"
+    site_metadata = "e1b6abc4236b6759f13c937a2b0e3ec5107bc8855aa3db97ed4ffb8f8aafa4a2"
+[[site]]
+raw_data_embedded = false
+site = "CZ-BK1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CZ-BK1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/CZ-BK1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/CZ-BK1/CZ-BK1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/CZ-BK1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "f847be512985acc86299b24e487f8b00c0be760806d5fa6ea606a872d720c507"
+    precipitation_forcing = "30178de7ec375751bc2cb8c585dea41ec8440d2172c82d816b5838ae7cad5d59"
+    prepared_initialization = "ed900d729f194726c6fac1aad3fa03be0bab032ec0ce62e87117f657a37cf61c"
+    site_metadata = "b7bbe6af4fa5ad171899fea075bc3eb068b087a3ffd8ad62711fdcc0b0639e97"
+[[site]]
+raw_data_embedded = false
+site = "DE-Hai"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Hai/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Hai/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/DE-Hai/DE-Hai_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/DE-Hai/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "8cc633419d93c08fce37ae8e02f936e7825b38deb72eb18d6ab35e11cb579343"
+    precipitation_forcing = "7ff44dff499c60df41d89a15d851b711a4a7ff1c33a80f8e26b24f6e2805cb0b"
+    prepared_initialization = "2f466cf7b02c17590c86e04490c72493e33789eb5b9c18e2a1a189a5c36c6291"
+    site_metadata = "2cb47075bab3510a3fb722e461cc21b01cd2142f74e0f540381013df9b9d1011"
+[[site]]
+raw_data_embedded = false
+site = "DE-Kli"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Kli/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Kli/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/DE-Kli/DE-Kli_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/DE-Kli/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "d4589b705d92c55b026db7557dda1f7a0f2beb264b53bfecc1418954e4d24f5e"
+    precipitation_forcing = "2e1861fa7ef17f6508c05ad9583b7cff0656c727387cd510a23fedfac76cf695"
+    prepared_initialization = "11426f0c315d00cc6e3f60ac6a2e846849ed86335699b3eed40482b5e834909a"
+    site_metadata = "9ce5217139b328b5ad78e69fb3568be11078fc71732d3b930c4a63d4f415da00"
+[[site]]
+raw_data_embedded = false
+site = "DE-Tha"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Tha/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DE-Tha/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/DE-Tha/DE-Tha_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/DE-Tha/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "487279adb8d6937bd715fbe2604174ae3929cd5f94c71411b6c62bd47735dae5"
+    precipitation_forcing = "3e0bbe61e8635773d345296a7c697ff0659e806f49f5695df32759cb49884163"
+    prepared_initialization = "d017516d58ce757d3486a9145e52d4907c92aa5e036dc00b488163e3012f2967"
+    site_metadata = "ab996d7481936fde352772131a1c3e5b064d50cb3f659679e1bf9c0ee6b90b59"
+[[site]]
+raw_data_embedded = false
+site = "DK-Sor"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DK-Sor/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/DK-Sor/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/DK-Sor/DK-Sor_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/DK-Sor/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5d4ace7fb48655b55d7736c3b497a5510886ce0ec7b1d27963bff257632b105c"
+    precipitation_forcing = "98667fe11193aa7355b540b334076055f1b3306a3bf943dde56460d4d93126f4"
+    prepared_initialization = "1948626bd4be69351c403cf96b55b1beafa091d377d54fb8ce66de2ee216672b"
+    site_metadata = "3e385e041c2fdb0d7888a5ae3830c401d160b22d413fd844b937310b59d3d00d"
+[[site]]
+raw_data_embedded = false
+site = "ES-Amo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-Amo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-Amo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/ES-Amo/ES-Amo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/ES-Amo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0761c123e8b291b9baf2abd4dcd0ef5e489b0d70172951687d27994d424d6d70"
+    precipitation_forcing = "3350dc8480bf3d3c0b61d0a14729cf522b45d186add910845f27d1ca8d05a86b"
+    prepared_initialization = "3d64291ba7860f5f480d2e425d2cdc2d9037f19950301b681cca18b9abdc162f"
+    site_metadata = "a904e962f968d45226a9e20f8ac106cb901a2bb6f19d27723dee8819ad218b4d"
+[[site]]
+raw_data_embedded = false
+site = "ES-LJu"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-LJu/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-LJu/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/ES-LJu/ES-LJu_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/ES-LJu/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5dbbc17fb0e3b493c7da45e623f421bf41654eb1b7c5fc54b6675910909bc1b4"
+    precipitation_forcing = "65f0d7d1b7779b1983732c523f1b6deb18a3fd0e6873580a199da24e3f70e919"
+    prepared_initialization = "319e37b66ae15b026e0e2c456d8614b75e6c19c31a3fdc6a8186e932a3709a58"
+    site_metadata = "846b74c09d65aab6c643744af6dbbd99e30b7a17a2a6f64e2d982cfee1be2ce8"
+[[site]]
+raw_data_embedded = false
+site = "ES-LgS"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-LgS/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ES-LgS/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/ES-LgS/ES-LgS_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/ES-LgS/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "2453f3402aa6f9a785748646021f8c1b9da5319eb7b4aec57d2071d2eeba168b"
+    precipitation_forcing = "f4dde7ce797ed650e8e994bcf2f135e4481e12bcc69ec3c9ac33b1824f79ef9c"
+    prepared_initialization = "4afcf0fa25267cfd38027695ffb61218476fd138589c29cf94c3f35fb7725a9d"
+    site_metadata = "04de1df87fea459956a30927ad7ebb6a2301a39837f73fde2e013a2f0fcd2dd7"
+[[site]]
+raw_data_embedded = false
+site = "FI-Hyy"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FI-Hyy/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FI-Hyy/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/FI-Hyy/FI-Hyy_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/FI-Hyy/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "dda7d9a4e3d38a56dde8b15df518d326efdb534ac74861d4b56c4bc9e56c46f0"
+    precipitation_forcing = "820bb2dcaf5651d373abd5bd3cd4b6c5f095408727a91954d44ad93ff605b09a"
+    prepared_initialization = "294d045fc1a49c8faae06e7e29d87a939971554b3b5cdb402bb3a0331b6ba141"
+    site_metadata = "571bee32f8947ebb3042f94dcb7f20997f2b62e9104cef493eff935aaf53a2a9"
+[[site]]
+raw_data_embedded = false
+site = "FR-Fon"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FR-Fon/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FR-Fon/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/FR-Fon/FR-Fon_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/FR-Fon/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "2dab912dff3da67d057e812926ee53d7a6584e430a396fa96cf0cb210e4fdf9b"
+    precipitation_forcing = "4188e83003b578d2d7504727a5b23b7c0bc36eccc0bb3167688fb0827dfbab2d"
+    prepared_initialization = "42b2f036629897bb2b4a37b79b6cffb2686f4163c4ef99707d161912ef53b94f"
+    site_metadata = "2d6df50929ef107af859955ea5f8b8737bc8c27ee4e8f8477876b44dadab2cd6"
+[[site]]
+raw_data_embedded = false
+site = "FR-Pue"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FR-Pue/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/FR-Pue/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/FR-Pue/FR-Pue_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/FR-Pue/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5f012d56b58febb13d07dce6c97ab232ae290638148b8c123704718aefcf967c"
+    precipitation_forcing = "203477ddba3e89e968d5f081b00734849d38b5e67e9ee09e385f6c1764a43471"
+    prepared_initialization = "4186233ae83cf1f3bfc45625b264a7831cd9d8b1d3ea59cb3a37e10735a22b73"
+    site_metadata = "9fd4f5b1a682031ce3af3067d7299a1cf4a6def41ac10a4d5e8886f465021522"
+[[site]]
+raw_data_embedded = false
+site = "GF-Guy"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GF-Guy/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GF-Guy/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/GF-Guy/GF-Guy_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/GF-Guy/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5da786a7b61bb8b9490c3650eaf13be465a5824fcf2373cde92733bb2ccb033f"
+    precipitation_forcing = "10723fc7f5e7fc58ab5a9300c107fa74a019ee822886131e131fe7c49838a4a0"
+    prepared_initialization = "b9587cd009019eda7ef495411276ec164cd36a34374a98a36dda6c9998e47e49"
+    site_metadata = "2d3545d7f10f79c9460326be1a1910170685e1fc27f5b35dc1806f5473477c66"
+[[site]]
+raw_data_embedded = false
+site = "GH-Ank"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GH-Ank/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GH-Ank/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/GH-Ank/GH-Ank_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/GH-Ank/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "746fa67f3731fdda552a4adafebcd2cac681373ac98998073ba5b149a30e3ab0"
+    precipitation_forcing = "e5881073826efadf6ca80ffd1a376242b247ded0a35660fd186cce6d3e3be25a"
+    prepared_initialization = "176edde2e1ef68ae48b34edfbeb80db581ebe2c5e045c738ba8e919ee6d2c6e2"
+    site_metadata = "00bf02e708d0c2317d6cfabea0078768759dab49f75de6d86aa1ae267c96d8ce"
+[[site]]
+raw_data_embedded = false
+site = "GL-ZaH"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GL-ZaH/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/GL-ZaH/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/GL-ZaH/GL-ZaH_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/GL-ZaH/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "64573011ecf5311e4028b6e37f4c89faab858075e10826a425715f0d710697e0"
+    precipitation_forcing = "9718c4d423fe930dca3c177614b1db3262e47e491c55d0e34c837b1b0f74fcf4"
+    prepared_initialization = "7bea4816a92b02553fc7dc28b272b57dce41bb50e72447b5bcb9d9a8661e00c6"
+    site_metadata = "7e8c64ca18d2b7577c5d236869fd14340d586cfc81bdf4f23fd5e4a96a9056a5"
+[[site]]
+raw_data_embedded = false
+site = "IT-Lav"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Lav/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Lav/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/IT-Lav/IT-Lav_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/IT-Lav/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "f707b7303cfe9ce686277de1d9528ead9c3d8f110189ea2520d12af83712070e"
+    precipitation_forcing = "a7e7689d65c5bb85c4b48a358b7fed9cae0b7cfa4f7d7b73c14a260dcc2412eb"
+    prepared_initialization = "3bdd3068c986961e7895a23267eb9fa16a5e3f8c16230c9960256e6e56361ae7"
+    site_metadata = "4c6f1cb429648c3fb56da4b17a7ec4f8149ded42ee167a0f2988f62a55d7174a"
+[[site]]
+raw_data_embedded = false
+site = "IT-Noe"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Noe/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Noe/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/IT-Noe/IT-Noe_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/IT-Noe/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "12b4d6a2f82f139177b9e04f10c5ea9a18bb2cd07dd8795da1f2f925e8c448ac"
+    precipitation_forcing = "fadd55baef44adeefd132a5a9d82618820cd7d4ecf69e6ae33b9106fa7b3c323"
+    prepared_initialization = "52cf7fa2aa677e562c7b6180aa0d38335dcd3c69d7033ee22459a9912ffc86b6"
+    site_metadata = "dc474a249bdbecc2978f6437b9aa25bdefabde33d7b1e4f033f08151930d4942"
+[[site]]
+raw_data_embedded = false
+site = "IT-SRo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-SRo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-SRo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/IT-SRo/IT-SRo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/IT-SRo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "b03688130fb776eac59bb1c9da61eab44946ec4d8a942316418076fb2cacbdc3"
+    precipitation_forcing = "39255816f84e38c006905508a37f8f152118e0cd9b3a501bef829e3f9502600e"
+    prepared_initialization = "6704c0274cc992f0cac757d3a49e4d78c76e734ad4ac00914751d9e74d901dbb"
+    site_metadata = "e5a855dcf55f864743c5186b30bc3e1016471340f1b0bed97a6c32b3141e33ab"
+[[site]]
+raw_data_embedded = false
+site = "IT-Tor"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Tor/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/IT-Tor/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/IT-Tor/IT-Tor_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/IT-Tor/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "d84d4dcfe911bffcb1d1ed2ff32c6abe0a183240106f0c400e1793c06034bffe"
+    precipitation_forcing = "c41f101dc5a231f2af073d17529daa39e5c15126d2bbf12b4f1200f3d6ed6afa"
+    prepared_initialization = "daa8a438a9bc7ff110a913b0232fe2d4a23512f80d74f4110e2dfbf893f708eb"
+    site_metadata = "d430da64591f2404cfd763fa8d9492dd995c75ff4f1ecf563c69d79fc876623f"
+[[site]]
+raw_data_embedded = false
+site = "MY-PSO"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/MY-PSO/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/MY-PSO/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/MY-PSO/MY-PSO_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/MY-PSO/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5fb65bf8e251ff995ec2267a69baa47522cdeb494914fac6983f2f988cdb6008"
+    precipitation_forcing = "f6733118ab5fc8104f670e23225f9bf3835ab2adfd0375df1e3f82c442c379bc"
+    prepared_initialization = "4476dbfa718d99e2b9265e2b7a8a49488a27978d9a31f30edb0a3c0203e2edd0"
+    site_metadata = "627d362df8335a7973bf5dbe5dcaa409d25ecd71b6476b867724c3fab60d2636"
+[[site]]
+raw_data_embedded = false
+site = "NL-Loo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/NL-Loo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/NL-Loo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/NL-Loo/NL-Loo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/NL-Loo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0f0894b91d1b6f52a956be23aa0ee83debee8df798adb8df5bb0ffa696d34e80"
+    precipitation_forcing = "88320c877572df2cb39496ea0db040fc0d6deecdd05259f33f579a2e8b957336"
+    prepared_initialization = "e88e232e0811299f6e346fca911f4ec6dc3cdb2826bc9d477ac4dc26b746a7c9"
+    site_metadata = "09ea0a48155869eb64e29a4c9213b8ec799f76ae04f1c8de54e4259d2bca4ef0"
+[[site]]
+raw_data_embedded = false
+site = "PA-SPs"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/PA-SPs/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/PA-SPs/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/PA-SPs/PA-SPs_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/PA-SPs/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "4e6eba3c65758ad827101514c75fa46bd6215c2a453ac5763299796aec45d12e"
+    precipitation_forcing = "d8eba4a147127378d54f76d58a38d9a9f1603cfb1a08372ac6dace31b01c0e89"
+    prepared_initialization = "0ace868d242f138f6453a02ece3619fb8ba86b4b7925834bb2353aa77f2f0a17"
+    site_metadata = "bc19b62cadb76a7a7431777c88cdeef3cec59a405f382b9816b2b485a169cbdb"
+[[site]]
+raw_data_embedded = false
+site = "RU-Che"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Che/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Che/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/RU-Che/RU-Che_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/RU-Che/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "4e7a77f30a13a87decbe175cd1dcf2291a9589ad9f0b9bc29b7d46367711c280"
+    precipitation_forcing = "5a8302bdee89cc5820f66defed5695c8ca64e46b8e8623ca265acffc645bff4b"
+    prepared_initialization = "7b1974f17db7767e7910d69cc4a12af810db47f1df28cca348f15ec37a908c30"
+    site_metadata = "8c5d29eb7edaaaf7c1a909710a6784632a886c0a7d0e621dfa6c8490f41156cf"
+[[site]]
+raw_data_embedded = false
+site = "RU-Fyo"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Fyo/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Fyo/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/RU-Fyo/RU-Fyo_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/RU-Fyo/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "9d187e99d3ade8f0850f1732959896de41ebf4c90dad9bb09f53dc8de4a351fc"
+    precipitation_forcing = "edadbb5cd48980bc1984698d4fc23566d2bf13cbd315b3398f7660812dd2a9ee"
+    prepared_initialization = "621aaf08605f9c957bc86a97d9f3e9dd2ecbd9290dce3ecfbf90ae062f48aa46"
+    site_metadata = "474c3f0d6eccebb6d838fd1308793cede638befd03e15105c0faf55d6f62aea6"
+[[site]]
+raw_data_embedded = false
+site = "RU-Ha1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Ha1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Ha1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/RU-Ha1/RU-Ha1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/RU-Ha1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "4c85bfeb8b8d5d24d6a1af3e87c98ad6ebd24e661ee341464b759a3db2e26e17"
+    precipitation_forcing = "f81838c94939ba6bcadf0abb75b7181d5279962680679adb8cb7e62e831f49df"
+    prepared_initialization = "cdb7c06a0d824a270583b30e30813e004c5020609f22105ecb175eebbab31386"
+    site_metadata = "592b600c20553a448aef7e95011b3064fc7ce7f642ed55ce8d1f53b5ec602365"
+[[site]]
+raw_data_embedded = false
+site = "RU-Sam"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Sam/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-Sam/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/RU-Sam/RU-Sam_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/RU-Sam/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "8eee5ccaf298ea09f23aab7810ab5f226ee51cd24ed78dde9a0f95b307e6725d"
+    precipitation_forcing = "cde198fea30dfdd9ad30a0114a55c65bd1bcc4c92592b7ac41ed8ac45e27679e"
+    prepared_initialization = "0b217f62306df190a11836b6d47c3bfde86d126bad80ef9ceb187fc65bfc0b16"
+    site_metadata = "0089f4dde89aace14d9264862795239ed7bdf230097895b9935ccca5a2c854f6"
+[[site]]
+raw_data_embedded = false
+site = "RU-SkP"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-SkP/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/RU-SkP/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/RU-SkP/RU-SkP_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/RU-SkP/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "230a093e2feddbcfb6c56dedc7f4412b040e4023204d3cef8ffca7e450227e04"
+    precipitation_forcing = "824c19e8f6dcc552907aa5570fd6152513a73618838084da042395b3f4aa3101"
+    prepared_initialization = "2e57eafbfd51fb96600b2981cc4e650ebddead1fa42465710c173721bbc5fb43"
+    site_metadata = "b20dc715330c8f8fc808ea1b6949de0976d297faa00da5c13a9f5feefd774fd3"
+[[site]]
+raw_data_embedded = false
+site = "SD-Dem"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/SD-Dem/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/SD-Dem/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/SD-Dem/SD-Dem_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/SD-Dem/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "9bc0c6d39697ae793d8051305ed2c32dc55475610e1f6ee4d87c45cd512c8092"
+    precipitation_forcing = "505b73ce8d6a059ab4f90e05f979ef3522fab4394c7e8337a1d3065c6421b2cb"
+    prepared_initialization = "c2f196a09c291a399d1cb93e38294db7497d3403b66709b1559a22348f9993ec"
+    site_metadata = "0f68563e8782f5ea38ab70c4d70933f97dd954d2ffbdcd4cd5bc81064618f36d"
+[[site]]
+raw_data_embedded = false
+site = "US-BZS"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-BZS/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-BZS/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-BZS/US-BZS_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-BZS/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "1548e84c5c4d7d19ec25c60b740aa6a6f2c3946e5d9208fcff162b55a19325a8"
+    precipitation_forcing = "f915d163f3bf6cc4290f7fa5819ddc61d5dc2e5cd5317c2a3f4317fe7686b570"
+    prepared_initialization = "81b1a65ede52455de374eecf71d38ed1028eda45baf5c8138ff72844220cf5e8"
+    site_metadata = "ddb28ccba566424e352079fedc0894ed9077df28aa38db7f5cb8cd92d3dd9838"
+[[site]]
+raw_data_embedded = false
+site = "US-Ha1"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Ha1/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Ha1/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Ha1/US-Ha1_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Ha1/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "cefd81e8430fb9ccf0d8e890742a185a517742e51aea801700cf139c86a2fcc6"
+    precipitation_forcing = "688c3d5d01952693fbadc0c06ee0bf8ecdee387f59c79db1fde4f63c5f7bc094"
+    prepared_initialization = "88e654131e085b77251069158daaeaec9823319921b673dc892f5ec58f54bff1"
+    site_metadata = "9285b5ae1d76a189f2d3883fdbe6220ae8b0fe3c9ba8233e56b68e858a48a9e0"
+[[site]]
+raw_data_embedded = false
+site = "US-MMS"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-MMS/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-MMS/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-MMS/US-MMS_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-MMS/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "2b213f637f6322753fbff3d3443cbd35b18f2fb93acc0a70a15507f7ba927550"
+    precipitation_forcing = "0a152335bc5931b2f81ecd67eacc99bb6d6446511652d6c9ea8e0ea52dbbb3d9"
+    prepared_initialization = "0626e764fd58a1becbeae9649fb80162b8943561fe6cedb1a637816ae9cf9e0c"
+    site_metadata = "3c9c757fc7326af7178eee0c94bfb9a29b9e6d4b7362d82af15d59023a177545"
+[[site]]
+raw_data_embedded = false
+site = "US-Prr"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Prr/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Prr/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Prr/US-Prr_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Prr/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "dcf73cd489886c45a9cf9e3afca89495cc3699253eb6e554618c701396353e6b"
+    precipitation_forcing = "566f3c420d4b017078b4f2af0ea8f08468d0461f77ef26a62e4e8134599633f6"
+    prepared_initialization = "47a3063c1849b1486a24c7ddcac9db3818f736a54d8774a92698c9cb4578ba71"
+    site_metadata = "994b2317be365907f9c31c584ff179687600b3728669f7843df3bec7795775de"
+[[site]]
+raw_data_embedded = false
+site = "US-SRC"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-SRC/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-SRC/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-SRC/US-SRC_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-SRC/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "f94e03946605087e174fb56507bcc705f8a2c70ab9f43034c697fad9a6b163a9"
+    precipitation_forcing = "99ad38a9d298dfe4f6406caffd9dc86f9b045bf6d1412812de6e2747ec2a60e4"
+    prepared_initialization = "9be80bb3d211bd47ee47fc48d21a4dc440fa257425381d3fff612f35fdb08dde"
+    site_metadata = "0034874cc490577edbdd82319f617f89f34273e64cdbeb713105b816df3ac826"
+[[site]]
+raw_data_embedded = false
+site = "US-Sta"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Sta/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Sta/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Sta/US-Sta_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Sta/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "5ce0bcffc1f563071c7b83980a1a9c829557bedc323ed2f86b541c3a0df56c79"
+    precipitation_forcing = "8f91990312cf91bfca8c44ecf0b24bc8ab3867a3d8fbf588fc68aca85a9e516f"
+    prepared_initialization = "fbe7e25b6d97331fff476615e6c6fd9205f708ffe52ed5d0366b9c82e0e639fc"
+    site_metadata = "5564a8ecf8ee0c51c8a69e70e057e9b286f902072dc066bd320b67e82b45d187"
+[[site]]
+raw_data_embedded = false
+site = "US-UMB"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-UMB/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-UMB/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-UMB/US-UMB_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-UMB/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "88ab2400e53aac23b2fda297ce1cb711952afad1f64efc2d1605870644c801a2"
+    precipitation_forcing = "1622f360a7108dd9204b89eab7c6006480fdbf0cfc86baf9270be36a76363b08"
+    prepared_initialization = "d3139bed2c39045cd896ab0bcab12efa01465dab35dac63f184f963682999643"
+    site_metadata = "fc8723162d5ba9f85d94b71336f5d45d2df1d34d90eb651d580150125d949ea8"
+[[site]]
+raw_data_embedded = false
+site = "US-Uaf"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Uaf/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Uaf/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Uaf/US-Uaf_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Uaf/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "be6194da0e258ee7d4506e37b65457400902c6461d314e551f5e0fa397463731"
+    precipitation_forcing = "d83f6aba69421d8e2eb51e91b4f8de2c1303717d4419020314e8c9aef0427f37"
+    prepared_initialization = "4db1e3994c9952a33109e09bb4fcd74a16cb55a7d5a67b2277a43123ad592f08"
+    site_metadata = "a138a047b9532cf883f666e4137d2d7d611c58e96d24c2105ae159a2edd26371"
+[[site]]
+raw_data_embedded = false
+site = "US-WCr"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-WCr/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-WCr/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-WCr/US-WCr_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-WCr/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "e425c2f2558f6a4dc4535ceb5df6fee5a29e3792c01bbfc5ca2764c5a6e002ed"
+    precipitation_forcing = "4224d16f50569ec77ba9492cc25fd173d570e77fb2fe6e08998a57f8f73b4a27"
+    prepared_initialization = "0d229069644627a25c0cfa6f56157553efb8b0475e468e9b860284e07786f43f"
+    site_metadata = "0530074f982bbaa43bafb9483a909a6bcccf5ced43b1931e7e4294efd5b6589a"
+[[site]]
+raw_data_embedded = false
+site = "US-Whs"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Whs/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Whs/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Whs/US-Whs_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Whs/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "87f15418223e1ac365ad973926e48d268f93a6195a6494a624860b0f2e4a73a0"
+    precipitation_forcing = "6483f504906bb5e0540d5c38c972bc3ab56e05a026db255d69b5200b9245db08"
+    prepared_initialization = "4dd921b4db89e4cf78b3a45ce51afad8e95fcbd4a4836c830c466704ef87da0c"
+    site_metadata = "11670051d0b3b10c3e1233844907c285f08268adc69927552caff6cc75df9670"
+[[site]]
+raw_data_embedded = false
+site = "US-Wkg"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Wkg/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/US-Wkg/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/US-Wkg/US-Wkg_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/US-Wkg/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "240e7d4e13d8a6bde5a2cb1803f3180c2ccf348d6b78d795eb1cb6038d5e3ba8"
+    precipitation_forcing = "51a6e77ea2cf61a15690ead82e9d9fc83b289f1c899d27d29924955fa9b8446d"
+    prepared_initialization = "86ac2df8db79b2469f787f915049c1098bba9a6e18b199cf3bf824488befdf39"
+    site_metadata = "d7b50a43bc8531daf74c11a5bee81b0934d2c88f292048170a69b4d9c7d9cbb2"
+[[site]]
+raw_data_embedded = false
+site = "ZA-Kru"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ZA-Kru/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ZA-Kru/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/ZA-Kru/ZA-Kru_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/ZA-Kru/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0df681c27e486c02388fbbaa29a630ae030337268bbbce589e7310d2e0d88d02"
+    precipitation_forcing = "48b868518c128716d02168f837eefd51e1188244f0a1375ab824b09d481d1a87"
+    prepared_initialization = "93f556bc83fdd4cee1bb8d201a71ff59ef26404a3f902d3ef71a011ba43df71e"
+    site_metadata = "d8fb4c02043d48185eab7a2ed486cae235da11c3c7bf2df8817a01e4ccf486a3"
+[[site]]
+raw_data_embedded = false
+site = "ZM-Mon"
+
+    [site.input_path]
+    air_temperature_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ZM-Mon/metVar_ta.nc"
+    precipitation_forcing = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/meteorology/ZM-Mon/metVar_pr.nc"
+    prepared_initialization = "replaceable/runs/issue-98-all-sites-pristine-20260809/ZM-Mon/ZM-Mon_init.nc"
+    site_metadata = "replaceable/extracted/issue-98-all-sites-pristine-20260809/CLASSIC/inputFiles/FLUXNETsites_12PFT/ZM-Mon/siteinfo.yaml"
+
+    [site.input_sha256]
+    air_temperature_forcing = "0d903111c4467b69ba58d8f2a992016174234b14ea8f3de10f5742586ab89204"
+    precipitation_forcing = "abaaffe4b39ad0ea3fbfd9b4294c5979363d8f9a97082f2d24303d4f8533be2f"
+    prepared_initialization = "500160620cc24234321d34e11a4fc3644c9991f71d5bcb79a84d52074687ab69"
+    site_metadata = "f32e027a1e2e9496df5a66579abad289f9c9b2d8ef424ba945172342a12c0239"

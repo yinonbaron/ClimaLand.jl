@@ -12,6 +12,7 @@ ClimaLand.Soil.Biogeochemistry.SoilCO2Model
 ClimaLand.Soil.Biogeochemistry.CASA.CASASoilModel
 ClimaLand.Soil.Biogeochemistry.MIMICS.MIMICSSoilModel
 ClimaLand.Soil.Biogeochemistry.CORPSE.CORPSESoilModel
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICSoilModel
 ```
 
 ## Parameter Structure
@@ -26,6 +27,7 @@ ClimaLand.Soil.Biogeochemistry.MIMICS.NitrogenParameters
 ClimaLand.Soil.Biogeochemistry.MIMICS.MIMICSSoilModelParameters
 ClimaLand.Soil.Biogeochemistry.CORPSE.CarbonParameters
 ClimaLand.Soil.Biogeochemistry.CORPSE.CORPSESoilModelParameters
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICParameters
 ```
 
 ## Model-specific Types
@@ -53,6 +55,14 @@ ClimaLand.Soil.Biogeochemistry.CORPSE.PrescribedDrivers
 ClimaLand.Soil.Biogeochemistry.CORPSE.AbstractTemporalMode
 ClimaLand.Soil.Biogeochemistry.CORPSE.LegacyDaily
 ClimaLand.Soil.Biogeochemistry.CORPSE.ContinuousRate
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICState
+ClimaLand.Soil.Biogeochemistry.CLASSIC.StageBTransfer
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICForcing
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICAudit
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICPhases
+ClimaLand.Soil.Biogeochemistry.CLASSIC.CLASSICTransition
+ClimaLand.Soil.Biogeochemistry.CLASSIC.ConstantForcingProvider
+ClimaLand.Soil.Biogeochemistry.CLASSIC.PrescribedDailyForcingProvider
 ```
 
 ## Functions of State
@@ -110,6 +120,38 @@ ClimaLand.Soil.Biogeochemistry.CORPSE.update_cohort
 ClimaLand.Soil.Biogeochemistry.CORPSE.daily_carbon_map
 ClimaLand.Soil.Biogeochemistry.CORPSE.continuous_cohort_tendencies
 ClimaLand.Soil.Biogeochemistry.CORPSE.continuous_carbon_fluxes
+```
+
+## CLASSIC Constants
+
+```@docs
+ClimaLand.Soil.Biogeochemistry.CLASSIC.N_PFTS
+ClimaLand.Soil.Biogeochemistry.CLASSIC.N_CATEGORIES
+ClimaLand.Soil.Biogeochemistry.CLASSIC.N_SOIL_LAYERS
+ClimaLand.Soil.Biogeochemistry.CLASSIC.N_PARAMETER_PFTS
+```
+
+## CLASSIC Functions
+
+```@docs
+ClimaLand.Soil.Biogeochemistry.CLASSIC.classic_domain
+ClimaLand.Soil.Biogeochemistry.CLASSIC.forcing_at
+ClimaLand.Soil.Biogeochemistry.CLASSIC.advance!
+ClimaLand.Soil.Biogeochemistry.CLASSIC.advance_stage_b
+ClimaLand.Soil.Biogeochemistry.CLASSIC.state_from_prognostic
+ClimaLand.Soil.Biogeochemistry.CLASSIC.set_prognostic_state!
+```
+
+## CLASSIC Developer Interface
+
+```@docs
+ClimaLand.Soil.Biogeochemistry.CLASSIC.advance_stage_b!
+ClimaLand.Soil.Biogeochemistry.CLASSIC._respiration!
+ClimaLand.Soil.Biogeochemistry.CLASSIC._update_pools_cached!
+ClimaLand.Soil.Biogeochemistry.CLASSIC._solve_mixing!
+ClimaLand.Soil.Biogeochemistry.CLASSIC._mix_column_cached!
+ClimaLand.Soil.Biogeochemistry.CLASSIC._turbate!
+ClimaLand.Soil.Biogeochemistry.CLASSIC.DailyAdvance
 ```
 
 ## Extendible Functions
