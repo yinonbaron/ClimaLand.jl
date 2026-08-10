@@ -1,6 +1,6 @@
 # Stable Representative Validation v1 readiness
 
-Audit updated: 2026-08-07.
+Audit updated: 2026-08-10.
 
 All six canonical Linux artifacts are published and bound: one shared
 Representative forcing bundle and one pinned Fortran-reference bundle for each
@@ -27,9 +27,9 @@ shard evidence. The exact CI topology and operator checklist are documented in
 | --- | --- | --- |
 | Pinned references | Ready | The forcing and all five model references have immutable Linux artifact bindings. |
 | Deterministic shard runner | Ready | One-based index/count controls preserve unsharded defaults and partition the exact ordered Scope Manifest. |
-| Fail-closed aggregation | Ready locally | Synthetic parity and malformed/missing/duplicate/inconsistent report contracts are repository-tested. |
-| Forty-job Actions workflow | Implemented, external proof pending | The 5-by-8 matrix, model-specific staging, unique report artifacts, and required aggregate job are configured. |
-| Runtime budget | Provisional | Conservative shard timeouts remain until a clean GitHub-hosted run measures every shard. |
+| Fail-closed aggregation | Ready | Synthetic parity and malformed, missing, duplicate, overlapping, incompatible, timed-out, and scientifically failed report contracts are repository-tested. |
+| Forty-job Actions workflow | Operationally verified | All 40 model-shard jobs and the required aggregate passed in public GitHub-hosted runs. |
+| Runtime budget | Measured | Warning and hard-timeout limits include measured setup, validation, transfer, and aggregation headroom. |
 
 ## Linux baseline measurements
 
@@ -44,17 +44,59 @@ unsharded baseline. They do not predict GitHub Actions matrix wall time.
 | MIMICS-C | 80/80 | 2025.416 |
 | MIMICS-CN | 80/80 | 11281.390 |
 
-The current workflow retains a 7,200-second runner deadline, a 180-minute job
-timeout, and a provisional warning at 3,600 seconds for every shard. These
-limits intentionally include substantial margin until CI supplies observed
-per-shard distributions.
+## GitHub-hosted proof
 
-## Remaining external verification
+The first complete public proof was
+[Actions run 31325476183](https://github.com/yinonbaron/ClimaLand.jl/actions/runs/31325476183)
+at commit `63c1252ee89ec11e61e859d2fe7154a95366b8c8`. The latest confirmation was
+[Actions run 31376673882](https://github.com/yinonbaron/ClimaLand.jl/actions/runs/31376673882)
+at commit `7a8bbabaa54ef03879018d25fdfb06e772c5f419`. Both runs completed all
+40 model-shard jobs and the required fail-closed aggregate.
 
-Repository implementation cannot prove GitHub-hosted scheduling or runtime.
-A clean Actions run must still demonstrate all 40 matrix jobs plus aggregation,
-record the run URL and commit, verify aggregate coverage and provenance, record
-per-shard timings, and exercise retained diagnostics for a deliberately missing
-or invalid shard. Until that evidence is recorded, the workflow is implemented
-but not declared operationally verified. See the unchecked proof list in
+The aggregate reproduced the accepted unsharded scientific result: CASA-C,
+CASA-CN, MIMICS-C, and MIMICS-CN each compared 80 of 80 cells; CORPSE compared
+78 eligible cells and retained the two reviewed gaps at cells 51 and 3442. The
+scope, forcing, reference, comparison schema, Comparison Policy, eligibility,
+and scientific outcomes matched the pinned unsharded evidence.
+
+The first proof measured the following GitHub-hosted critical paths. The full
+per-shard distribution and artifact identities are recorded in
 [`REPRESENTATIVE_VALIDATION_CI.md`](REPRESENTATIVE_VALIDATION_CI.md).
+
+| Measurement | Result |
+| --- | ---: |
+| Complete workflow wall time | 4,681 s |
+| Matrix phase wall time | 4,319 s |
+| Peak concurrent shard jobs | 37 of 40 requested |
+| Setup before validation | 63--357 s; 338 s median |
+| Pinned-artifact staging | 1--5 s; 4 s median |
+| Compact-report upload | 0--1 s; 1 s median |
+| Aggregate job wall time | 356 s |
+| Aggregate computation | 16 s |
+
+| Model | Slowest scientific shard (s) |
+| --- | ---: |
+| CORPSE | 1689.554 |
+| MIMICS-C | 613.640 |
+| MIMICS-CN | 3030.433 |
+| CASA-C | 454.284 |
+| CASA-CN | 1299.150 |
+
+These measurements set the warning at 4,200 seconds, the Validation Runner
+deadline at 4,800 seconds, the shard-job timeout at 100 minutes, and the
+aggregate-job timeout at 30 minutes. The warning remains diagnostic and does
+not alter scientific acceptance. Repository tests prove that missing,
+duplicate, overlapping, incompatible, timed-out, corrupt, or scientifically
+failed shard evidence prevents the aggregate from passing while retaining a
+diagnostic report.
+
+## Unrelated repository checks
+
+At the latest proof commit, the general package workflow still reported a
+pre-existing CanopyModel SurfaceFluxes Jacobian mismatch in unchanged canopy
+code. The personal fork's CLA workflow also failed before checking contributors
+because its CliMA organization secrets were unavailable. Neither failure is in
+the Representative soil-biogeochemistry validation path: the dedicated
+40-shard workflow and aggregate passed, as did the relevant soil and
+biogeochemistry test groups. These unrelated failures remain visible rather
+than being skipped or weakening the scientific gate.
