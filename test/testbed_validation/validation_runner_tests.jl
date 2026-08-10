@@ -61,6 +61,47 @@ function write_smoke_scope_manifests(directory, eligibility_gaps)
     return manifests
 end
 
+function write_representative_forcing_bundle(root)
+    mkpath(root)
+    scope_path = joinpath(VALIDATION_SCOPE_MANIFESTS, "representative.toml")
+    fixture_path = joinpath(root, "fixture.toml")
+    scope_sha256 = bytes2hex(SHA.sha256(read(scope_path)))
+    open(fixture_path, "w") do io
+        TOML.print(
+            io,
+            Dict(
+                "schema_version" => 1,
+                "selection" => Dict(
+                    "scope_manifest_sha256" => scope_sha256,
+                    "representative_cell_ids" =>
+                        Int.(TOML.parsefile(scope_path)["cell_ids"]),
+                ),
+            );
+            sorted = true,
+        )
+    end
+    manifest = Dict(
+        "schema_version" => 1,
+        "kind" => "forcing",
+        "scope" => "representative",
+        "files" => Dict(
+            "fixture.toml" => bytes2hex(SHA.sha256(read(fixture_path))),
+        ),
+        "payload" => Dict("fixture_manifest" => "fixture.toml"),
+        "provenance" => Dict(
+            "scope_manifest_sha256" => scope_sha256,
+            "forcing_sha256" => Dict("forcing.nc" => repeat("a", 64)),
+            "shared_parameter_sha256" =>
+                Dict("parameters.toml" => repeat("b", 64)),
+            "comparison_schema" => "reduced-comparison-oracle-v1",
+        ),
+    )
+    open(joinpath(root, "manifest.toml"), "w") do io
+        TOML.print(io, manifest; sorted = true)
+    end
+    return root
+end
+
 @testset "CASA-CN scientific outcome gates on Fortran evidence" begin
     boundary_comparison = Dict(
         stage => Dict(
@@ -734,6 +775,8 @@ end
     end
 
     mktempdir() do output
+        forcing =
+            write_representative_forcing_bundle(joinpath(output, "forcing"))
         result = run_validation(
             "--scope",
             "representative",
@@ -746,6 +789,7 @@ end
             environment = Dict(
                 VALIDATION_RUNNER_MODULE.REFERENCE_OVERRIDE["CORPSE"] =>
                     joinpath(output, "missing-reference"),
+                VALIDATION_RUNNER_MODULE.CORPSE_FORCING_OVERRIDE => forcing,
             ),
         )
         @test result.exitcode == 2

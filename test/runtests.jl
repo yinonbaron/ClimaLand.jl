@@ -79,8 +79,12 @@ end
 @safetestset "CORPSE biogeochemistry kernels" begin
     include("standalone/Soil/Biogeochemistry/corpse.jl")
 end
-@safetestset "Biogeochemical testbed reference harness" begin
-    include("testbed_validation/runtests.jl")
+# The reference harness executes POSIX tools and Linux-built Fortran oracles.
+# Its pinned provenance and test environment target Julia 1.12 or newer.
+if !Sys.iswindows() && VERSION >= v"1.12"
+    @safetestset "Biogeochemical testbed reference harness" begin
+        include("testbed_validation/runtests.jl")
+    end
 end
 @safetestset "CASA plant-soil litter coupling" begin
     include("integrated/casa_biogeochemistry.jl")

@@ -61,7 +61,7 @@ selection = "choose the smallest r >= 0 minimizing a(r) + r*mean(x)"
 
 [provenance.calibration_source]
 id = "test/testbed_validation/generate_corpse_c_representative_calibration.jl"
-sha256 = "42dc36de2a417422282091d0fc503167a515b5b9f68a0eea1dcee8d3cf50a91b"
+sha256 = "40631bb63bf20fa9ed01e0d7bdf6f7d7c8e5730ee83ed662558a537222cacca1"
 
 [provenance.fortran_reconstruction_report]
 id = "fortran/reconstruction_report.toml"
@@ -165,7 +165,7 @@ sha256 = "18b9efbea769bef8e58cd2acda215b83d754cf83372a46d6d5fe8af4ac053739"
 
 [provenance.runner_source]
 id = "test/testbed_validation/native_corpse_c_reconstruction.jl"
-sha256 = "99cbd0cdad938891d5a2cfd9659c77de4348ca943e675dae5135f37d1bb59aae"
+sha256 = "41ee54ecf694ff4be98ea04dea333df97087184078f1c3a2b3944c9129655457"
 
 [provenance.scope_manifest]
 id = "validation/scopes/representative.toml"
