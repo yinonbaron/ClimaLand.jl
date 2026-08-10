@@ -156,18 +156,32 @@ end
 end
 
 @testset "matrix acceptance requires real issue-103 seasonal archives" begin
-    matrix = TOML.parsefile(joinpath(@__DIR__, "selection_matrix.toml"))
-    @test !matrix_acceptance_ready(matrix, nothing)
+    matrix_path = joinpath(@__DIR__, "selection_matrix.toml")
+    manifest_path = joinpath(@__DIR__, "canonical_archives.toml")
+    tolerance_path = joinpath(@__DIR__, "tolerances.toml")
+    schema_path = joinpath(@__DIR__, "..", "trajectory_bundle", "schema.toml")
+    matrix = TOML.parsefile(matrix_path)
+    checked_paths = (
+        matrix_path = matrix_path,
+        manifest_path = manifest_path,
+        tolerance_path = tolerance_path,
+        schema_path = schema_path,
+    )
+    @test !matrix_acceptance_ready(matrix, nothing; checked_paths...)
 
     ready_matrix = deepcopy(matrix)
     ready_matrix["acceptance"]["status"] = "ready_for_acceptance"
     ready_matrix["acceptance"]["seasonal_parity_claimed"] = true
     selected_sites = [selection["site"] for selection in matrix["selection"]]
+    manifest = TOML.parsefile(manifest_path)
+    manifest_sites = Dict(site["site"] => site for site in manifest["site"])
     site_results = [
         Dict(
             "name" => site,
             "status" => "pass",
-            "archive_sha256" => repeat("c", 64),
+            "archive_sha256" => manifest_sites[site]["archive_sha256"],
+            "archive_receipt_sha256" =>
+                manifest_sites[site]["receipt_sha256"],
             "max_state_errors" => Dict("state" => 0.0),
             "max_flux_errors" => Dict("flux" => 0.0),
             "max_budget_errors" => Dict("budget" => 0.0),
@@ -178,51 +192,100 @@ end
 
     mktempdir() do directory
         receipt_path = joinpath(directory, "seasonal-receipt.toml")
+        function write_receipt(receipt)
+            open(receipt_path, "w") do io
+                TOML.print(io, receipt; sorted = true)
+            end
+            return receipt_path
+        end
+        function is_ready(receipt, candidate = ready_matrix)
+            write_receipt(receipt)
+            return matrix_acceptance_ready(
+                candidate,
+                receipt_path;
+                checked_paths...,
+            )
+        end
         write(
             receipt_path,
             "schema_version = 1\nstatus = \"complete\"\nreference_kind = \"synthetic\"\nsite_count = 4\n",
         )
-        @test !matrix_acceptance_ready(ready_matrix, receipt_path)
+        @test !matrix_acceptance_ready(
+            ready_matrix,
+            receipt_path;
+            checked_paths...,
+        )
 
         write(
             receipt_path,
             "schema_version = 1\nstatus = \"complete\"\nreference_kind = \"fresh_local_fortran\"\nsite_count = 4\n",
         )
-        @test !matrix_acceptance_ready(ready_matrix, receipt_path)
+        @test !matrix_acceptance_ready(
+            ready_matrix,
+            receipt_path;
+            checked_paths...,
+        )
 
-        open(receipt_path, "w") do io
-            TOML.print(
-                io,
-                Dict(
-                    "schema_version" => 1,
-                    "status" => "complete",
-                    "reference_kind" => "fresh_local_fortran",
-                    "site_count" => 4,
-                    "oracle_contract" => "stage_b_v5",
-                    "synthetic_data_used" => false,
-                    "sites" => selected_sites,
-                    "state_comparisons_passed" => true,
-                    "flux_comparisons_passed" => true,
-                    "budget_comparisons_passed" => true,
-                    "drift_comparisons_passed" => true,
-                    "tolerance_rationale" => "bit-exact v5",
-                    "site" => site_results,
-                ),
-            )
+        receipt = Dict(
+            "schema_version" => 1,
+            "status" => "complete",
+            "reference_kind" => "fresh_local_fortran",
+            "site_count" => 4,
+            "oracle_contract" => "stage_b_v5",
+            "synthetic_data_used" => false,
+            "sites" => selected_sites,
+            "state_comparisons_passed" => true,
+            "flux_comparisons_passed" => true,
+            "budget_comparisons_passed" => true,
+            "drift_comparisons_passed" => true,
+            "tolerance_rationale" => "bit-exact v5",
+            "matrix_selection_sha256" =>
+                bytes2hex(open(SHA.sha256, matrix_path)),
+            "archive_manifest_sha256" =>
+                bytes2hex(open(SHA.sha256, manifest_path)),
+            "tolerance_contract_sha256" =>
+                bytes2hex(open(SHA.sha256, tolerance_path)),
+            "trajectory_schema_sha256" =>
+                bytes2hex(open(SHA.sha256, schema_path)),
+            "tolerances" => Dict(
+                "contract_sha256" =>
+                    bytes2hex(open(SHA.sha256, tolerance_path)),
+            ),
+            "site" => site_results,
+        )
+        @test is_ready(receipt)
+
+        for key in (
+            "matrix_selection_sha256",
+            "archive_manifest_sha256",
+            "tolerance_contract_sha256",
+            "trajectory_schema_sha256",
+        )
+            forged = deepcopy(receipt)
+            forged[key] = repeat("0", 64)
+            @test !is_ready(forged)
         end
-        @test matrix_acceptance_ready(ready_matrix, receipt_path)
-        receipt = TOML.parsefile(receipt_path)
-        receipt["drift_comparisons_passed"] = false
-        open(receipt_path, "w") do io
-            TOML.print(io, receipt; sorted = true)
-        end
-        @test !matrix_acceptance_ready(ready_matrix, receipt_path)
-        receipt["drift_comparisons_passed"] = true
-        delete!(first(receipt["site"]), "max_drift_errors")
-        open(receipt_path, "w") do io
-            TOML.print(io, receipt; sorted = true)
-        end
-        @test !matrix_acceptance_ready(ready_matrix, receipt_path)
-        @test !matrix_acceptance_ready(matrix, receipt_path)
+        forged = deepcopy(receipt)
+        forged["tolerances"]["contract_sha256"] = repeat("0", 64)
+        @test !is_ready(forged)
+        forged = deepcopy(receipt)
+        first(forged["site"])["archive_sha256"] = repeat("0", 64)
+        @test !is_ready(forged)
+        forged = deepcopy(receipt)
+        first(forged["site"])["archive_receipt_sha256"] = repeat("0", 64)
+        @test !is_ready(forged)
+
+        forged_matrix = deepcopy(ready_matrix)
+        forged_matrix["inventory"]["site_count"] = 58
+        @test !is_ready(receipt, forged_matrix)
+        forged = deepcopy(receipt)
+        forged["drift_comparisons_passed"] = false
+        @test !is_ready(forged)
+        forged = deepcopy(receipt)
+        delete!(first(forged["site"]), "max_drift_errors")
+        @test !is_ready(forged)
+        blocked_matrix = deepcopy(ready_matrix)
+        blocked_matrix["acceptance"]["status"] = "blocked"
+        @test !is_ready(receipt, blocked_matrix)
     end
 end

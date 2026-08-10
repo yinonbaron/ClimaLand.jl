@@ -37,7 +37,7 @@ JULIA_DEPOT_PATH=/tmp/classic-matrix-depot \
   julia \
   --project=.buildkite --startup-file=no \
   test/testbed_validation/classic_reference_workspace/process_stress_matrix/run_real_matrix.jl \
-  canonical_archives.toml \
+  test/testbed_validation/classic_reference_workspace/process_stress_matrix/canonical_archives.toml \
   $CLASSIC_REFERENCE_ROOT/replaceable/runs/issue-106-process-matrix/receipt.toml
 ```
 

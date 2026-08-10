@@ -43,6 +43,21 @@ JULIA_DEPOT_PATH=/tmp/classic-stage-b-depot \
   test/testbed_validation/classic_reference_workspace/stage_b_snapshots/runtests.jl
 ```
 
+## Run the real Julia transition acceptance
+
+The exact Julia-versus-Fortran transition check is deliberately separate from
+ordinary CI because its snapshot payloads are external and non-redistributable.
+Run it explicitly with the promoted v5 snapshot root:
+
+```bash
+CLASSIC_V5_SNAPSHOT_ROOT="${CLASSIC_REFERENCE_ROOT:?set CLASSIC_REFERENCE_ROOT}/replaceable/runs/issue-101-stage-b-instrumented-v5-promotable/stage_b_snapshots" \
+  julia --project=.buildkite --startup-file=no \
+  test/standalone/Soil/Biogeochemistry/classic_v5_acceptance.jl
+```
+
+This command never silently skips acceptance. An unset, empty, missing, or
+incorrect snapshot root is a hard failure before any parity claim is made.
+
 ## Completed instrumentation evidence
 
 The reproducible generated patch writes transition-start `pre.*` pools before
